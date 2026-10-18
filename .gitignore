@@ -1,0 +1,18 @@
+# Derleme çıktıları
+dist/
+bin/
+obj/
+publish/
+.vs/
+
+# Kullanıcı/yerel dosyalar
+*.user
+*.log
+.gtacoop-scan-cache.json
+settings.json
+Thumbs.db
+desktop.ini
+
+# Geçici
+*.tmp
+*.bak

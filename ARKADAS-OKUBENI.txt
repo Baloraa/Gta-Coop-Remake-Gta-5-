@@ -1,0 +1,68 @@
+==========================================================
+ GTACoop Remake - Arkadaş Sürümü (Türkçe)
+==========================================================
+
+Bu bir GTA V (Hikaye Modu) arkadaş-arası co-op aracıdır.
+Sunucu sahibi modları ekler; siz bağlanınca modlar otomatik
+inip oyununuza kurulur ve oyundan çıkınca otomatik kaldırılır.
+
+------------------------------------------------------------------
+KURULUM
+------------------------------------------------------------------
+1) Bu klasörü bilgisayarınızda bir yere çıkarın
+   (ör. C:\GTACoop-Remake).
+
+2) GTACoop.Launcher.exe dosyasını çalıştırın.
+   - Windows "bilinmeyen yayımcı" uyarısı gösterirse:
+     "Ek bilgi" -> "Yine de çalıştır" deyin (imzasız uygulama
+     olduğu için normaldir).
+   - "You must install .NET" hatası alırsanız .NET 8 Desktop
+     Runtime kurun:
+     https://dotnet.microsoft.com/tr-tr/download/dotnet/8.0
+
+3) Launcher'da "Oyun" sekmesi:
+   - "Gözat..." ile GTA V klasörünüzü seçin
+     (GTA5.exe'nin bulunduğu klasör).
+   - "İstemciyi Kur / Güncelle" düğmesine basın.
+
+   GEREKLİ (pakete dahil değildir, kendiniz kurmalısınız):
+   - Orijinal GTA V (Steam/Epic/Rockstar, hikaye modu)
+   - ScriptHook V            https://www.dev-c.com/gtav/scripthookv/
+   - ScriptHookVDotNet v3    https://github.com/scripthookvdotnet/scripthookvdotnet/releases
+   - Microsoft Visual C++ çalışma zamanı (çoğu PC'de zaten vardır)
+
+4) "Sunucular" sekmesi:
+   - "Sunucu ekle" deyin; sunucu sahibinin verdiği adresi ve
+     portları girin (oyun portu 4499 UDP, sync portu 4599 TCP).
+   - "Bağlan ve Oyna"ya basın. Sunucu modları otomatik iner,
+     oyun açılır.
+
+5) Oyunda:
+   - F9  : GTA Coop menüsü
+   - T   : sohbet
+   - Z   : oyuncu listesi
+   - İlk girişte sohbetten:  /register sıfre
+     (sonraki girişlerde:    /login sıfre)
+
+------------------------------------------------------------------
+ÖNEMLİ NOTLAR
+------------------------------------------------------------------
+- Bu araç GTA Online'a dokunmaz; yalnızca Hikaye Modu'nda çalışır.
+- KENDİ modlarınıza asla dokunulmaz. Sunucudaki bir mod sizde
+  zaten varsa o mod atlanır: indirilmez, üzerine yazılmaz.
+- Sunucu modları yalnızca siz oynarken kuruludur; oyundan
+  çıkınca otomatik olarak güvenli bir klasöre taşınır:
+  %LOCALAPPDATA%\GTACoopRemake\removed\
+- Oyun dosyalarınız ve ScriptHook dosyalarınız değiştirilmez.
+- Kendi sunucunuzu kurmak isterseniz ayrıca .NET 10 gerekir.
+
+------------------------------------------------------------------
+LİSANS
+------------------------------------------------------------------
+Bu paket, GNU GPL v3 lisanslı GTA Coop (GTACoOp) açık kaynak
+projesini ve aynı lisans altındaki launcher'ı içerir.
+Lisans metni: Distribution\LICENSE.md
+Atıf/okuma:  Distribution\ATIF-README.md
+Ücretsiz paylaşılabilir; ticari satışı yapılmamalıdır.
+
+İyi oyunlar!

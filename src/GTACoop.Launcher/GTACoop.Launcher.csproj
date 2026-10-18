@@ -1,0 +1,48 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>GTACoop.Launcher</AssemblyName>
+    <RootNamespace>GTACoop.Remake</RootNamespace>
+    <NoWarn>$(NoWarn);CA1416</NoWarn>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+    <ApplicationIcon>Assets\app.ico</ApplicationIcon>
+    <Version>2.1.1</Version>
+    <AssemblyVersion>2.1.1.0</AssemblyVersion>
+    <FileVersion>2.1.1.0</FileVersion>
+    <AssemblyTitle>GTACoop Remake</AssemblyTitle>
+    <Product>GTACoop Remake</Product>
+    <Description>GTA V mod ve sunucu yöneticisi (GTACoOp) - Türkçe/İngilizce</Description>
+    <Company>GTACoop Remake</Company>
+    <Copyright>© 2026 GTACoop Remake</Copyright>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\GTACoop.Sync\GTACoop.Sync.csproj" />
+    <ProjectReference Include="..\GTACoop.SyncServer\GTACoop.SyncServer.csproj" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
+  <!-- Dağıtım dosyalarını (GTACoOp sunucu/istemci + SyncServer) çıktı klasörüne kopyala -->
+  <Target Name="CopyDistribution" AfterTargets="Build">
+    <ItemGroup>
+      <DistServerFiles Include="$(MSBuildThisFileDirectory)..\..\vendor\Distribution\Server\**\*" />
+      <DistScriptsFiles Include="$(MSBuildThisFileDirectory)..\..\vendor\Distribution\Scripts\**\*" />
+      <SyncServerOut Include="$(MSBuildThisFileDirectory)..\GTACoop.SyncServer\bin\$(Configuration)\net8.0\**\*" />
+    </ItemGroup>
+
+    <Copy SourceFiles="@(DistServerFiles)"
+          DestinationFiles="@(DistServerFiles->'$(OutDir)Distribution\Server\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(DistScriptsFiles)"
+          DestinationFiles="@(DistScriptsFiles->'$(OutDir)Distribution\Scripts\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(SyncServerOut)"
+          DestinationFiles="@(SyncServerOut->'$(OutDir)Distribution\SyncServer\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+  </Target>
+
+</Project>
