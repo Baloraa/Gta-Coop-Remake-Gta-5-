@@ -11,9 +11,9 @@
     <NoWarn>$(NoWarn);CA1416</NoWarn>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
     <ApplicationIcon>Assets\app.ico</ApplicationIcon>
-    <Version>2.1.3</Version>
-    <AssemblyVersion>2.1.3.0</AssemblyVersion>
-    <FileVersion>2.1.3.0</FileVersion>
+    <Version>2.1.4</Version>
+    <AssemblyVersion>2.1.4.0</AssemblyVersion>
+    <FileVersion>2.1.4.0</FileVersion>
     <AssemblyTitle>GTACoop Remake</AssemblyTitle>
     <Product>GTACoop Remake</Product>
     <Description>GTA V mod ve sunucu yöneticisi (GTACoOp) - Türkçe/İngilizce</Description>
@@ -24,6 +24,12 @@
   <ItemGroup>
     <ProjectReference Include="..\GTACoop.Sync\GTACoop.Sync.csproj" />
     <ProjectReference Include="..\GTACoop.SyncServer\GTACoop.SyncServer.csproj" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
+  <!-- Avatar (Hakkında sekmesi) uygulamanın içine gömülür -->
+  <ItemGroup>
+    <None Remove="Assets\avatar.png" />
+    <EmbeddedResource Include="Assets\avatar.png" />
   </ItemGroup>
 
   <!-- Dağıtım dosyalarını (GTACoOp sunucu/istemci + SyncServer) çıktı klasörüne kopyala -->

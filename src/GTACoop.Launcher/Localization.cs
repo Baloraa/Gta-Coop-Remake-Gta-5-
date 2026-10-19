@@ -215,5 +215,17 @@ public static class Loc
         ["YOK - scriptler çalışmaz"] = "NO - scripts won't work",
         ["yok (oluşturulur)"] = "no (will be created)",
         ["Yukarı"] = "Up",
+        ["Hakkında"] = "About",
+        ["Bağlantı açılamadı: "] = "Could not open link: ",
+        ["Bağlantılar"] = "Links",
+        ["Geliştirici: Turkish Mods"] = "Developer: Turkish Mods",
+        ["GTA V hikâye modu için arkadaş-arası co-op aracı (GTACoOp tabanlı)."] = "A friend-to-friend co-op tool for GTA V story mode (based on GTACoOp).",
+        ["GTACoop kaynak kodu (GitHub)"] = "GTACoop source code (GitHub)",
+        ["GTACoop Remake, GTACoop (GTACoOp) açık kaynak projesini temel alan, GNU GPL v3 lisanslı ücretsiz bir araçtır; kaynak kodu GitHub'da açıktır.\r\nRockstar Games / Take-Two Interactive ile bağlantılı değildir; resmî bir ürün değildir. Orijinal GTA V gerektirir.\r\nÜcretsizdir: satılamaz, ticari amaçla dağıtılamaz."] = "GTACoop Remake is a free tool based on the open-source GTACoop (GTACoOp) project, licensed under GNU GPL v3; the source code is available on GitHub.\r\nNot affiliated with Rockstar Games / Take-Two Interactive; not an official product. Requires the original GTA V.\r\nIt is free: it may not be sold or distributed commercially.",
+        ["gta5-mods profilim: Turkish Mods"] = "My gta5-mods profile: Turkish Mods",
+        ["Lisans ve Bilgi"] = "License & Info",
+        ["Sürüm: {0}"] = "Version: {0}",
+        ["X (Twitter): @imp_loyal38310"] = "X (Twitter): @imp_loyal38310",
+        ["YouTube kanalım: @Reelone123"] = "My YouTube channel: @Reelone123",
     };
 }

@@ -14,6 +14,7 @@ public sealed class MainForm : Form
     private readonly ServersTab _serversTab = new();
     private readonly MyServerTab _serverTab = new();
     private readonly LogTab _logTab = new();
+    private readonly AboutTab _aboutTab = new();
 
     public MainForm()
     {
@@ -142,6 +143,7 @@ public sealed class MainForm : Form
         AddTab(T("Sunucular"), _serversTab);
         AddTab(T("Sunucum"), _serverTab);
         AddTab(T("Günlük / Araçlar"), _logTab);
+        AddTab(T("Hakkında"), _aboutTab);
 
         Controls.Add(_tabs);
         _tabs.BringToFront();
