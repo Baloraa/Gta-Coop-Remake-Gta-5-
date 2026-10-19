@@ -383,12 +383,50 @@ public sealed class RpfArchive : IDisposable
 
         uint oldSize = bin0.FileSize == 0 ? bin0.FileUncompressedSize : bin0.FileSize;
         long oldPos = (long)bin0.FileOffset * 512;
+        long headerEnd = 16 + (long)EntryCount * EntrySize + NamesLength;
+        if (oldPos < headerEnd || oldPos + oldSize > _fs.Length)
+            throw new InvalidDataException(
+                $"RPF7: '{entry.Path}' veri konumu arşiv sınırlarının dışında; yazma iptal edildi.");
 
-        if (stored.Length <= oldSize)
+        // İçerik zaten aynıysa hiç yazma: gereksiz dosya büyümesini ve TOC değişimini önler.
+        try
         {
+            if (ReadFile(bin0).AsSpan().SequenceEqual(content))
+                return;
+        }
+        catch
+        {
+            // Karşılaştırma yapılamazsa normal yazma akışına devam edilir.
+        }
+
+        // Eski konumun gerçek boş alanı: bir sonraki girdinin başlangıcına (veya dosya sonuna) kadar.
+        // Sektör dolgusundaki boşluk böylece yeniden kullanılır; arşiv gereksiz yere büyümez.
+        // (OpenIV'nin ekleme yapabilmesi için 4 GB RPF7 sınırının altında kalmak kritiktir.)
+        long freeEnd = _fs.Length;
+        bool collision = false;
+        foreach (var other in AllFiles())
+        {
+            if (other.Index == bin0.Index) continue;
+            long op = (long)other.FileOffset * 512;
+            long olen = other is RpfBinaryFileEntry ob
+                ? (ob.FileSize == 0 ? ob.FileUncompressedSize : ob.FileSize)
+                : other.FileSize;
+            if (olen == 0 || op + olen <= oldPos) continue;
+
+            if (op < oldPos + stored.Length)
+            {
+                collision = true;
+                break;
+            }
+            if (op < freeEnd) freeEnd = op;
+        }
+
+        if (!collision && stored.Length <= freeEnd - oldPos)
+        {
+            long clear = Math.Min(freeEnd - oldPos, Math.Max(oldSize, (long)stored.Length));
             _fs.Position = oldPos;
             _fs.Write(stored, 0, stored.Length);
-            WriteZeros(oldSize - stored.Length);
+            WriteZeros(clear - stored.Length);
         }
         else
         {
@@ -396,13 +434,19 @@ public sealed class RpfArchive : IDisposable
             long sector = newPos / 512;
             if (sector > 0x7FFFFF)
                 throw new InvalidOperationException(
-                    "RPF7: arşiv 4 GB veri sınırını aşıyor; ekleme yapılamaz.");
+                    "RPF7: arşiv 4 GB veri sınırını aşıyor; ekleme yapılamaz. " +
+                    "Lütfen Launcher > Yedekler bölümünden sağlıklı bir yedeğe dönün.");
 
             _fs.Position = newPos;
             _fs.Write(stored, 0, stored.Length);
             long tail = newPos + stored.Length;
             long aligned = (tail + 511) / 512 * 512;
             WriteZeros(aligned - tail);
+
+            // Eski blok artık kullanılmıyor: içinde bayat veri kalmasın.
+            _fs.Position = oldPos;
+            WriteZeros(oldSize);
+
             bin0.FileOffset = (uint)sector;
         }
 

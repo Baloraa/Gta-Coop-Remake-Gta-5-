@@ -679,23 +679,34 @@ public sealed class AddonApplier
     private string UpdateRpfPath => Path.Combine(_gameFolder, "mods", "update", "update.rpf");
 
     /// <summary>
-    /// update.rpf 4 GB RPF7 veri sınırına yaklaşırsa uyarır. Dosya başka araçlarla
-    /// (dlcpacks içe aktarma vb.) şişirilmişse OpenIV paket kurulumları başarısız olabilir.
+    /// update.rpf düzenlemeye uygun mu? Değilse (4 GB RPF7 sınırına yakın veya bozuk)
+    /// en yeni sağlıklı yedekten otomatik geri yükler. Böylece GTACoop şişmiş/bozuk bir
+    /// arşivi asla düzenlemez ve OpenIV'nin yeni dosya ekleme yeteneği korunur.
     /// </summary>
-    private void WarnIfUpdateRpfHuge()
+    private void EnsureUpdateRpfUsable()
     {
-        try
-        {
-            var len = new FileInfo(UpdateRpfPath).Length;
-            if (len > 3_600_000_000L)
-                _log($"UYARI: mods/update/update.rpf çok büyük ({len / 1_000_000_000.0:0.0} GB). " +
-                     "4 GB üzerindeki arşivlerde OpenIV paket kurulumları başarısız olabilir; " +
-                     "Launcher'daki Yedekler bölümünden temiz bir yedeğe dönebilirsiniz.");
-        }
-        catch
-        {
-            // yalnızca bilgilendirme amaçlı; hata yutulur
-        }
+        if (!File.Exists(UpdateRpfPath))
+            throw new SyncException(
+                "mods/update/update.rpf bulunamadı. DLC paketleri için OpenIV ile mods klasörü oluşturulmalı.");
+
+        if (BackupService.IsUpdateRpfHealthy(UpdateRpfPath, out var reason))
+            return;
+
+        _log($"UYARI: update.rpf düzenlemeye uygun değil: {reason}");
+
+        var backup = BackupService.FindNewestHealthyBackup(_gameFolder, _log);
+        if (backup == null)
+            throw new SyncException(
+                "update.rpf sağlıksız/çok büyük ve sağlıklı yedek bulunamadı. " +
+                "OpenIV ile mods klasörünü onarın veya Launcher > Yedekler bölümünden geri dönün.");
+
+        _log($"Otomatik onarım: {Path.GetFileName(backup)} geri yükleniyor...");
+        BackupService.RestoreUpdateRpf(_gameFolder, backup, _log);
+
+        if (!BackupService.IsUpdateRpfHealthy(UpdateRpfPath, out var after))
+            throw new SyncException("update.rpf otomatik onarımı başarısız: " + after);
+
+        _log("update.rpf onarıldı; işleme devam ediliyor.");
     }
 
     public void AddDlclistEntry(string entry)
@@ -706,7 +717,7 @@ public sealed class AddonApplier
             throw new SyncException(
                 "mods/update/update.rpf bulunamadı. DLC paketleri için OpenIV ile mods klasörü oluşturulmalı.");
 
-        WarnIfUpdateRpfHuge();
+        EnsureUpdateRpfUsable();
         BackupService.EnsureUpdateRpfBackup(_gameFolder, _log);
 
         lock (_rpfLock)
@@ -738,7 +749,7 @@ public sealed class AddonApplier
             throw new SyncException(
                 "mods/update/update.rpf bulunamadı. dlclist girdisi çıkarılamıyor.");
 
-        WarnIfUpdateRpfHuge();
+        EnsureUpdateRpfUsable();
         BackupService.EnsureUpdateRpfBackup(_gameFolder, _log);
 
         lock (_rpfLock)
@@ -798,6 +809,7 @@ public sealed class AddonApplier
         try
         {
             if (IsGameRunning()) throw new SyncException("GTA V açık; atlandı.");
+            EnsureUpdateRpfUsable();
 
             lock (_rpfLock)
             {
