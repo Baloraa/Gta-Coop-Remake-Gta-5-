@@ -137,13 +137,81 @@ public static class Dlclist
         return Serialize(doc, xml);
     }
 
-    /// <summary>Dosyanın şifreli olup olmadığını test etmek için basit doğrulama.</summary>
+    /// <summary>dlclist.xml dosyasının bayt kodlaması.</summary>
+    public enum DlclistEncoding
+    {
+        Utf8,
+        Utf8Bom,
+        Utf16LeBom,
+        Utf16BeBom
+    }
+
+    /// <summary>
+    /// Ham baytları metne çevirir. Orijinal oyun dosyası UTF-16 (BOM'lu) olduğundan
+    /// BOM algılaması şarttır; aksi hâlde düzenlemeler dosyayı bozar.
+    /// </summary>
+    public static (string Text, DlclistEncoding Enc) Decode(byte[] data)
+    {
+        if (data.Length >= 2 && data[0] == 0xFF && data[1] == 0xFE)
+            return (Encoding.Unicode.GetString(data, 2, data.Length - 2), DlclistEncoding.Utf16LeBom);
+        if (data.Length >= 2 && data[0] == 0xFE && data[1] == 0xFF)
+            return (Encoding.BigEndianUnicode.GetString(data, 2, data.Length - 2), DlclistEncoding.Utf16BeBom);
+        if (data.Length >= 3 && data[0] == 0xEF && data[1] == 0xBB && data[2] == 0xBF)
+            return (Encoding.UTF8.GetString(data, 3, data.Length - 3), DlclistEncoding.Utf8Bom);
+        return (Encoding.UTF8.GetString(data), DlclistEncoding.Utf8);
+    }
+
+    /// <summary>Metni özgün kodlamasıyla (BOM korunarak) baytlara çevirir.</summary>
+    public static byte[] Encode(string text, DlclistEncoding enc)
+    {
+        switch (enc)
+        {
+            case DlclistEncoding.Utf16LeBom:
+                return Prepend(new byte[] { 0xFF, 0xFE }, Encoding.Unicode.GetBytes(text));
+            case DlclistEncoding.Utf16BeBom:
+                return Prepend(new byte[] { 0xFE, 0xFF }, Encoding.BigEndianUnicode.GetBytes(text));
+            case DlclistEncoding.Utf8Bom:
+                return Prepend(new byte[] { 0xEF, 0xBB, 0xBF }, Encoding.UTF8.GetBytes(text));
+            default:
+                return Encoding.UTF8.GetBytes(text);
+        }
+    }
+
+    /// <summary>
+    /// XML beyanı "utf-16" olduğu hâlde dosya UTF-8 ise (bozuk araçlardan kalma
+    /// yaygın bir durum) beyana uyup UTF-16LE+BOM üretir. OpenIV'in XML düzenleyicisi
+    /// bu uyumsuzlukta dosyayı okuyamayabilir.
+    /// </summary>
+    public static DlclistEncoding Normalize(string text, DlclistEncoding current)
+    {
+        var head = text.Length > 200 ? text[..200] : text;
+        if (head.Contains("encoding=\"utf-16\"", StringComparison.OrdinalIgnoreCase) &&
+            (current == DlclistEncoding.Utf8 || current == DlclistEncoding.Utf8Bom))
+        {
+            return DlclistEncoding.Utf16LeBom;
+        }
+        return current;
+    }
+
+    private static byte[] Prepend(byte[] head, byte[] body)
+    {
+        var full = new byte[head.Length + body.Length];
+        Buffer.BlockCopy(head, 0, full, 0, head.Length);
+        Buffer.BlockCopy(body, 0, full, head.Length, body.Length);
+        return full;
+    }
+
+    /// <summary>Dosyanın XML olup olmadığını (UTF-8/UTF-16 BOM'larıyla) test eder.</summary>
     public static bool LooksLikeXml(byte[] data)
     {
         if (data.Length == 0) return false;
-        int start = 0;
-        if (data.Length >= 3 && data[0] == 0xEF && data[1] == 0xBB && data[2] == 0xBF) start = 3;
-        return data.Length > start && data[start] == (byte)'<';
+        if (data.Length >= 3 && data[0] == 0xEF && data[1] == 0xBB && data[2] == 0xBF)
+            return data.Length > 3 && data[3] == (byte)'<';
+        if (data.Length >= 4 && data[0] == 0xFF && data[1] == 0xFE)
+            return data[2] == (byte)'<' && data[3] == 0x00;
+        if (data.Length >= 4 && data[0] == 0xFE && data[1] == 0xFF)
+            return data[2] == 0x00 && data[3] == (byte)'<';
+        return data[0] == (byte)'<';
     }
 
     // ------------------------------------------------------------ helpers

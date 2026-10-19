@@ -726,7 +726,7 @@ public sealed class AddonApplier
             var file = archive.Find(Dlclist.RelativePath)
                 ?? throw new SyncException("update.rpf içinde dlclist.xml bulunamadı.");
 
-            var xml = Encoding.UTF8.GetString(archive.ReadFile(file));
+            var (xml, enc) = Dlclist.Decode(archive.ReadFile(file));
             var existing = Dlclist.GetPackNames(xml);
             if (existing.Contains(entry, StringComparer.OrdinalIgnoreCase))
             {
@@ -736,7 +736,7 @@ public sealed class AddonApplier
 
             var updated = Dlclist.AddPackNames(xml, new[] { entry });
             ValidateXml(updated);
-            archive.ReplaceFile(file, Encoding.UTF8.GetBytes(updated));
+            ReplaceDlclist(archive, file, updated, enc);
             _log($"dlclist: eklendi -> {entry}");
         }
     }
@@ -758,10 +758,10 @@ public sealed class AddonApplier
             var file = archive.Find(Dlclist.RelativePath)
                 ?? throw new SyncException("update.rpf içinde dlclist.xml bulunamadı.");
 
-            var xml = Encoding.UTF8.GetString(archive.ReadFile(file));
+            var (xml, enc) = Dlclist.Decode(archive.ReadFile(file));
             var updated = Dlclist.RemovePackNames(xml, new[] { entry });
             ValidateXml(updated);
-            archive.ReplaceFile(file, Encoding.UTF8.GetBytes(updated));
+            ReplaceDlclist(archive, file, updated, enc);
             _log($"dlclist: çıkarıldı -> {entry}");
         }
     }
@@ -788,6 +788,19 @@ public sealed class AddonApplier
         {
             throw new SyncException("dlclist düzenlemesi geçersiz XML üretti; yazma iptal edildi: " + ex.Message);
         }
+    }
+
+    /// <summary>
+    /// dlclist'i özgün kodlamasıyla yazar (UTF-16 BOM'lu dosyalar dahil).
+    /// Beyan "utf-16" iken dosya UTF-8 kalmışsa UTF-16'ya normalleştirir; OpenIV'in
+    /// XML düzenleyicisi bu uyumsuzlukta dosyayı düzenleyemeyebiliyor.
+    /// </summary>
+    private void ReplaceDlclist(RpfArchive archive, RpfFileEntry file, string updated, Dlclist.DlclistEncoding enc)
+    {
+        var writeEnc = Dlclist.Normalize(updated, enc);
+        if (writeEnc != enc)
+            _log("dlclist: kodlama beyana uygun UTF-16'ya düzeltildi (OpenIV uyumu).");
+        archive.ReplaceFile(file, Dlclist.Encode(updated, writeEnc));
     }
 
     /// <summary>dlclist'te gcs_ ile başlayan sahipsiz girdileri ve klasörleri temizler.</summary>
@@ -817,7 +830,7 @@ public sealed class AddonApplier
                 var file = archive.Find(Dlclist.RelativePath);
                 if (file == null) return;
 
-                var xml = Encoding.UTF8.GetString(archive.ReadFile(file));
+                var (xml, enc) = Dlclist.Decode(archive.ReadFile(file));
                 var orphans = Dlclist.GetPackNames(xml)
                     .Where(n => n.StartsWith("gcs_", StringComparison.OrdinalIgnoreCase) ||
                                 n.Contains("/gcs_", StringComparison.OrdinalIgnoreCase))
@@ -832,7 +845,7 @@ public sealed class AddonApplier
                 BackupService.EnsureUpdateRpfBackup(_gameFolder, _log);
                 var updated = Dlclist.RemovePackNames(xml, orphans);
                 ValidateXml(updated);
-                archive.ReplaceFile(file, Encoding.UTF8.GetBytes(updated));
+                ReplaceDlclist(archive, file, updated, enc);
                 _log($"dlclist: {orphans.Count} gcs_ girdisi temizlendi.");
             }
         }

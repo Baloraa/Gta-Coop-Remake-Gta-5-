@@ -214,9 +214,9 @@ internal static class Program
         var data = a.ReadFile(f);
         if (!Dlclist.LooksLikeXml(data))
             throw new InvalidDataException("dlclist.xml ham verisi XML degil.");
-        var xml = Encoding.UTF8.GetString(data);
+        var (xml, enc) = Dlclist.Decode(data);
         var names = Dlclist.GetPackNames(xml);
-        Console.WriteLine($"dlclist.xml: {names.Count} paket ({data.Length:N0} bayt)");
+        Console.WriteLine($"dlclist.xml: {names.Count} paket ({data.Length:N0} bayt, {enc})");
         foreach (var name in names) Console.WriteLine("  " + name);
         return 0;
     }
@@ -227,7 +227,9 @@ internal static class Program
         var f = a.Find(Dlclist.RelativePath)
             ?? throw new FileNotFoundException("dlclist.xml bulunamadi.");
         var data = a.ReadFile(f);
-        var xml = Encoding.UTF8.GetString(data);
+        if (!Dlclist.LooksLikeXml(data))
+            throw new InvalidDataException("dlclist.xml ham verisi XML degil.");
+        var (xml, enc) = Dlclist.Decode(data);
         var before = Dlclist.GetPackNames(xml);
         var newXml = Dlclist.AddPackNames(xml, args.Skip(2));
         var after = Dlclist.GetPackNames(newXml);
@@ -236,10 +238,11 @@ internal static class Program
             Console.WriteLine("Degisiklik yok (paketler zaten listeli).");
             return 0;
         }
-        var bytes = Encoding.UTF8.GetBytes(newXml);
+        var writeEnc = Dlclist.Normalize(newXml, enc);
+        var bytes = Dlclist.Encode(newXml, writeEnc);
         a.ReplaceFile(f, bytes);
         Console.WriteLine($"Eklendi: {string.Join(", ", after.Except(before, StringComparer.OrdinalIgnoreCase))}");
-        Console.WriteLine($"Yeni boyut: {bytes.Length:N0} bayt (eski {data.Length:N0})");
+        Console.WriteLine($"Yeni boyut: {bytes.Length:N0} bayt (eski {data.Length:N0}, kodlama {writeEnc})");
         return 0;
     }
 
@@ -249,7 +252,9 @@ internal static class Program
         var f = a.Find(Dlclist.RelativePath)
             ?? throw new FileNotFoundException("dlclist.xml bulunamadi.");
         var data = a.ReadFile(f);
-        var xml = Encoding.UTF8.GetString(data);
+        if (!Dlclist.LooksLikeXml(data))
+            throw new InvalidDataException("dlclist.xml ham verisi XML degil.");
+        var (xml, enc) = Dlclist.Decode(data);
         var before = Dlclist.GetPackNames(xml);
         var newXml = Dlclist.RemovePackNames(xml, args.Skip(2));
         var after = Dlclist.GetPackNames(newXml);
@@ -258,10 +263,11 @@ internal static class Program
             Console.WriteLine("Degisiklik yok (paketler listede degil).");
             return 0;
         }
-        var bytes = Encoding.UTF8.GetBytes(newXml);
+        var writeEnc = Dlclist.Normalize(newXml, enc);
+        var bytes = Dlclist.Encode(newXml, writeEnc);
         a.ReplaceFile(f, bytes);
         Console.WriteLine($"Cikarildi: {string.Join(", ", before.Except(after, StringComparer.OrdinalIgnoreCase))}");
-        Console.WriteLine($"Yeni boyut: {bytes.Length:N0} bayt (eski {data.Length:N0})");
+        Console.WriteLine($"Yeni boyut: {bytes.Length:N0} bayt (eski {data.Length:N0}, kodlama {writeEnc})");
         return 0;
     }
 
@@ -273,10 +279,11 @@ internal static class Program
         bool verify = !args.Contains("--no-verify");
         bool? compress = args.Contains("--raw") ? false : args.Contains("--compress") ? true : null;
         var oldSize = f.FileSize;
+        var oldOffset = f.FileOffset;
         a.ReplaceFile(f, content, verify, compress);
         Console.WriteLine($"Degistirildi: {f.Path}");
         Console.WriteLine($"  Eski depolama: {oldSize:N0} -> Yeni: {f.FileSize:N0} bayt (icerik: {content.Length:N0})");
-        Console.WriteLine($"  Konum: {(f.FileSize <= oldSize ? "yerinde (in-place)" : "dosya sonuna eklendi")}");
+        Console.WriteLine($"  Konum: {(f.FileOffset == oldOffset ? "yerinde (in-place)" : "dosya sonuna eklendi")}");
         Console.WriteLine($"  Dogrulama: {(verify ? "basarili" : "atlandi")}");
         return 0;
     }
