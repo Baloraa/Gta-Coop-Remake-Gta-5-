@@ -4,6 +4,9 @@
 
 $ErrorActionPreference = "Stop"
 
+# Çevrimdışı politika: .NET telemetrisi kapalı (hiçbir veri gönderilmesin)
+$env:DOTNET_CLI_TELEMETRY_OPTOUT = "1"
+
 $root = $PSScriptRoot
 $dist = Join-Path $root "dist\GTACoopRemake"
 $vendor = Join-Path $root "vendor\Distribution"

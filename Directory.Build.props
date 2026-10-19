@@ -1,0 +1,8 @@
+<Project>
+  <PropertyGroup>
+    <!-- Çevrimdışı derleme politikası:
+         NuGet güvenlik denetimi (vulnerability DB) indirmesi kapalı.
+         Böylece restore/build/publish sırasında ağa çıkılmaz. -->
+    <NuGetAudit>false</NuGetAudit>
+  </PropertyGroup>
+</Project>
