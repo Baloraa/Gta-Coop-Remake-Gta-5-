@@ -25,14 +25,14 @@ New-Item -ItemType Directory -Force $dist | Out-Null
 # --- launcher publish
 Write-Host "[2/5] Launcher yayınlanıyor..."
 dotnet publish (Join-Path $root "src\GTACoop.Launcher\GTACoop.Launcher.csproj") `
-    -c Release -o $dist --nologo
+    -c Release -o $dist --nologo --no-restore
 if ($LASTEXITCODE -ne 0) { throw "Launcher yayını başarısız." }
 
 # --- sync sunucusu publish
 Write-Host "[3/5] Senkronizasyon sunucusu yayınlanıyor..."
 $syncOut = Join-Path $dist "Distribution\SyncServer"
 dotnet publish (Join-Path $root "src\GTACoop.SyncServer\GTACoop.SyncServer.csproj") `
-    -c Release -o $syncOut --nologo
+    -c Release -o $syncOut --nologo --no-restore
 if ($LASTEXITCODE -ne 0) { throw "SyncServer yayını başarısız." }
 
 # --- GTACoOp istemci + sunucu dağıtımı (vendor)
@@ -52,7 +52,7 @@ Copy-Item (Join-Path $vendor "README.md") (Join-Path $dist "Distribution\ATIF-RE
 Write-Host "[5/5] SyncTool yayınlanıyor..."
 $toolOut = Join-Path $dist "tools\SyncTool"
 dotnet publish (Join-Path $root "src\GTACoop.SyncTool\GTACoop.SyncTool.csproj") `
-    -c Release -o $toolOut --nologo
+    -c Release -o $toolOut --nologo --no-restore
 if ($LASTEXITCODE -ne 0) { throw "SyncTool yayını başarısız." }
 
 # --- kök klasöre sızan gereksiz SyncServer apphost dosyalarını temizle
