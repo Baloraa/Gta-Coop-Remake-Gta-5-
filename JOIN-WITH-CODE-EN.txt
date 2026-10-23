@@ -1,0 +1,76 @@
+==========================================================
+ GTACoop Remake - Joining a Server with a Join Code
+==========================================================
+
+You no longer need to remember IPs and ports: the server owner
+creates a "join code" with one click, and the friend pastes it
+into the launcher. The code contains the connection details
+itself; no cloud service or account is required.
+
+------------------------------------------------------------------
+SERVER OWNER
+------------------------------------------------------------------
+1) In the "My Server" tab, check the server name, game port
+   (default 4499) and sync port (default 4599). You may also set
+   a password and sync token (optional).
+
+2) Click "Create Join Code...".
+
+3) Pick the address your friend will use from the
+   "Server address" list:
+   - Same home/network: 192.168.x.x (Wi-Fi/Ethernet)
+   - Using Radmin VPN:  26.x.x.x
+   - Port forwarding + public IP: type the public IP manually
+   You can always type an address manually.
+
+4) Click "Copy" and send the code to your friend
+   (WhatsApp, Discord, etc.).
+
+5) Click "Start Server". When your friend joins with the code,
+   server mods download automatically.
+
+Note: the code contains the server password and sync token.
+Only give it to people you trust.
+
+------------------------------------------------------------------
+FRIEND (JOINING)
+------------------------------------------------------------------
+1) Open the launcher and go to the "Servers" tab.
+
+2) Click "Join with Code...". If the code is in your clipboard,
+   the window fills it in automatically; otherwise paste it.
+
+3) When the details appear, click "Add and Connect". The server
+   is added to the list, mods download, and the game starts.
+
+You can still play without a code: "Add Server..." and manual
+IP/port entry work exactly as before.
+
+------------------------------------------------------------------
+WHERE ARE MODS STORED?
+------------------------------------------------------------------
+Downloaded server mods are kept in the program folder, in a
+separate folder for each server:
+
+  <GTACoop Remake folder>\Servers\<server name>__<server id>\
+
+- Every server has its own folder; servers never mix.
+- DLC packs are not copied into the game folder; they are
+  referenced from this folder via an NTFS junction.
+- Script/ASI files are installed temporarily while playing and
+  removed automatically on exit. Your own mods are untouched.
+- To open the folder: "My Server" -> "Open Server Folders".
+- The server.json file inside identifies the server.
+
+This is similar to FiveM: content lives next to the program,
+per server, and the original game files are not modified.
+
+------------------------------------------------------------------
+FAQ
+------------------------------------------------------------------
+- The code does not work: make sure you copied all of it.
+  Line breaks are fine; the launcher strips whitespace.
+- Same network: a local IP is enough. For internet play, use
+  Radmin VPN (free) or forward 4499 UDP + 4599 TCP.
+- You can create a code while the server is stopped; your friend
+  will connect once you start it.

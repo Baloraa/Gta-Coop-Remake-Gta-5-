@@ -1,0 +1,75 @@
+==========================================================
+ GTACoop Remake - Friend Edition (English)
+==========================================================
+
+This is a friend-to-friend co-op tool for GTA V (Story Mode).
+The server owner adds mods; when you connect, they are downloaded
+and installed automatically, then removed when you exit the game.
+
+------------------------------------------------------------------
+INSTALLATION
+------------------------------------------------------------------
+1) Extract this folder somewhere on your PC
+   (for example C:\GTACoop-Remake).
+
+2) Run GTACoop.Launcher.exe.
+   - If Windows shows an "unknown publisher" warning:
+     click "More info" -> "Run anyway" (the app is unsigned,
+     this is normal).
+   - If you get "You must install .NET", install the
+     .NET 8 Desktop Runtime:
+     https://dotnet.microsoft.com/en-us/download/dotnet/8.0
+
+3) In the launcher, open the "Game" tab:
+   - Click "Browse..." and select your GTA V folder
+     (the folder that contains GTA5.exe).
+   - Click "Install / Update Client".
+
+   REQUIRED (NOT included in this package - install it yourself):
+   - Original GTA V (Steam/Epic/Rockstar, Story Mode)
+   - ScriptHook V            https://www.dev-c.com/gtav/scripthookv/
+   - ScriptHookVDotNet v3    https://github.com/scripthookvdotnet/scripthookvdotnet/releases
+   - Microsoft Visual C++ runtime (already present on most PCs)
+
+4) Open the "Servers" tab:
+   - EASIEST: paste the JOIN CODE from the server owner into
+     "Join with Code..." and click "Add and Connect".
+     The code carries the address/ports/password by itself.
+   - Alternative: click "Add Server..." and enter the address and
+     ports given by the server owner (game port 4499 UDP,
+     sync port 4599 TCP).
+   - Click "Connect & Play". Server mods download automatically
+     and the game starts. Details: JOIN-WITH-CODE-EN.txt
+
+5) In game:
+   - F9  : GTA Coop menu
+   - T   : chat
+   - Z   : player list
+   - On first join, type in chat:   /register password
+     (later sessions:               /login password)
+
+------------------------------------------------------------------
+IMPORTANT NOTES
+------------------------------------------------------------------
+- This tool does not touch GTA Online; it works in Story Mode only.
+- YOUR OWN mods are never touched. If a server mod already exists
+  on your PC, it is skipped: not downloaded, not overwritten.
+- Server mods are installed only while you play; they are removed
+  automatically when you exit the game.
+- Downloaded server files are stored per server in the program
+  folder: Servers\<server name>__<server id>\
+  (open it via "My Server" -> "Open Server Folders").
+- Your game files and ScriptHook files are not modified.
+- Hosting your own server additionally requires .NET 10.
+
+------------------------------------------------------------------
+LICENSE
+------------------------------------------------------------------
+This package includes the GNU GPL v3 licensed open-source
+GTA Coop (GTACoOp) project and this launcher under the same
+license.
+License text: Distribution\LICENSE.md
+Credits/readme: Distribution\ATIF-README.md
+Free to share; do not sell it commercially.
+
+Have fun!

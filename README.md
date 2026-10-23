@@ -204,6 +204,8 @@ Oyun sırasında geçici kurulur/bağlanır; oyundan çıkınca kaldırılır. A
   ```
 
   → `dist\GTACoop-Remake-Paylas.zip` (uygulama + arkadaş okubeni + lisans) oluşur.
+  Pakette Türkçe (`OKUBENI-ARKADASLAR.txt`, `KODLA-KATIL.txt`) ve İngilizce
+  (`READ-ME-EN.txt`, `JOIN-WITH-CODE-EN.txt`) rehberler birlikte yer alır.
 - **Pakete asla eklemeyin:** GTA V oyun dosyaları; ScriptHook V / ScriptHookVDotNet dosyaları
   (lisansları yeniden dağıtıma izin vermez). Arkadaşınız bunları kendisi kurar — gerekli
   liste `OKUBENI-ARKADASLAR.txt` içinde yazılıdır.

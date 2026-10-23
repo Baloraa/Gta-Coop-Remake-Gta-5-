@@ -12,6 +12,8 @@ $dist  = Join-Path $root 'dist\GTACoopRemake'
 $zip   = Join-Path $root 'dist\GTACoop-Remake-Paylas.zip'
 $okubeni = Join-Path $root 'ARKADAS-OKUBENI.txt'
 $katil   = Join-Path $root 'KODLA-KATIL.txt'
+$okubeniEn = Join-Path $root 'READ-ME-EN.txt'
+$katilEn   = Join-Path $root 'JOIN-WITH-CODE-EN.txt'
 $stage = Join-Path $env:TEMP ('gtacoop-paylas-' + [Guid]::NewGuid().ToString('N'))
 
 Write-Host "== GTACoop Remake Paylaşım Paketi ==" -ForegroundColor Cyan
@@ -32,12 +34,22 @@ if (-not (Test-Path $katil)) {
     Write-Host "HATA: KODLA-KATIL.txt bulunamadı." -ForegroundColor Red
     exit 1
 }
+if (-not (Test-Path $okubeniEn)) {
+    Write-Host "HATA: READ-ME-EN.txt bulunamadı." -ForegroundColor Red
+    exit 1
+}
+if (-not (Test-Path $katilEn)) {
+    Write-Host "HATA: JOIN-WITH-CODE-EN.txt bulunamadı." -ForegroundColor Red
+    exit 1
+}
 
 # --- Aşama klasörüne kopyala ---
 New-Item -ItemType Directory -Force -Path (Join-Path $stage 'GTACoop-Remake') | Out-Null
 Copy-Item (Join-Path $dist '*') (Join-Path $stage 'GTACoop-Remake') -Recurse -Force
 Copy-Item $okubeni (Join-Path $stage 'GTACoop-Remake\OKUBENI-ARKADASLAR.txt') -Force
 Copy-Item $katil (Join-Path $stage 'GTACoop-Remake\KODLA-KATIL.txt') -Force
+Copy-Item $okubeniEn (Join-Path $stage 'GTACoop-Remake\READ-ME-EN.txt') -Force
+Copy-Item $katilEn (Join-Path $stage 'GTACoop-Remake\JOIN-WITH-CODE-EN.txt') -Force
 
 # --- Zip'le ---
 if (Test-Path $zip) { Remove-Item $zip -Force }
@@ -53,6 +65,6 @@ Write-Host "  $zip  ($mb MB)"
 Write-Host ""
 Write-Host "Bu ZIP'i arkadaşlarınıza gönderebilirsiniz. İçinde:"
 Write-Host "  - Uygulama (GTACoop.Launcher.exe ve tüm dosyalar)"
-Write-Host "  - OKUBENI-ARKADASLAR.txt (arkadaşınız için kurulum talimatı)"
-Write-Host "  - KODLA-KATIL.txt (katılım kodu ve sunucu mod klasörleri rehberi)"
+Write-Host "  - OKUBENI-ARKADASLAR.txt / READ-ME-EN.txt (TR/EN arkadaş kurulum talimatı)"
+Write-Host "  - KODLA-KATIL.txt / JOIN-WITH-CODE-EN.txt (TR/EN katılım kodu ve mod klasörleri rehberi)"
 Write-Host "  - Distribution\LICENSE.md (GPL v3 lisans metni) + atıf"
