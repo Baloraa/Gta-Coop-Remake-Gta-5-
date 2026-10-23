@@ -1,4 +1,4 @@
-# GTACoop Remake v2 — Yapım Betiği
+﻿# GTACoop Remake v2 — Yapım Betiği
 # Kullanım:  powershell -ExecutionPolicy Bypass -File build.ps1
 # Çıktı:     dist\GTACoopRemake\  (GTACoop.Launcher.exe buradan çalıştırılır)
 
@@ -63,6 +63,9 @@ if ($LASTEXITCODE -ne 0) { throw "SyncTool yayını başarısız." }
 Remove-Item (Join-Path $dist "GTACoop.SyncServer.exe") -ErrorAction SilentlyContinue
 Remove-Item (Join-Path $dist "GTACoop.SyncServer.deps.json") -ErrorAction SilentlyContinue
 Remove-Item (Join-Path $dist "GTACoop.SyncServer.runtimeconfig.json") -ErrorAction SilentlyContinue
+
+# --- sunucuya özel mod klasörlerinin kökü (uygulama klasörü\Servers)
+New-Item -ItemType Directory -Force (Join-Path $dist "Servers") | Out-Null
 
 Write-Host ""
 Write-Host "== YAPIM TAMAM ==" -ForegroundColor Green

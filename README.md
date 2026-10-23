@@ -168,12 +168,27 @@ Notlar:
 
 ---
 
-## Arkadaşlarla oynama (internet üzerinden)
+## Arkadaşlarla oynama (katılım kodu veya IP)
+
+**En kolay yol (katılım kodu):**
+
+1. Siz **Sunucum → Katılım Kodu Oluştur...** ile adresi seçip kodu kopyalayın,
+   arkadaşınıza gönderin (WhatsApp/Discord).
+2. Arkadaşınız **Sunucular → Kod ile Katıl...** deyip kodu yapıştırsın ve
+   **Ekle ve Bağlan**'a bassın. Kod bağlantı bilgilerini kendi taşır; hesap/internet
+   sunucusu gerekmez (şifre/token içerebilir, yalnızca güvendiğiniz kişiye verin).
+3. Siz **Sunucuyu Başlat** deyin; arkadaşınız bağlanınca modlar otomatik iner.
+
+**IP ile (kod olmadan):**
 
 1. Yönlendiricinizde port yönlendirme yapın: **4499 UDP** ve **4599 TCP** → kendi bilgisayarınız.
 2. Arkadaşınız **Sunucular** sekmesinden sizin dış IP adresinizle sunucuyu ekleyip
    **Bağlan ve Oyna**'ya basar; gerekli değilse oyun kapılarını (4499/4599) açık tutun.
 3. İlk girişte arkadaşınız da oyunda **T** → `/register şifre` yazar.
+
+**Modlar nerede?** Sunucudan indirilen içerik program klasöründe sunucu başına ayrı
+saklanır: `Servers\<sunucu adı>__<kimlik>\` (`Sunucum → Sunucu Klasörlerini Aç`).
+Oyun sırasında geçici kurulur/bağlanır; oyundan çıkınca kaldırılır. Ayrıntı: `KODLA-KATIL.txt`.
 
 ---
 

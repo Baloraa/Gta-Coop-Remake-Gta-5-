@@ -113,6 +113,8 @@ public sealed class MyServerTab : UserControl
         controlButtons.Controls.Add(Ui.Btn(T("Sunucuyu Başlat"), (_, _) => StartServer()));
         controlButtons.Controls.Add(Ui.Btn(T("Durdur"), (_, _) => StopServer()));
         controlButtons.Controls.Add(Ui.Btn(T("Durumu Yenile"), (_, _) => RefreshStatus()));
+        controlButtons.Controls.Add(Ui.Btn(T("Katılım Kodu Oluştur..."), (_, _) => ShowJoinCode()));
+        controlButtons.Controls.Add(Ui.Btn(T("Sunucu Klasörlerini Aç"), (_, _) => OpenFolder(AppEnv.ServersFolder)));
 
         _gameServerStatus.Text = T("Oyun sunucusu: kapalı");
         _gameServerStatus.AutoSize = true;
@@ -211,6 +213,20 @@ public sealed class MyServerTab : UserControl
             AppEnv.LogError(ex.Message);
             Ui.Error(FindForm()!, T("Ayarlar kaydedilemedi:\r\n") + ex.Message);
         }
+    }
+
+    /// <summary>Arkadaşla paylaşılacak katılım kodunu üretir (sunucu kapalıyken de çalışır).</summary>
+    private void ShowJoinCode()
+    {
+        var info = CurrentSettings();
+        if (string.IsNullOrWhiteSpace(info.Name))
+        {
+            Ui.Warn(FindForm()!, T("Sunucu adı boş olamaz."));
+            return;
+        }
+
+        using var dlg = new ShareCodeDialog(ToSettings(info));
+        dlg.ShowDialog(FindForm());
     }
 
     private void StartServer()

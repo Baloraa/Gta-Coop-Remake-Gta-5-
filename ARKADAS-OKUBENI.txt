@@ -32,10 +32,13 @@ KURULUM
    - Microsoft Visual C++ çalışma zamanı (çoğu PC'de zaten vardır)
 
 4) "Sunucular" sekmesi:
-   - "Sunucu ekle" deyin; sunucu sahibinin verdiği adresi ve
-     portları girin (oyun portu 4499 UDP, sync portu 4599 TCP).
+   - EN KOLAY: Sunucu sahibinin gönderdiği KATILIM KODU'nu
+     "Kod ile Katıl..." düğmesine yapıştırın; "Ekle ve Bağlan" deyin.
+     Kod, adres/port/şifre bilgilerini kendi taşır.
+   - Alternatif: "Sunucu Ekle" deyin; sunucu sahibinin verdiği
+     adresi ve portları girin (oyun portu 4499 UDP, sync 4599 TCP).
    - "Bağlan ve Oyna"ya basın. Sunucu modları otomatik iner,
-     oyun açılır.
+     oyun açılır. Ayrıntılar: KODLA-KATIL.txt
 
 5) Oyunda:
    - F9  : GTA Coop menüsü
@@ -51,8 +54,10 @@ KURULUM
 - KENDİ modlarınıza asla dokunulmaz. Sunucudaki bir mod sizde
   zaten varsa o mod atlanır: indirilmez, üzerine yazılmaz.
 - Sunucu modları yalnızca siz oynarken kuruludur; oyundan
-  çıkınca otomatik olarak güvenli bir klasöre taşınır:
-  %LOCALAPPDATA%\GTACoopRemake\removed\
+  çıkınca otomatik olarak kaldırılır.
+- Sunucudan indirilen mod dosyaları program klasöründe her sunucu
+  için ayrı saklanır: Servers\<sunucu adı>__<sunucu kimliği>\
+  ("Sunucum" -> "Sunucu Klasörlerini Aç" ile görebilirsiniz).
 - Oyun dosyalarınız ve ScriptHook dosyalarınız değiştirilmez.
 - Kendi sunucunuzu kurmak isterseniz ayrıca .NET 10 gerekir.
 

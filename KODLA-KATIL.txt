@@ -1,0 +1,76 @@
+==========================================================
+ GTACoop Remake - Katılım Kodu ile Sunucuya Katılma
+==========================================================
+
+Bu sürümde sunucuya katılmak için IP/port ezberlemeye gerek yok:
+sunucu sahibi tek tıkla bir "katılım kodu" üretir, arkadaş da bu
+kodu launcher'a yapıştırır. Kod, bağlantı bilgilerini kendi içinde
+taşır; internet sunucusu/hesap gerektirmez.
+
+------------------------------------------------------------------
+SUNUCU SAHİBİ
+------------------------------------------------------------------
+1) "Sunucum" sekmesinde sunucu adını, oyun portunu (varsayılan 4499)
+   ve sync portunu (varsayılan 4599) kontrol et. İstersen şifre
+   ve sync token da girebilirsin (isteğe bağlı).
+
+2) "Katılım Kodu Oluştur..." düğmesine bas.
+
+3) "Sunucu adresi" listesinden arkadaşının kullanacağı adresi seç:
+   - Aynı ev/ağdasınız: 192.168.x.x (Wi-Fi/Ethernet)
+   - Radmin VPN kullanıyorsanız: 26.x.x.x
+   - Port yönlendirme + dış IP kullanıyorsanız: dış IP'yi elle yaz
+   Liste boş olsa bile adresi elle yazabilirsin.
+
+4) "Kopyala" deyip kodu arkadaşına gönder (WhatsApp, Discord...).
+
+5) "Sunucuyu Başlat" ile sunucuyu aç. Arkadaşın kod ile bağlanınca
+   sunucu modları otomatik inecek.
+
+Not: Kod, sunucu şifresini ve sync token'ını da içerir. Sadece
+güvendiğin kişilere ver.
+
+------------------------------------------------------------------
+ARKADAŞ (katılan)
+------------------------------------------------------------------
+1) Launcher'ı aç, "Sunucular" sekmesine geç.
+
+2) "Kod ile Katıl..." düğmesine bas. Kod panodaysa pencere
+   açıldığında otomatik dolar; değilse kodu yapıştır.
+
+3) Bilgiler görününce "Ekle ve Bağlan" de. Sunucu listeye eklenir,
+   modlar iner ve oyun açılır.
+
+Kod olmadan da oynanabilir: "Sunucu Ekle..." ile IP ve portları
+elle girme yöntemi aynen duruyor.
+
+------------------------------------------------------------------
+MODLAR NEREDE SAKLANIR?
+------------------------------------------------------------------
+Sunucudan indirilen modlar artık program klasöründe, her sunucu
+için ayrı bir klasörde tutulur:
+
+  <GTACoop Remake klasörü>\Servers\<sunucu adı>__<sunucu kimliği>\
+
+- Her sunucunun kendi klasörü vardır; sunucular birbirine karışmaz.
+- DLC paketleri oyun klasörüne kopyalanmaz; bu klasörden NTFS
+  bağlantısı (junction) ile gösterilir.
+- Script/ASI dosyaları oyun sırasında geçici olarak kurulur;
+  oyundan çıkınca otomatik kaldırılır. Senin kendi modlarına
+  dokunulmaz.
+- Klasörü açmak için: "Sunucum" -> "Sunucu Klasörlerini Aç".
+- İçindeki server.json dosyası hangi sunucuya ait olduğunu yazar.
+
+Yani FiveM mantığına yakın: içerik sunucu bazında programın yanında
+durur, oyunun orijinal dosyaları değiştirilmez.
+
+------------------------------------------------------------------
+SIK SORULANLAR
+------------------------------------------------------------------
+- Kod çalışmadı: eksiksiz kopyalandığından emin ol; satır sonları
+  sorun değil, launcher boşlukları temizler.
+- Aynı ağdasınız yerel IP yeterli. İnternet üzerinden bağlanacaksanız
+  Radmin VPN (ücretsiz) kullanın veya 4499 UDP + 4599 TCP portlarını
+  yönlendirin.
+- Sunucu kapalıyken kod oluşturabilirsin; arkadaşın sen başlatınca
+  bağlanır.

@@ -40,6 +40,7 @@ public sealed class ServersTab : UserControl
         _list.DoubleClick += (_, _) => EditServer();
 
         var listButtons = Ui.Flow();
+        listButtons.Controls.Add(Ui.Btn(T("Kod ile Katıl..."), (_, _) => JoinWithCode()));
         listButtons.Controls.Add(Ui.Btn(T("Sunucu Ekle..."), (_, _) => AddServer()));
         listButtons.Controls.Add(Ui.Btn(T("Düzenle..."), (_, _) => EditServer()));
         listButtons.Controls.Add(Ui.Btn(T("Sil"), (_, _) => DeleteServer()));
@@ -158,6 +159,49 @@ public sealed class ServersTab : UserControl
         AppEnv.SaveSettings();
         RefreshList();
         AppEnv.Log($"Sunucu eklendi: {dlg.Entry.Name} ({dlg.Entry.Host})");
+    }
+
+    /// <summary>Arkadaşın gönderdiği katılım kodunu çözer, sunucuyu ekler ve istenirse bağlanır.</summary>
+    private void JoinWithCode()
+    {
+        using var dlg = new JoinCodeDialog();
+        if (dlg.ShowDialog(FindForm()) != DialogResult.OK || dlg.Entry == null) return;
+
+        var entry = dlg.Entry;
+        var existing = AppEnv.Settings.Servers.FirstOrDefault(s =>
+            string.Equals(s.Host, entry.Host, StringComparison.OrdinalIgnoreCase) &&
+            s.GamePort == entry.GamePort && s.SyncPort == entry.SyncPort);
+
+        if (existing != null)
+        {
+            existing.Name = entry.Name;
+            existing.Password = entry.Password;
+            existing.SyncToken = entry.SyncToken;
+            entry = existing;
+            AppEnv.Log($"Katılım kodu mevcut kaydı güncelledi: {entry.Name} ({entry.Host})");
+        }
+        else
+        {
+            AppEnv.Settings.Servers.Add(entry);
+            AppEnv.Log($"Katılım kodu ile sunucu eklendi: {entry.Name} " +
+                       $"({entry.Host}:{entry.GamePort}, sync {entry.SyncPort})");
+        }
+
+        AppEnv.SaveSettings();
+        RefreshList();
+        foreach (ListViewItem item in _list.Items)
+        {
+            if (ReferenceEquals(item.Tag, entry))
+            {
+                item.Selected = true;
+                item.Focused = true;
+                item.EnsureVisible();
+                _list.Select();
+                break;
+            }
+        }
+
+        if (dlg.ConnectRequested) _ = ConnectAsync(launch: true);
     }
 
     private void EditServer()
@@ -294,8 +338,10 @@ public sealed class ServersTab : UserControl
                     }
                 }
 
+                var contentDir = AppEnv.ServerContentFolder(sel, mf);
+                AppEnv.Log($"Sunucu içerik klasörü: {contentDir}");
                 var result = await applier.SyncAsync(client, mf, AppEnv.DataFolder,
-                    AppEnv.CacheRoot, progress, ct);
+                    contentDir, progress, ct);
                 AppEnv.Log($"Senkronizasyon tamam: {result.Addons.Count} eklenti kurulu.");
                 return (Manifest?)mf;
             }, ct);
@@ -396,7 +442,9 @@ public sealed class ServersTab : UserControl
                 using var client = new SyncClient(sel.Host, sel.SyncPort, sel.SyncToken);
                 var mf = await client.GetManifestAsync(ct);
                 AppEnv.Log($"Ön indirme: {mf.ServerName} ({mf.Addons.Count} eklenti)");
-                await applier.PrefetchAsync(client, mf, AppEnv.CacheRoot, progress, ct);
+                var contentDir = AppEnv.ServerContentFolder(sel, mf);
+                AppEnv.Log($"Sunucu içerik klasörü: {contentDir}");
+                await applier.PrefetchAsync(client, mf, contentDir, progress, ct);
             }, ct);
 
             SetStatus(T("Tüm mod dosyaları indirildi (oyuna kurulmadı). Bir sonraki girişte yeniden indirilmez."), Ui.OkColor);

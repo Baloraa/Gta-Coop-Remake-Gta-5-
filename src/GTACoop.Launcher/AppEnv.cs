@@ -12,6 +12,13 @@ public static class AppEnv
     public static LauncherSettings Settings { get; private set; } = new();
     public static string CacheRoot => Path.Combine(DataFolder, "cache");
     public static string ServerDir => Path.Combine(DataFolder, "server");
+    private static string? _serversFolder;
+
+    /// <summary>
+    /// Sunucuya özel mod klasörlerinin kökü: uygulama klasörü\Servers.
+    /// Uygulama klasörü yazılamazsa veri klasörüne düşer.
+    /// </summary>
+    public static string ServersFolder => _serversFolder ??= ResolveServersFolder();
     public static string LogFile => Path.Combine(DataFolder, "logs", $"launcher-{DateTime.Now:yyyyMMdd}.log");
     public static string SettingsPath => Path.Combine(DataFolder, "settings.json");
 
@@ -27,6 +34,7 @@ public static class AppEnv
         Directory.CreateDirectory(CacheRoot);
         Directory.CreateDirectory(ServerDir);
         Directory.CreateDirectory(Path.Combine(DataFolder, "logs"));
+        Directory.CreateDirectory(ServersFolder);
 
         Settings = SyncJson.Load<LauncherSettings>(SettingsPath) ?? new LauncherSettings();
         Settings.DataFolder = DataFolder;
@@ -47,6 +55,77 @@ public static class AppEnv
     }
 
     public static void SaveSettings() => SyncJson.Save(SettingsPath, Settings);
+
+    private static string ResolveServersFolder()
+    {
+        try
+        {
+            var dir = Path.Combine(AppContext.BaseDirectory, "Servers");
+            Directory.CreateDirectory(dir);
+            return dir;
+        }
+        catch (Exception ex)
+        {
+            var fallback = Path.Combine(DataFolder, "Servers");
+            Directory.CreateDirectory(fallback);
+            Log($"Uygulama klasöründe 'Servers' oluşturulamadı ({ex.Message}); " +
+                $"veri klasörü kullanılıyor: {fallback}");
+            return fallback;
+        }
+    }
+
+    /// <summary>
+    /// Bir sunucunun mod klasörünü döndürür: <c>Servers\&lt;sunucu adı&gt;__&lt;sunucu kimliği&gt;</c>.
+    /// Klasör ada göre değil, kararlı sunucu kimliğine göre bulunur; sunucu adı değişse bile
+    /// indirilen modlar yeniden indirilmez. İçine okunabilir bir <c>server.json</c> yazılır.
+    /// </summary>
+    public static string ServerContentFolder(ServerEntry entry, Manifest manifest)
+    {
+        var idPart = AddonApplier.Safe(manifest.ServerId);
+        var root = ServersFolder;
+
+        string? existing = null;
+        try
+        {
+            existing = Directory.EnumerateDirectories(root)
+                .FirstOrDefault(d => Path.GetFileName(d)
+                    .EndsWith("__" + idPart, StringComparison.OrdinalIgnoreCase));
+        }
+        catch { /* klasör taranamazsa yeni klasör adı denenir */ }
+
+        var displayName = string.IsNullOrWhiteSpace(manifest.ServerName)
+            ? entry.Name
+            : manifest.ServerName;
+        var dir = existing ?? Path.Combine(root, AddonApplier.Safe(displayName) + "__" + idPart);
+        Directory.CreateDirectory(dir);
+
+        try
+        {
+            SyncJson.Save(Path.Combine(dir, "server.json"), new ServerFolderInfo
+            {
+                Name = displayName,
+                ServerId = manifest.ServerId,
+                Host = entry.Host,
+                GamePort = entry.GamePort,
+                SyncPort = entry.SyncPort,
+                LastUsedUtc = DateTime.UtcNow
+            });
+        }
+        catch { /* bilgi dosyası kritik değil */ }
+
+        return dir;
+    }
+
+    /// <summary>Sunucu klasöründeki okunabilir bilgi dosyası (server.json).</summary>
+    public sealed class ServerFolderInfo
+    {
+        public string Name { get; set; } = "";
+        public string ServerId { get; set; } = "";
+        public string Host { get; set; } = "";
+        public int GamePort { get; set; } = 4499;
+        public int SyncPort { get; set; } = 4599;
+        public DateTime LastUsedUtc { get; set; }
+    }
 
     public static void Log(string message)
     {

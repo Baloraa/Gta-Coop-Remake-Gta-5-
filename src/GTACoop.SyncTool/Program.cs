@@ -63,7 +63,8 @@ try
                 Console.WriteLine($"      [{p.Fraction,6:P0}] {p.Message}"));
 
             Console.WriteLine("[4/4] Senkronizasyon...");
-            var result = await applier.SyncAsync(client, manifest, dataDir, cacheDir, progress);
+            var result = await applier.SyncAsync(client, manifest, dataDir,
+                Path.Combine(cacheDir, AddonApplier.Safe(manifest.ServerId)), progress);
             Console.WriteLine($"TAMAM: {result.Addons.Count} eklenti kurulu.");
             foreach (var a in result.Addons)
                 Console.WriteLine($"  - {a.Id} v{a.Version} " +
@@ -117,7 +118,8 @@ try
             var applier = new AddonApplier("", s => Console.WriteLine("      " + s));
             var progress = new Progress<SyncProgress>(p =>
                 Console.WriteLine($"      [{p.Fraction,6:P0}] {p.Message}"));
-            await applier.PrefetchAsync(client, manifest, cacheDir, progress);
+            await applier.PrefetchAsync(client, manifest,
+                Path.Combine(cacheDir, AddonApplier.Safe(manifest.ServerId)), progress);
             Console.WriteLine("TAMAM: dosyalar önbelleğe indirildi (oyuna kurulmadı).");
             return 0;
         }

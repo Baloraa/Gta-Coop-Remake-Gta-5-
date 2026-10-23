@@ -151,10 +151,11 @@ public sealed class AddonApplier
 
     /// <summary>
     /// Tam senkronizasyon: eksik/güncel olmayan eklentileri indirir ve kurar,
-    /// sunucudan kaldırılanları temizler.
+    /// sunucudan kaldırılanları temizler. <paramref name="serverCacheDir"/> sunucuya
+    /// özel içerik klasörüdür (ör. uygulama klasörü\Servers\sunucum__srv_xxx).
     /// </summary>
     public async Task<SyncState> SyncAsync(
-        SyncClient client, Manifest manifest, string dataFolder, string cacheRoot,
+        SyncClient client, Manifest manifest, string dataFolder, string serverCacheDir,
         IProgress<SyncProgress>? progress = null, CancellationToken ct = default)
     {
         var state = SyncStateStore.Load(dataFolder, manifest.ServerId);
@@ -191,7 +192,7 @@ public sealed class AddonApplier
         foreach (var addon in plan.ToInstall)
         {
             ct.ThrowIfCancellationRequested();
-            var addonCacheDir = Path.Combine(cacheRoot, Safe(manifest.ServerId), Safe(addon.Id));
+            var addonCacheDir = Path.Combine(serverCacheDir, Safe(addon.Id));
             var version = ServerScanner.ComputeVersion(addon);
 
             // Güncelleme senaryosu: eskisini kaldır
@@ -361,9 +362,9 @@ public sealed class AddonApplier
         }
     }
 
-    /// <summary>Yalnızca indirme: eklentileri önbelleğe alır, oyuna KURMAZ.</summary>
+    /// <summary>Yalnızca indirme: eklentileri sunucu içerik klasörüne alır, oyuna KURMAZ.</summary>
     public async Task PrefetchAsync(
-        SyncClient client, Manifest manifest, string cacheRoot,
+        SyncClient client, Manifest manifest, string serverCacheDir,
         IProgress<SyncProgress>? progress = null, CancellationToken ct = default)
     {
         var addons = manifest.Addons.Where(a => a.Type != AddonType.ServerPlugin).ToList();
@@ -373,7 +374,7 @@ public sealed class AddonApplier
         foreach (var addon in addons)
         {
             ct.ThrowIfCancellationRequested();
-            var addonCacheDir = Path.Combine(cacheRoot, Safe(manifest.ServerId), Safe(addon.Id));
+            var addonCacheDir = Path.Combine(serverCacheDir, Safe(addon.Id));
             doneBytes = await DownloadAddonAsync(
                 client, addon, addonCacheDir, progress, doneBytes, totalBytes, ct);
         }
