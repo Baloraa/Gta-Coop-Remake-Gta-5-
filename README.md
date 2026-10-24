@@ -1,7 +1,8 @@
 # GTACoop Remake — Türkçe Mod + Sunucu Yöneticisi
 
-2.1 sürümü — kendi sunucu yönetimi, otomatik mod indirme ve **oturum modu**:
-sunucu modları yalnızca oyun açıkken kurulu kalır, oyundan çıkınca otomatik kaldırılır.
+2.1.6 sürümü — kendi sunucu yönetimi, otomatik mod indirme, **oturum modu** ve
+**kısa kod** (ör. `Gel.com`) ile internetten sunucu bulma: sunucu modları yalnızca oyun
+açıkken kurulu kalır, oyundan çıkınca otomatik kaldırılır.
 
 ---
 
@@ -17,6 +18,10 @@ sunucu modları yalnızca oyun açıkken kurulu kalır, oyundan çıkınca otoma
 - **Tekrar indirme yok**: indirilen dosyalar bilgisayarınızda saklanır (önbellek); ikinci
   girişte yeniden indirilmez. DLC paketleri oyun klasörüne kopyalanmaz, bağlantı (junction)
   ile eklenir — GB'larca veri çoğaltılmaz.
+- **Gerekirse elle yenileme**: bir sunucunun indirdiği dosyaları bozuk/eksik bulursanız
+  **Sunucular** sekmesinde sunucuyu seçip **Yeniden İndir...** deyin; yalnızca o sunucunun
+  önbelleği silinip baştan indirilir. Bu sunucunun modları oyuna kuruluyken yenileme
+  çalışmaz; önce **Oturumu Bitir** ile kaldırın.
 - **Aynı mod zaten sizde varsa atlanır**: sunucudaki bir mod bilgisayarınızda zaten mevcutsa
   (aynı adlı script, ASI eklentisi veya DLC paketi) o mod **kabul edilmez**: indirilmez,
   kurulmaz, üzerine yazılmaz. Bu kural addon pedler dahil tüm türler için geçerlidir
@@ -32,7 +37,8 @@ sunucu modları yalnızca oyun açıkken kurulu kalır, oyundan çıkınca otoma
   durumu, yedekler.
 - **Sunucular**: sunucu ekleme, **Bağlan ve Oyna** (modlar otomatik iner-kurulur), oturum modu
   ayarı, modları önceden indirme, oturumu bitirme.
-- **Sunucum**: kendi sunucunuzu başlatma/durdurma, ayarlar, mod ekleme.
+- **Sunucum**: kendi sunucunuzu başlatma/durdurma, ayarlar, mod ekleme, **kısa kod**
+  (ör. `Gel.com`) ile sunucuyu internetten bulunur yapma.
 - **Günlük / Araçlar**: günlük, yedekten geri yükleme, kalıntı temizleme.
 
 ---
@@ -57,7 +63,7 @@ sunucu modları yalnızca oyun açıkken kurulu kalır, oyundan çıkınca otoma
 - Bu betik uygulamayı `%LOCALAPPDATA%\Programs\GTACoop Remake` klasörüne kopyalar ve
   **masaüstü** + **Başlat menüsü** kısayollarını buraya bağlar. Hiçbir şey silinmez
   (eski `dist` klasörü olduğu yerde kalır).
-- Uygulama simgesi ve sürüm bilgisi (2.1.0) exe dosyasına işlenmiştir.
+- Uygulama simgesi ve sürüm bilgisi (2.1.6) exe dosyasına işlenmiştir.
 
 ---
 
@@ -117,11 +123,13 @@ seçeneği varsayılan olarak **açıktır**. Çalışma biçimi:
 
 **Modları önceden indirme**: **Sunucu Modlarını İndir (ön yükleme)** düğmesi, modları *oyuna
 kurmadan* yalnızca indirir. Böylece **Bağlan ve Oyna** sırasında beklemezsiniz; dosyalar bir
-daha indirilmez.
+daha indirilmez. İndirilmiş dosyaları elle yenilemek için **Yeniden İndir...** kullanın
+(o sunucunun dosyaları silinip baştan indirilir, oyuna kurulmaz). Modlar oyuna kuruluyken
+yenileme engellenir; önce **Oturumu Bitir**.
 
-**Dosyalar nerede durur?** indirilen mod dosyaları `%LOCALAPPDATA%\GTACoopRemake\cache\`
-altında saklanır; oyun klasörüne yalnızca oynarken eklenir. Oyun kapanınca oyun klasörü
-temizlenir, önbellek kalır (tekrar indirme olmaz).
+**Dosyalar nerede durur?** indirilen mod dosyaları program klasöründe sunucu başına ayrı
+saklanır: `Servers\<sunucu adı>__<kimlik>\`. Oyun klasörüne yalnızca oynarken eklenir; oyun
+kapanınca oyun klasörü temizlenir, indirilen dosyalar kalır (tekrar indirme olmaz).
 
 ---
 
@@ -168,15 +176,33 @@ Notlar:
 
 ---
 
-## Arkadaşlarla oynama (katılım kodu veya IP)
+## Arkadaşlarla oynama (kısa kod, uzun kod veya IP)
 
-**En kolay yol (katılım kodu):**
+**En kolay yol (kısa kod, ör. `Gel.com`):**
+
+1. **Sunucum** sekmesindeki **Kısa kod** alanına `Gel.com` gibi bir kod yazın.
+   3–64 karakter; harf, rakam, nokta, tire ve alt çizgi kullanılabilir, büyük/küçük harf
+   fark etmez. Boş bırakırsanız kısa kod kapalıdır. **Kaydet**'e basın.
+2. **Sunucuyu Başlat** deyin. Launcher kodu internet üzerinden yayınlar ve 60 saniyede bir
+   tazeler; durum satırında **Kısa kod yayında: Gel.com** yazısını görün.
+3. Arkadaşınıza **yalnızca kısa kodu** gönderin (WhatsApp/Discord). Arkadaşınız
+   **Sunucular → Kod ile Katıl...** ekranına kodu yazıp **Ekle ve Bağlan**'a bassın; launcher
+   sunucu bilgilerini internetten alır.
+4. Sunucuyu durdurunca (veya uygulamayı kapatınca) kod çevrimdışı olur; arkadaşınız bağlanamaz.
+
+Kısa kod, sunucu bilgilerini şifreli olarak **ntfy.sh** üzerinden yayınlar; hesap açmanız veya
+kendi sunucunuzu kurmanız gerekmez. Kısa kod yalnızca **adresi bulur**: bağlantı için yine
+**Radmin VPN** (26.x.x.x) ya da **4499 UDP + 4599 TCP** port yönlendirmesi gerekir. Sunucu açık
+ve internet bağlantınız çalışır olmalıdır.
+
+**Uzun kod (`GTC1...`) — internet gerektirmez:**
 
 1. Siz **Sunucum → Katılım Kodu Oluştur...** ile adresi seçip kodu kopyalayın,
    arkadaşınıza gönderin (WhatsApp/Discord).
 2. Arkadaşınız **Sunucular → Kod ile Katıl...** deyip kodu yapıştırsın ve
-   **Ekle ve Bağlan**'a bassın. Kod bağlantı bilgilerini kendi taşır; hesap/internet
-   sunucusu gerekmez (şifre/token içerebilir, yalnızca güvendiğiniz kişiye verin).
+   **Ekle ve Bağlan**'a bassın. Uzun kod bağlantı bilgilerini kendi taşır; hesap/internet
+   sunucusu gerekmez, sunucu kapalıyken de oluşturulabilir (şifre/token içerebilir, yalnızca
+   güvendiğiniz kişiye verin).
 3. Siz **Sunucuyu Başlat** deyin; arkadaşınız bağlanınca modlar otomatik iner.
 
 **IP ile (kod olmadan):**
@@ -203,7 +229,7 @@ Oyun sırasında geçici kurulur/bağlanır; oyundan çıkınca kaldırılır. A
   powershell -ExecutionPolicy Bypass -File paylas.ps1
   ```
 
-  → `dist\GTACoop-Remake-Paylas.zip` (uygulama + arkadaş okubeni + lisans) oluşur.
+  → `dist\GTACoop-Remake-Share.zip` (uygulama + arkadaş okubeni + lisans) oluşur.
   Pakette Türkçe (`OKUBENI-ARKADASLAR.txt`, `KODLA-KATIL.txt`) ve İngilizce
   (`READ-ME-EN.txt`, `JOIN-WITH-CODE-EN.txt`) rehberler birlikte yer alır.
 - **Pakete asla eklemeyin:** GTA V oyun dosyaları; ScriptHook V / ScriptHookVDotNet dosyaları

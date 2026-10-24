@@ -62,6 +62,7 @@ public sealed class ServersTab : UserControl
         _connectBtn.Font = new Font("Segoe UI", 10f, FontStyle.Bold);
         actions.Controls.Add(_connectBtn);
         actions.Controls.Add(Ui.Btn(T("Sunucu Modlarını İndir (ön yükleme)"), (_, _) => _ = PrefetchAsync()));
+        actions.Controls.Add(Ui.Btn(T("Yeniden İndir..."), (_, _) => _ = PrefetchAsync(force: true)));
         actions.Controls.Add(Ui.Btn(T("Sadece Oyunu Başlat"), (_, _) => LaunchOnly()));
         _cancelBtn = Ui.Btn(T("İptal"), (_, _) => _cts?.Cancel());
         _cancelBtn.Enabled = false;
@@ -412,12 +413,17 @@ public sealed class ServersTab : UserControl
     }
 
     /// <summary>Yalnızca indirme: sunucu modlarını önbelleğe alır, oyuna kurmaz.</summary>
-    private async Task PrefetchAsync()
+    private async Task PrefetchAsync(bool force = false)
     {
         if (_busy) return;
         var sel = Selected;
         if (sel == null) { Ui.Warn(FindForm()!, T("Önce listeden bir sunucu seçin.")); return; }
         if (!MainForm.RequireGameFolder(FindForm()!, out var gameFolder)) return;
+
+        if (force && !Ui.Confirm(FindForm()!,
+                T("Bu sunucunun indirilmiş mod dosyaları silinip sunucudan yeniden indirilecek.\r\n" +
+                  "Oyun açıksa önce kapatın.\r\n\r\nDevam edilsin mi?")))
+            return;
 
         _busy = true;
         _connectBtn.Enabled = false;
@@ -425,7 +431,7 @@ public sealed class ServersTab : UserControl
         _cancelBtn.Enabled = true;
         _cts = new CancellationTokenSource();
         var ct = _cts.Token;
-        SetStatus(T("Mod dosyaları indiriliyor (oyuna kurulmayacak)..."), Ui.WarnColor);
+        SetStatus(T(force ? "Mod dosyaları yeniden indiriliyor (oyuna kurulmayacak)..." : "Mod dosyaları indiriliyor (oyuna kurulmayacak)..."), Ui.WarnColor);
         SetProgress(0);
 
         try
@@ -444,10 +450,23 @@ public sealed class ServersTab : UserControl
                 AppEnv.Log($"Ön indirme: {mf.ServerName} ({mf.Addons.Count} eklenti)");
                 var contentDir = AppEnv.ServerContentFolder(sel, mf);
                 AppEnv.Log($"Sunucu içerik klasörü: {contentDir}");
+
+                if (force)
+                {
+                    var state = SyncStateStore.Load(AppEnv.DataFolder, mf.ServerId);
+                    if (state.Addons.Count > 0)
+                        throw new SyncException(
+                            T("Bu sunucunun modları şu anda oyuna kurulu. Önce 'Oturumu Bitir' ile kaldırın."));
+                    AppEnv.ResetServerContent(contentDir);
+                    AppEnv.Log($"Yeniden indirme için sunucu içeriği sıfırlandı: {contentDir}");
+                }
+
                 await applier.PrefetchAsync(client, mf, contentDir, progress, ct);
             }, ct);
 
-            SetStatus(T("Tüm mod dosyaları indirildi (oyuna kurulmadı). Bir sonraki girişte yeniden indirilmez."), Ui.OkColor);
+            SetStatus(T(force
+                ? "Tüm mod dosyaları yeniden indirildi (oyuna kurulmadı)."
+                : "Tüm mod dosyaları indirildi (oyuna kurulmadı). Bir sonraki girişte yeniden indirilmez."), Ui.OkColor);
             SetProgress(100);
         }
         catch (OperationCanceledException)

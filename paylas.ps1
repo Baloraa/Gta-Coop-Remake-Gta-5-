@@ -1,6 +1,6 @@
 ﻿# =============================================================================
 #  GTACoop Remake - Paylaşım Paketi Oluştur
-#  dist\GTACoopRemake + arkadaş okubeni + lisans -> dist\GTACoop-Remake-Paylas.zip
+#  dist\GTACoopRemake + arkadaş okubeni (TR/EN) + lisans -> dist\GTACoop-Remake-Share.zip
 #  Kullanım:  powershell -ExecutionPolicy Bypass -File paylas.ps1
 #  (Önce build.ps1 ile dist üretilmiş olmalı.)
 # =============================================================================
@@ -9,12 +9,13 @@ $ErrorActionPreference = 'Stop'
 
 $root  = Split-Path -Parent $MyInvocation.MyCommand.Path
 $dist  = Join-Path $root 'dist\GTACoopRemake'
-$zip   = Join-Path $root 'dist\GTACoop-Remake-Paylas.zip'
+$zip   = Join-Path $root 'dist\GTACoop-Remake-Share.zip'
+$oldZip = Join-Path $root 'dist\GTACoop-Remake-Paylas.zip'
 $okubeni = Join-Path $root 'ARKADAS-OKUBENI.txt'
 $katil   = Join-Path $root 'KODLA-KATIL.txt'
 $okubeniEn = Join-Path $root 'READ-ME-EN.txt'
 $katilEn   = Join-Path $root 'JOIN-WITH-CODE-EN.txt'
-$stage = Join-Path $env:TEMP ('gtacoop-paylas-' + [Guid]::NewGuid().ToString('N'))
+$stage = Join-Path $env:TEMP ('gtacoop-share-' + [Guid]::NewGuid().ToString('N'))
 
 Write-Host "== GTACoop Remake Paylaşım Paketi ==" -ForegroundColor Cyan
 
@@ -53,6 +54,7 @@ Copy-Item $katilEn (Join-Path $stage 'GTACoop-Remake\JOIN-WITH-CODE-EN.txt') -Fo
 
 # --- Zip'le ---
 if (Test-Path $zip) { Remove-Item $zip -Force }
+if (Test-Path $oldZip) { Remove-Item $oldZip -Force }  # eski Türkçe adlı paket
 Compress-Archive -Path (Join-Path $stage 'GTACoop-Remake') -DestinationPath $zip -CompressionLevel Optimal
 
 # --- Aşamayı temizle (sadece geçici klasör) ---

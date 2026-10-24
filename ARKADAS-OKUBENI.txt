@@ -32,9 +32,12 @@ KURULUM
    - Microsoft Visual C++ çalışma zamanı (çoğu PC'de zaten vardır)
 
 4) "Sunucular" sekmesi:
-   - EN KOLAY: Sunucu sahibinin gönderdiği KATILIM KODU'nu
-     "Kod ile Katıl..." düğmesine yapıştırın; "Ekle ve Bağlan" deyin.
-     Kod, adres/port/şifre bilgilerini kendi taşır.
+   - EN KOLAY: Sunucu sahibinin gönderdiği KISA KOD'u (ör. Gel.com)
+     "Kod ile Katıl..." düğmesine yazın; "Ekle ve Bağlan" deyin.
+     Launcher sunucu bilgilerini internetten alır; sunucu açık ve
+     internetiniz çalışır olmalıdır.
+   - Sunucu sahibi uzun GTC1 kodu gönderdiyse onu da aynı ekrana
+     yapıştırabilirsiniz; uzun kod bilgileri kendi taşır.
    - Alternatif: "Sunucu Ekle" deyin; sunucu sahibinin verdiği
      adresi ve portları girin (oyun portu 4499 UDP, sync 4599 TCP).
    - "Bağlan ve Oyna"ya basın. Sunucu modları otomatik iner,
@@ -58,6 +61,11 @@ KURULUM
 - Sunucudan indirilen mod dosyaları program klasöründe her sunucu
   için ayrı saklanır: Servers\<sunucu adı>__<sunucu kimliği>\
   ("Sunucum" -> "Sunucu Klasörlerini Aç" ile görebilirsiniz).
+- Daha önce indirilen dosyalar sonraki girişlerde yeniden
+  indirilmez. İndirme bozuk/eksikse "Sunucular" sekmesinde
+  sunucuyu seçip "Yeniden İndir..." deyin; o sunucunun dosyaları
+  silinip baştan indirilir (oyuna kurulmaz). Modlar oyuna
+  kuruluyken bu işlem çalışmaz; önce "Oturumu Bitir".
 - Oyun dosyalarınız ve ScriptHook dosyalarınız değiştirilmez.
 - Kendi sunucunuzu kurmak isterseniz ayrıca .NET 10 gerekir.
 

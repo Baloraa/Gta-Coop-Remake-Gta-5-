@@ -1,18 +1,55 @@
 ==========================================================
- GTACoop Remake - Joining a Server with a Join Code
+ GTACoop Remake - Joining a Server (v2.1.6)
 ==========================================================
 
-You no longer need to remember IPs and ports: the server owner
-creates a "join code" with one click, and the friend pastes it
-into the launcher. The code contains the connection details
-itself; no cloud service or account is required.
+There are two ways to join:
+
+  1) SHORT CODE (for example Gel.com)
+     The launcher looks the server details up over the internet.
+     The server must be running and you need internet access.
+
+  2) LONG CODE (GTC1...)
+     The code carries the connection details itself; no
+     internet lookup or account is required.
+
+Both are pasted into "Join with Code..." on the "Servers" tab.
 
 ------------------------------------------------------------------
-SERVER OWNER
+SERVER OWNER - SHORT CODE (recommended)
 ------------------------------------------------------------------
 1) In the "My Server" tab, check the server name, game port
    (default 4499) and sync port (default 4599). You may also set
    a password and sync token (optional).
+
+2) Enter a code such as Gel.com in the "Short code" field and
+   click Save.
+   - 3-64 characters: letters, digits, dot, dash, underscore.
+   - Upper/lower case does not matter.
+   - Leave it empty to turn the short code off.
+   - Codes starting with "GTC1." cannot be used as short codes.
+
+3) Click "Start Server". Under the short code field you should
+   see "Short code online: Gel.com".
+   The launcher publishes the code encrypted via ntfy.sh and
+   refreshes it every 60 seconds; it goes offline when the
+   server stops.
+
+4) Send ONLY the short code to your friend (WhatsApp/Discord).
+
+5) When your friend enters the code, the launcher fetches the
+   server details from the internet and connects if the server
+   is running.
+
+Note: the short code only finds the address. Radmin VPN
+(26.x.x.x) or 4499 UDP + 4599 TCP port forwarding is still
+required for the connection. The code also carries the server
+password and sync token (encrypted); only give it to people
+you trust.
+
+------------------------------------------------------------------
+SERVER OWNER - LONG CODE (GTC1...)
+------------------------------------------------------------------
+1) In the "My Server" tab, check the server name and ports.
 
 2) Click "Create Join Code...".
 
@@ -29,8 +66,10 @@ SERVER OWNER
 5) Click "Start Server". When your friend joins with the code,
    server mods download automatically.
 
-Note: the code contains the server password and sync token.
-Only give it to people you trust.
+Note: the long code carries the connection details itself. It
+needs no internet account and can be created while the server
+is stopped. It may contain the password/token; only give it to
+people you trust.
 
 ------------------------------------------------------------------
 FRIEND (JOINING)
@@ -40,14 +79,19 @@ FRIEND (JOINING)
 2) Click "Join with Code...". If the code is in your clipboard,
    the window fills it in automatically; otherwise paste it.
 
-3) When the details appear, click "Add and Connect". The server
+3) If you enter a short code (Gel.com), the launcher fetches the
+   server details from the internet; the server must be running.
+   If you enter a long code (GTC1...), the details are read from
+   the code itself.
+
+4) When the details appear, click "Add and Connect". The server
    is added to the list, mods download, and the game starts.
 
 You can still play without a code: "Add Server..." and manual
 IP/port entry work exactly as before.
 
 ------------------------------------------------------------------
-WHERE ARE MODS STORED?
+WHERE ARE MODS STORED? / RE-DOWNLOAD
 ------------------------------------------------------------------
 Downloaded server mods are kept in the program folder, in a
 separate folder for each server:
@@ -59,6 +103,13 @@ separate folder for each server:
   referenced from this folder via an NTFS junction.
 - Script/ASI files are installed temporarily while playing and
   removed automatically on exit. Your own mods are untouched.
+- Files that were already downloaded are skipped on later joins.
+- If a download is broken or incomplete: select the server in
+  the "Servers" tab and click "Re-download...", then confirm.
+  Only that server's downloaded files are deleted and fetched
+  again (they are not installed into the game).
+- This is blocked while that server's mods are installed in the
+  game; click "End Session" first.
 - To open the folder: "My Server" -> "Open Server Folders".
 - The server.json file inside identifies the server.
 
@@ -68,9 +119,14 @@ per server, and the original game files are not modified.
 ------------------------------------------------------------------
 FAQ
 ------------------------------------------------------------------
-- The code does not work: make sure you copied all of it.
+- Short code not found: is the server running, did you type the
+  code correctly, and is your internet working? You can also try
+  the long GTC1 code.
+- A short code is only published after the server starts; while
+  the server is stopped, the lookup finds nothing.
+- The long code does not work: make sure you copied all of it.
   Line breaks are fine; the launcher strips whitespace.
 - Same network: a local IP is enough. For internet play, use
   Radmin VPN (free) or forward 4499 UDP + 4599 TCP.
-- You can create a code while the server is stopped; your friend
-  will connect once you start it.
+- You can create a long code while the server is stopped; your
+  friend will connect once you start it.

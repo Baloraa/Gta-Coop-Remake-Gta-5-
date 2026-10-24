@@ -1,4 +1,6 @@
 ﻿using System.Net;
+using System.Net.NetworkInformation;
+using System.Net.Sockets;
 using System.Windows.Forms;
 using GTACoop.Sync;
 
@@ -13,12 +15,18 @@ public sealed class MyServerTab : UserControl
     private readonly TextBox _password = new();
     private readonly TextBox _motd = new();
     private readonly TextBox _token = new();
+    private readonly TextBox _shortCode = new();
     private readonly Label _gameServerStatus = new();
     private readonly Label _syncServerStatus = new();
+    private readonly Label _shortCodeStatus = new();
     private readonly Label _addressInfo = new();
     private readonly System.Windows.Forms.Timer _timer = new();
 
     private MyServer? _server;
+    private CancellationTokenSource? _publishCts;
+    private string _publisherCode = "";
+    private string _publishStatus = "";
+    private bool _publishOk;
 
     public MyServerTab()
     {
@@ -41,10 +49,10 @@ public sealed class MyServerTab : UserControl
         {
             Dock = DockStyle.Fill,
             ColumnCount = 2,
-            RowCount = 7,
+            RowCount = 8,
             Padding = new Padding(8, 4, 8, 4)
         };
-        settingsTable.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 160));
+        settingsTable.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 200));
         settingsTable.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
 
         AddRow(settingsTable, T("Sunucu adı:"), _name, s.ServerName);
@@ -54,12 +62,17 @@ public sealed class MyServerTab : UserControl
         AddRow(settingsTable, T("Şifre (boş=yok):"), _password, s.Password);
         AddRow(settingsTable, T("Motd (karşılama):"), _motd, s.Motd);
         AddRow(settingsTable, T("Sync token:"), _token, s.SyncToken);
+        AddRow(settingsTable, T("Kısa kod (boş = kapalı):"), _shortCode, s.ShortCode);
+        _shortCode.Name = "ShortCodeBox";
+        _shortCode.AccessibleName = T("Kısa kod (boş = kapalı):");
+        _shortCode.PlaceholderText = "Gel.com";
+        _shortCode.TextChanged += (_, _) => RefreshShortCodeStatus();
 
         var settingsGroup = new GroupBox
         {
             Text = T("Sunucu Ayarları"),
             Dock = DockStyle.Top,
-            Height = 325,
+            Height = 385,
             Padding = new Padding(8)
         };
         var settingsButtons = Ui.Flow(DockStyle.Bottom);
@@ -69,6 +82,18 @@ public sealed class MyServerTab : UserControl
             OpenFolder(Path.Combine(AppEnv.ServerDir, "Addons"))));
 
         settingsGroup.Controls.Add(settingsTable);
+
+        _shortCodeStatus.Name = "ShortCodeStatus";
+        _shortCodeStatus.Text = T("Kısa kod: kapalı (isteğe bağlı)");
+        _shortCodeStatus.AutoSize = false;
+        _shortCodeStatus.Height = 24;
+        _shortCodeStatus.Dock = DockStyle.Bottom;
+        _shortCodeStatus.TextAlign = ContentAlignment.MiddleLeft;
+        _shortCodeStatus.AutoEllipsis = true;
+        _shortCodeStatus.ForeColor = Color.DimGray;
+        // Tablodaki "Kısa kod" alanının hizasında başlasın (200 px etiket + 8 px iç boşluk).
+        _shortCodeStatus.Padding = new Padding(208, 0, 0, 0);
+        settingsGroup.Controls.Add(_shortCodeStatus);
         settingsGroup.Controls.Add(settingsButtons);
 
         // --- modlar
@@ -120,7 +145,6 @@ public sealed class MyServerTab : UserControl
         _gameServerStatus.AutoSize = true;
         _syncServerStatus.Text = T("Senkronizasyon sunucusu: kapalı");
         _syncServerStatus.AutoSize = true;
-
         _addressInfo.Dock = DockStyle.Bottom;
         _addressInfo.AutoSize = false;
         _addressInfo.Height = 46;
@@ -180,11 +204,12 @@ public sealed class MyServerTab : UserControl
         (int)_maxClients.Value,
         _password.Text,
         _motd.Text,
-        _token.Text.Trim());
+        _token.Text.Trim(),
+        _shortCode.Text.Trim());
 
     private readonly record struct MyServerServerInfo(
         string Name, int GamePort, int SyncPort, int MaxClients,
-        string Password, string Motd, string Token);
+        string Password, string Motd, string Token, string ShortCode);
 
     private MyServerSettings ToSettings(MyServerServerInfo i) => new()
     {
@@ -194,24 +219,36 @@ public sealed class MyServerTab : UserControl
         MaxClients = i.MaxClients,
         Password = i.Password,
         Motd = i.Motd,
-        SyncToken = i.Token
+        SyncToken = i.Token,
+        ShortCode = i.ShortCode
     };
 
     private MyServer Server => _server ??= new MyServer(AppEnv.ServerDir, AppEnv.Log);
 
-    private void SaveSettings()
+    private bool SaveSettings()
     {
         try
         {
             var info = CurrentSettings();
+
+            if (info.ShortCode.Length > 0 &&
+                !ShortCodeDirectory.TryNormalize(info.ShortCode, out _, out var shortError))
+            {
+                Ui.Warn(FindForm()!, T("Kısa kod geçersiz: {0}", shortError));
+                return false;
+            }
+
             ToSettings(info).Save(AppEnv.DataFolder);
             Server.EnsureLayout();
-            AppEnv.Log($"Sunucu ayarları kaydedildi: {info.Name} (oyun: {info.GamePort}, sync: {info.SyncPort})");
+            AppEnv.Log($"Sunucu ayarları kaydedildi: {info.Name} (oyun: {info.GamePort}, sync: {info.SyncPort})" +
+                       (info.ShortCode.Length > 0 ? $", kısa kod: {info.ShortCode}" : ""));
+            return true;
         }
         catch (Exception ex)
         {
             AppEnv.LogError(ex.Message);
             Ui.Error(FindForm()!, T("Ayarlar kaydedilemedi:\r\n") + ex.Message);
+            return false;
         }
     }
 
@@ -225,7 +262,29 @@ public sealed class MyServerTab : UserControl
             return;
         }
 
-        using var dlg = new ShareCodeDialog(ToSettings(info));
+        if (info.ShortCode.Length > 0 &&
+            !ShortCodeDirectory.TryNormalize(info.ShortCode, out _, out var shortError))
+        {
+            Ui.Warn(FindForm()!, T("Kısa kod geçersiz: {0}", shortError));
+            return;
+        }
+
+        var serverRunning = Server.IsGameServerRunning && Server.IsSyncServerRunning;
+        var status = _publishStatus;
+        var ok = _publishOk;
+
+        if (serverRunning)
+        {
+            var normalized = "";
+            if (ShortCodeDirectory.TryNormalize(info.ShortCode, out normalized, out _) &&
+                !string.Equals(normalized, _publisherCode, StringComparison.Ordinal))
+            {
+                status = T("Kısa kod değişti; yayına almak için sunucuyu yeniden başlatın.");
+                ok = false;
+            }
+        }
+
+        using var dlg = new ShareCodeDialog(ToSettings(info), serverRunning, status, ok);
         dlg.ShowDialog(FindForm());
     }
 
@@ -240,7 +299,7 @@ public sealed class MyServerTab : UserControl
                 return;
             }
 
-            SaveSettings();
+            if (!SaveSettings()) return;
             var settings = ToSettings(info);
 
             Server.EnsureLayout();
@@ -249,9 +308,11 @@ public sealed class MyServerTab : UserControl
 
             Server.StartGameServer();
             Server.StartSyncServer(settings);
+            StartPublisher(settings);
 
             AppEnv.Log($"Sunucu başlatıldı: {info.Name} " +
-                       $"(oyun portu {info.GamePort}, sync portu {info.SyncPort})");
+                       $"(oyun portu {info.GamePort}, sync portu {info.SyncPort})" +
+                       (info.ShortCode.Length > 0 ? $", kısa kod: {info.ShortCode}" : ""));
 
             RefreshStatus();
         }
@@ -266,6 +327,7 @@ public sealed class MyServerTab : UserControl
     {
         try
         {
+            StopPublisher(publishOffline: true);
             Server.StopAll();
             RefreshStatus();
         }
@@ -281,6 +343,9 @@ public sealed class MyServerTab : UserControl
         try
         {
             _timer.Stop();
+            // Uygulama kapatılırken de kısa kodu çevrimdışı bırak; aksi halde
+            // arkadaşlar 5 dakikaya kadar eski sunucu bilgisini görebilir.
+            StopPublisher(publishOffline: true);
             Server.StopAll();
         }
         catch (Exception ex)
@@ -308,6 +373,200 @@ public sealed class MyServerTab : UserControl
             ? T("Bağlantı adresleri: ") + string.Join(", ", ips.Select(ip =>
                 T("{0}:{1} (oyun) / {2}:{3} (sync)", ip, info.GamePort, ip, info.SyncPort)))
             : T("Sunucu kapalıyken modlar değiştirilebilir; başlatınca otomatik güncellenir.");
+
+        RefreshShortCodeStatus();
+    }
+
+    // ------------------------------------------------------------------ kısa kod yayını
+
+    private void StartPublisher(MyServerSettings settings)
+    {
+        StopPublisher(publishOffline: false);
+        _publishStatus = "";
+        _publishOk = false;
+
+        if (string.IsNullOrWhiteSpace(settings.ShortCode)) return;
+        if (!ShortCodeDirectory.TryNormalize(settings.ShortCode, out var code, out _)) return;
+
+        _publisherCode = code;
+        var cts = new CancellationTokenSource();
+        _publishCts = cts;
+        _ = Task.Run(() => PublishLoopAsync(settings, code, cts.Token));
+    }
+
+    private void StopPublisher(bool publishOffline)
+    {
+        var code = _publisherCode;
+        _publisherCode = "";
+        var cts = _publishCts;
+        _publishCts = null;
+
+        try { cts?.Cancel(); } catch { /* zaten kapanmış */ }
+
+        _publishStatus = "";
+        _publishOk = false;
+
+        if (publishOffline && !string.IsNullOrEmpty(code))
+        {
+            try
+            {
+                // UI iş parçacığında doğrudan .Wait() çağrısı, async metodun
+                // devamının UI'ye post edilmesiyle kilitlenir. Task.Run ile
+                // arka planda çalıştırıp en fazla 5 sn bekle.
+                if (!Task.Run(() => ShortCodeDirectory.PublishOfflineAsync(
+                        code, CancellationToken.None)).Wait(TimeSpan.FromSeconds(5)))
+                    AppEnv.Log("Kısa kod çevrimdışı yayını 5 sn içinde tamamlanamadı (arka planda sürüyor).");
+            }
+            catch (Exception ex)
+            {
+                AppEnv.Log("Kısa kod çevrimdışı yayını başarısız: " + ex.Message);
+            }
+        }
+    }
+
+    private async Task PublishLoopAsync(MyServerSettings settings, string code, CancellationToken ct)
+    {
+        var hosts = new List<string>();
+        var hostsAt = DateTime.MinValue;
+        var lastOk = false;
+
+        while (!ct.IsCancellationRequested)
+        {
+            try
+            {
+                if (hosts.Count == 0 || (DateTime.UtcNow - hostsAt).TotalMinutes >= 10)
+                {
+                    hosts = await BuildAdvertiseHostsAsync(ct);
+                    hostsAt = DateTime.UtcNow;
+                }
+
+                var offer = new ShortCodeDirectory.ShortCodeOffer(
+                    settings.ServerName,
+                    hosts,
+                    settings.GamePort,
+                    settings.SyncPort,
+                    settings.Password,
+                    settings.SyncToken,
+                    DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+
+                await ShortCodeDirectory.PublishAsync(code, offer, ct);
+                SetPublishStatus(T("Kısa kod yayında: {0}", settings.ShortCode), ok: true);
+
+                if (!lastOk)
+                    AppEnv.Log($"Kısa kod yayınlandı: {settings.ShortCode} ({hosts.Count} adres)");
+                lastOk = true;
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
+            catch (Exception ex)
+            {
+                SetPublishStatus(T("Kısa kod yayınlanamadı: {0}", ex.Message), ok: false);
+                if (lastOk) AppEnv.LogError("Kısa kod yayını: " + ex.Message);
+                lastOk = false;
+            }
+
+            try
+            {
+                await Task.Delay(TimeSpan.FromSeconds(ShortCodeDirectory.HeartbeatSeconds), ct);
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
+        }
+    }
+
+    private static async Task<List<string>> BuildAdvertiseHostsAsync(CancellationToken ct)
+    {
+        var list = new List<string>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        try
+        {
+            foreach (var ni in NetworkInterface.GetAllNetworkInterfaces())
+            {
+                if (ni.OperationalStatus != OperationalStatus.Up) continue;
+                if (ni.NetworkInterfaceType == NetworkInterfaceType.Loopback) continue;
+
+                foreach (var ua in ni.GetIPProperties().UnicastAddresses)
+                {
+                    if (ua.Address.AddressFamily != AddressFamily.InterNetwork) continue;
+                    var ip = ua.Address.ToString();
+                    if (ip.StartsWith("169.254.")) continue;
+                    if (seen.Add(ip)) list.Add(ip);
+                }
+            }
+        }
+        catch { /* adres listesi kritik değil */ }
+
+        var publicIp = await ShortCodeDirectory.GetPublicIpAsync(ct);
+        if (!string.IsNullOrEmpty(publicIp) && seen.Add(publicIp))
+            list.Add(publicIp);
+
+        // Radmin VPN (26.x) ve genel IP önce denenir; istemci adresleri paralel dener.
+        list.Sort((a, b) => ScoreHost(a, publicIp).CompareTo(ScoreHost(b, publicIp)));
+        if (list.Count > 12) list = list.Take(12).ToList();
+        return list;
+    }
+
+    private static int ScoreHost(string ip, string? publicIp)
+    {
+        if (ip.StartsWith("26.")) return 0;
+        if (ip == publicIp) return 1;
+        if (ip.StartsWith("192.168.") || ip.StartsWith("10.") ||
+            ip.StartsWith("172.")) return 2;
+        return 3;
+    }
+
+    private void SetPublishStatus(string text, bool ok)
+    {
+        _publishStatus = text;
+        _publishOk = ok;
+
+        try
+        {
+            if (IsDisposed || !IsHandleCreated) return;
+            if (InvokeRequired) BeginInvoke(RefreshShortCodeStatus);
+            else RefreshShortCodeStatus();
+        }
+        catch { /* pencere kapanırken */ }
+    }
+
+    private void RefreshShortCodeStatus()
+    {
+        var code = _shortCode.Text.Trim();
+        var normalized = ShortCodeDirectory.TryNormalize(code, out var n, out _) ? n : "";
+        bool running = Server.IsGameServerRunning && Server.IsSyncServerRunning;
+
+        if (code.Length == 0)
+        {
+            _shortCodeStatus.Text = T("Kısa kod: kapalı (isteğe bağlı)");
+            _shortCodeStatus.ForeColor = Color.DimGray;
+        }
+        else if (!running)
+        {
+            _shortCodeStatus.Text = T("Kısa kod: {0} (sunucu başlatılınca yayınlanır)", code);
+            _shortCodeStatus.ForeColor = Color.DimGray;
+        }
+        else if (normalized.Length > 0 &&
+                 !string.Equals(normalized, _publisherCode, StringComparison.Ordinal))
+        {
+            _shortCodeStatus.Text =
+                T("Kısa kod değişti; yayına almak için sunucuyu yeniden başlatın.");
+            _shortCodeStatus.ForeColor = Ui.WarnColor;
+        }
+        else if (!string.IsNullOrEmpty(_publishStatus))
+        {
+            _shortCodeStatus.Text = _publishStatus;
+            _shortCodeStatus.ForeColor = _publishOk ? Ui.OkColor : Ui.WarnColor;
+        }
+        else
+        {
+            _shortCodeStatus.Text = T("Kısa kod: {0} (yayın hazırlanıyor...)", code);
+            _shortCodeStatus.ForeColor = Color.DimGray;
+        }
     }
 
     private static List<string> GetLocalIPv4()

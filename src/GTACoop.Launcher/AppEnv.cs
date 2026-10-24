@@ -116,6 +116,19 @@ public static class AppEnv
         return dir;
     }
 
+    /// <summary>Bir sunucunun indirilmiş mod dosyalarını siler (server.json kalır).</summary>
+    public static void ResetServerContent(string dir)
+    {
+        if (!Directory.Exists(dir)) return;
+        foreach (var entry in Directory.EnumerateFileSystemEntries(dir))
+        {
+            if (string.Equals(Path.GetFileName(entry), "server.json", StringComparison.OrdinalIgnoreCase))
+                continue;
+            if (Directory.Exists(entry)) Directory.Delete(entry, recursive: true);
+            else File.Delete(entry);
+        }
+    }
+
     /// <summary>Sunucu klasöründeki okunabilir bilgi dosyası (server.json).</summary>
     public sealed class ServerFolderInfo
     {

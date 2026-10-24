@@ -1,18 +1,51 @@
 ==========================================================
- GTACoop Remake - Katılım Kodu ile Sunucuya Katılma
+ GTACoop Remake - Sunucuya Katılma (v2.1.6)
 ==========================================================
 
-Bu sürümde sunucuya katılmak için IP/port ezberlemeye gerek yok:
-sunucu sahibi tek tıkla bir "katılım kodu" üretir, arkadaş da bu
-kodu launcher'a yapıştırır. Kod, bağlantı bilgilerini kendi içinde
-taşır; internet sunucusu/hesap gerektirmez.
+Sunucuya katılmanın iki yolu var:
+
+  1) KISA KOD (ör. Gel.com)
+     Sunucu bilgileri internetten alınır. Sunucunun açık ve
+     internet bağlantınızın çalışır olması gerekir.
+
+  2) UZUN KOD (GTC1...)
+     Bağlantı bilgilerini kendi taşır; internet/hesap gerekmez.
+
+Her iki kod da "Sunucular" sekmesindeki "Kod ile Katıl..."
+ekranına yapıştırılır.
 
 ------------------------------------------------------------------
-SUNUCU SAHİBİ
+SUNUCU SAHİBİ - KISA KOD (önerilen)
 ------------------------------------------------------------------
-1) "Sunucum" sekmesinde sunucu adını, oyun portunu (varsayılan 4499)
-   ve sync portunu (varsayılan 4599) kontrol et. İstersen şifre
-   ve sync token da girebilirsin (isteğe bağlı).
+1) "Sunucum" sekmesinde sunucu adını, oyun portunu (varsayılan
+   4499) ve sync portunu (varsayılan 4599) kontrol et. İstersen
+   şifre ve sync token da girebilirsin (isteğe bağlı).
+
+2) "Kısa kod" alanına Gel.com gibi bir kod yaz ve Kaydet'e bas.
+   - 3-64 karakter: harf, rakam, nokta, tire, alt çizgi.
+   - Büyük/küçük harf fark etmez.
+   - Boş bırakırsan kısa kod kapalıdır.
+   - "GTC1." ile başlayan kod kısa kod olarak kullanılamaz.
+
+3) "Sunucuyu Başlat" düğmesine bas. Kısa kod alanının altında
+   "Kısa kod yayında: Gel.com" yazısını gör.
+   Launcher kodu ntfy.sh üzerinden şifreli yayınlar ve 60
+   saniyede bir tazeler; sunucu durunca kod çevrimdışı olur.
+
+4) Arkadaşına SADECE kısa kodu gönder (WhatsApp, Discord...).
+
+5) Arkadaşın kodu girdiğinde launcher sunucu bilgilerini
+   internetten alır; sunucu açıksa bağlanır.
+
+Not: Kısa kod yalnızca adresi bulur. Bağlantı için Radmin VPN
+(26.x.x.x) ya da 4499 UDP + 4599 TCP port yönlendirmesi gerekir.
+Kod, sunucu şifresini ve sync token'ını da şifreli olarak taşır;
+sadece güvendiğin kişilere ver.
+
+------------------------------------------------------------------
+SUNUCU SAHİBİ - UZUN KOD (GTC1...)
+------------------------------------------------------------------
+1) "Sunucum" sekmesinde sunucu adını ve portları kontrol et.
 
 2) "Katılım Kodu Oluştur..." düğmesine bas.
 
@@ -27,8 +60,9 @@ SUNUCU SAHİBİ
 5) "Sunucuyu Başlat" ile sunucuyu aç. Arkadaşın kod ile bağlanınca
    sunucu modları otomatik inecek.
 
-Not: Kod, sunucu şifresini ve sync token'ını da içerir. Sadece
-güvendiğin kişilere ver.
+Not: Uzun kod bağlantı bilgilerini kendi taşır; internet hesabı
+gerektirmez ve sunucu kapalıyken de oluşturulabilir. Şifre/token
+içerebilir; sadece güvendiğin kişilere ver.
 
 ------------------------------------------------------------------
 ARKADAŞ (katılan)
@@ -38,16 +72,20 @@ ARKADAŞ (katılan)
 2) "Kod ile Katıl..." düğmesine bas. Kod panodaysa pencere
    açıldığında otomatik dolar; değilse kodu yapıştır.
 
-3) Bilgiler görününce "Ekle ve Bağlan" de. Sunucu listeye eklenir,
+3) Kısa kod (Gel.com) girersen launcher sunucu bilgilerini
+   internetten alır; sunucunun açık olması gerekir. Uzun kod
+   (GTC1...) girersen bilgiler koddan okunur.
+
+4) Bilgiler görününce "Ekle ve Bağlan" de. Sunucu listeye eklenir,
    modlar iner ve oyun açılır.
 
 Kod olmadan da oynanabilir: "Sunucu Ekle..." ile IP ve portları
 elle girme yöntemi aynen duruyor.
 
 ------------------------------------------------------------------
-MODLAR NEREDE SAKLANIR?
+MODLAR NEREDE SAKLANIR? / YENİDEN İNDİRME
 ------------------------------------------------------------------
-Sunucudan indirilen modlar artık program klasöründe, her sunucu
+Sunucudan indirilen modlar program klasöründe, her sunucu
 için ayrı bir klasörde tutulur:
 
   <GTACoop Remake klasörü>\Servers\<sunucu adı>__<sunucu kimliği>\
@@ -58,6 +96,14 @@ için ayrı bir klasörde tutulur:
 - Script/ASI dosyaları oyun sırasında geçici olarak kurulur;
   oyundan çıkınca otomatik kaldırılır. Senin kendi modlarına
   dokunulmaz.
+- Daha önce indirilen dosyalar sonraki girişlerde yeniden
+  indirilmez.
+- İndirme bozuk/eksikse: "Sunucular" sekmesinde sunucuyu seç,
+  "Yeniden İndir..." düğmesine bas ve onayla. Yalnızca o
+  sunucunun indirilmiş dosyaları silinip baştan indirilir
+  (oyuna kurulmaz).
+- Bu sunucunun modları oyuna kuruluyken yeniden indirme
+  çalışmaz; önce "Oturumu Bitir" ile modları kaldır.
 - Klasörü açmak için: "Sunucum" -> "Sunucu Klasörlerini Aç".
 - İçindeki server.json dosyası hangi sunucuya ait olduğunu yazar.
 
@@ -67,10 +113,15 @@ durur, oyunun orijinal dosyaları değiştirilmez.
 ------------------------------------------------------------------
 SIK SORULANLAR
 ------------------------------------------------------------------
-- Kod çalışmadı: eksiksiz kopyalandığından emin ol; satır sonları
-  sorun değil, launcher boşlukları temizler.
-- Aynı ağdasınız yerel IP yeterli. İnternet üzerinden bağlanacaksanız
-  Radmin VPN (ücretsiz) kullanın veya 4499 UDP + 4599 TCP portlarını
-  yönlendirin.
-- Sunucu kapalıyken kod oluşturabilirsin; arkadaşın sen başlatınca
-  bağlanır.
+- Kısa kod bulunamadı: sunucu açık mı, kodu doğru yazdın mı,
+  internet bağlantın çalışıyor mu? Uzun GTC1 kodunu da
+  deneyebilirsin.
+- Kısa kod ancak sunucu başlatılınca yayınlanır; sunucu kapalıyken
+  arkadaşın kodu arasa da bulamaz.
+- Uzun kod çalışmadı: eksiksiz kopyalandığından emin ol; satır
+  sonları sorun değil, launcher boşlukları temizler.
+- Aynı ağdasınız yerel IP yeterli. İnternet üzerinden
+  bağlanacaksanız Radmin VPN (ücretsiz) kullanın veya
+  4499 UDP + 4599 TCP portlarını yönlendirin.
+- Sunucu kapalıyken uzun kod oluşturabilirsin; arkadaşın sen
+  başlatınca bağlanır.

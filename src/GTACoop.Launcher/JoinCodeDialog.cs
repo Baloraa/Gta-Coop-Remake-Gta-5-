@@ -5,7 +5,8 @@ namespace GTACoop.Remake;
 
 /// <summary>
 /// Arkadaşın gönderdiği katılım kodunu yapıştırıp sunucuyu tek adımda ekleme penceresi.
-/// Kod, bağlantı bilgilerini kendi içinde taşır; internet/sunucu gerekmez.
+/// Uzun GTC1 kodu bağlantı bilgilerini kendi taşır; kısa kod (ör. Gel.com) ise
+/// internet üzerindeki şifreli yayından çözülür.
 /// </summary>
 public sealed class JoinCodeDialog : Form
 {
@@ -13,7 +14,11 @@ public sealed class JoinCodeDialog : Form
     private readonly Label _summary = new();
     private readonly Button _addBtn;
     private readonly Button _connectBtn;
+    private readonly Button _retryBtn;
+    private readonly System.Windows.Forms.Timer _lookupTimer = new();
     private ServerEntry? _parsed;
+    private CancellationTokenSource? _lookupCts;
+    private string? _pendingCode;
 
     /// <summary>Çözülen sunucu kaydı (yalnızca OK ile kapanırsa dolu).</summary>
     public ServerEntry? Entry { get; private set; }
@@ -26,9 +31,9 @@ public sealed class JoinCodeDialog : Form
         Text = T("Katılım Kodu");
         AutoScaleMode = AutoScaleMode.Dpi;
         AutoScaleDimensions = new SizeF(96f, 96f);
-        Width = 620;
-        Height = 440;
-        MinimumSize = new Size(520, 380);
+        Width = 760;
+        Height = 620;
+        MinimumSize = new Size(680, 560);
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
         MinimizeBox = false;
@@ -80,6 +85,8 @@ public sealed class JoinCodeDialog : Form
         buttons.Dock = DockStyle.Fill;
         buttons.Margin = new Padding(0, 0, 0, 4);
         buttons.Controls.Add(Ui.Btn(T("Panodan Yapıştır"), (_, _) => PasteCode()));
+        _retryBtn = Ui.Btn(T("Yeniden Ara"), (_, _) => RetryLookup());
+        buttons.Controls.Add(_retryBtn);
         _addBtn = Ui.Btn(T("Ekle"), (_, _) => Accept(connect: false));
         _addBtn.Enabled = false;
         _connectBtn = Ui.Btn(T("Ekle ve Bağlan"), (_, _) => Accept(connect: true));
@@ -93,9 +100,10 @@ public sealed class JoinCodeDialog : Form
         {
             AutoSize = true,
             ForeColor = Color.DimGray,
-            MaximumSize = new Size(560, 0),
-            Text = T("İpucu: Kodu sunucu sahibi 'Sunucum' sekmesinde 'Katılım Kodu Oluştur...' ile üretir. " +
-                     "Kod sunucu şifresini/token'ını içerebilir; yalnızca güvendiğiniz kişilerle paylaşın."),
+            MaximumSize = new Size(720, 0),
+            Text = T("İpucu: Kısa kod (ör. Gel.com) sunucuyu internet üzerinden bulur; sunucu açık olmalı. " +
+                     "Uzun GTC1 kodu bağlantı bilgilerini kendi taşır ve internet gerektirmez. " +
+                     "Kod şifre/token içerebilir; yalnızca güvendiğiniz kişilerle paylaşın."),
             Margin = new Padding(2, 2, 2, 0)
         };
 
@@ -109,6 +117,20 @@ public sealed class JoinCodeDialog : Form
         AcceptButton = _connectBtn;
         CancelButton = cancelBtn;
 
+        _lookupTimer.Interval = 600;
+        _lookupTimer.Tick += (_, _) =>
+        {
+            _lookupTimer.Stop();
+            var code = _pendingCode;
+            if (code != null) _ = LookupShortCodeAsync(code);
+        };
+
+        FormClosed += (_, _) =>
+        {
+            _lookupTimer.Stop();
+            _lookupCts?.Cancel();
+        };
+
         // Panoda hazır bir kod varsa otomatik doldur (kopyala → launcher → yapıştır gerekmesin).
         TryFillFromClipboard();
     }
@@ -119,7 +141,8 @@ public sealed class JoinCodeDialog : Form
         {
             if (!Clipboard.ContainsText()) return;
             var text = Clipboard.GetText().Trim();
-            if (text.StartsWith(JoinCode.Prefix, StringComparison.OrdinalIgnoreCase))
+            if (text.StartsWith(JoinCode.Prefix, StringComparison.OrdinalIgnoreCase) ||
+                ShortCodeDirectory.IsShortCode(text))
                 _code.Text = text;
         }
         catch { /* pano erişilemezse kullanıcı elle yapıştırır */ }
@@ -142,33 +165,187 @@ public sealed class JoinCodeDialog : Form
         }
     }
 
+    private void RetryLookup()
+    {
+        Decode();
+        if (_pendingCode == null) return;
+
+        _lookupTimer.Stop();
+        var code = _pendingCode;
+        _ = LookupShortCodeAsync(code);
+    }
+
     private void Decode()
     {
-        if (string.IsNullOrWhiteSpace(_code.Text))
+        _lookupTimer.Stop();
+        _lookupCts?.Cancel();
+        _pendingCode = null;
+
+        var text = _code.Text.Trim();
+        if (text.Length == 0)
         {
             _parsed = null;
-            _summary.ForeColor = Color.DimGray;
-            _summary.Text = T("Kod yapıştırıldığında sunucu bilgileri burada görünür.");
+            SetSummary(T("Kod yapıştırıldığında sunucu bilgileri burada görünür."), Color.DimGray);
             _addBtn.Enabled = _connectBtn.Enabled = false;
             return;
         }
 
-        if (JoinCode.TryParse(_code.Text, out var entry, out var error) && entry != null)
+        // 1) Uzun (GTC1) kod: bağlantı bilgilerini kendi taşır.
+        if (JoinCode.TryParse(text, out var entry, out var longError) && entry != null)
         {
             _parsed = entry;
-            _summary.ForeColor = Ui.OkColor;
-            _summary.Text = T("Sunucu: {0}\r\nAdres: {1}\r\nOyun portu: {2}  |  Sync portu: {3}\r\nŞifre: {4}",
+            SetSummary(T("Sunucu: {0}\r\nAdres: {1}\r\nOyun portu: {2}  |  Sync portu: {3}\r\nŞifre: {4}",
                 entry.Name, entry.Host, entry.GamePort, entry.SyncPort,
-                string.IsNullOrEmpty(entry.Password) ? T("yok") : T("var"));
+                string.IsNullOrEmpty(entry.Password) ? T("yok") : T("var")), Ui.OkColor);
             _addBtn.Enabled = _connectBtn.Enabled = true;
+            return;
         }
-        else
+
+        if (text.StartsWith(JoinCode.Prefix, StringComparison.OrdinalIgnoreCase) ||
+            text.Length > ShortCodeDirectory.MaxLength)
         {
             _parsed = null;
-            _summary.ForeColor = Ui.ErrColor;
-            _summary.Text = T("Geçersiz kod: {0}", error);
+            SetSummary(T("Geçersiz kod: {0}", longError), Ui.ErrColor);
             _addBtn.Enabled = _connectBtn.Enabled = false;
+            return;
         }
+
+        // 2) Kısa kod: internet üzerinden şifreli yayından çözülür.
+        if (ShortCodeDirectory.TryNormalize(text, out var code, out var shortError))
+        {
+            _parsed = null;
+            _addBtn.Enabled = _connectBtn.Enabled = false;
+            SetSummary(T("Kısa kod aranıyor: {0} ...", text), Color.DimGray);
+            _pendingCode = code;
+            _lookupTimer.Start();
+            return;
+        }
+
+        _parsed = null;
+        SetSummary(T("Geçersiz kod: {0}", shortError), Ui.ErrColor);
+        _addBtn.Enabled = _connectBtn.Enabled = false;
+    }
+
+    private async Task LookupShortCodeAsync(string code)
+    {
+        _lookupCts?.Cancel();
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        _lookupCts = cts;
+
+        var display = _code.Text.Trim();
+        SetSummary(T("Kısa kod aranıyor: {0} ...\r\n(İnternet üzerinden sunucu bilgileri alınıyor)", display),
+            Color.DimGray);
+
+        try
+        {
+            var offer = await ShortCodeDirectory.LookupAsync(code, cts.Token);
+            if (cts.IsCancellationRequested || IsDisposed || !IsCurrentShortCode(code)) return;
+
+            if (offer == null)
+            {
+                SetSummary(T("Kısa kod bulunamadı.\r\nSunucu açık mı? Kodu doğru yazdınız mı? İnternet bağlantınız var mı?\r\nUzun GTC1 kodunu da deneyebilirsiniz."),
+                    Ui.WarnColor);
+                return;
+            }
+
+            SetSummary(T("Sunucu bulundu, adresler deneniyor..."), Color.DimGray);
+            var resolved = await ResolveOfferAsync(offer, cts.Token);
+            if (cts.IsCancellationRequested || IsDisposed || !IsCurrentShortCode(code)) return;
+
+            if (resolved == null)
+            {
+                SetSummary(T("Sunucuya ulaşılamadı. Sunucu açık mı, adres/port doğru mu? Radmin VPN veya port yönlendirme gerekebilir.\r\nUzun GTC1 kodunu da deneyebilirsiniz."),
+                    Ui.WarnColor);
+                return;
+            }
+
+            _parsed = resolved;
+            SetSummary(T("Kısa kod bulundu ✓\r\nSunucu: {0}\r\nAdres: {1}\r\nOyun portu: {2}  |  Sync portu: {3}\r\nŞifre: {4}",
+                resolved.Name, resolved.Host, resolved.GamePort, resolved.SyncPort,
+                string.IsNullOrEmpty(resolved.Password) ? T("yok") : T("var")), Ui.OkColor);
+            _addBtn.Enabled = _connectBtn.Enabled = true;
+        }
+        catch (OperationCanceledException)
+        {
+            // Yeni bir arama başladı veya pencere kapandı.
+        }
+        catch (Exception ex)
+        {
+            if (!cts.IsCancellationRequested && !IsDisposed && IsCurrentShortCode(code))
+                SetSummary(T("Kısa kod aranamadı: {0}", ex.Message), Ui.ErrColor);
+        }
+        finally
+        {
+            if (ReferenceEquals(_lookupCts, cts)) _lookupCts = null;
+            cts.Dispose();
+        }
+    }
+
+    private async Task<ServerEntry?> ResolveOfferAsync(
+        ShortCodeDirectory.ShortCodeOffer offer, CancellationToken ct)
+    {
+        // Adresleri sırayla denemek yerine paralel dene: uzak bir arkadaş için
+        // yerel/virtual adreslerin zaman aşımını beklemeden genel IP'ye ulaşılsın.
+        var groupCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        var tasks = offer.Hosts
+            .Select(host => TryHostAsync(host, offer, groupCts.Token))
+            .ToList();
+
+        while (tasks.Count > 0)
+        {
+            var done = await Task.WhenAny(tasks);
+            tasks.Remove(done);
+            var entry = await done;
+            if (entry == null) continue;
+
+            groupCts.Cancel(); // diğer adres denemelerini bırak
+            return entry;
+        }
+
+        return null;
+    }
+
+    private static async Task<ServerEntry?> TryHostAsync(string host,
+        ShortCodeDirectory.ShortCodeOffer offer, CancellationToken ct)
+    {
+        try
+        {
+            using var linkCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            linkCts.CancelAfter(TimeSpan.FromSeconds(3));
+
+            using var client = new SyncClient(host, offer.SyncPort, offer.SyncToken);
+            var mf = await client.GetManifestAsync(linkCts.Token);
+
+            return new ServerEntry
+            {
+                Name = string.IsNullOrWhiteSpace(mf.ServerName) ? offer.Name : mf.ServerName,
+                Host = host,
+                GamePort = offer.GamePort,
+                SyncPort = offer.SyncPort,
+                Password = offer.Password,
+                SyncToken = offer.SyncToken,
+                AutoConnect = true
+            };
+        }
+        catch
+        {
+            // Bu adres çalışmadı; diğerleri paralel deneniyor.
+            return null;
+        }
+    }
+
+    private bool IsCurrentShortCode(string normalized)
+    {
+        var text = _code.Text.Trim();
+        return ShortCodeDirectory.TryNormalize(text, out var current, out _) &&
+               string.Equals(current, normalized, StringComparison.Ordinal);
+    }
+
+    private void SetSummary(string text, Color color)
+    {
+        if (IsDisposed) return;
+        _summary.ForeColor = color;
+        _summary.Text = text;
     }
 
     private void Accept(bool connect)

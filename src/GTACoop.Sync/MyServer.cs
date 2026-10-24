@@ -16,6 +16,12 @@ public sealed class MyServerSettings
     public string GamemodeName { get; set; } = "none";
     public string SyncToken { get; set; } = "";
 
+    /// <summary>
+    /// İsteğe bağlı kısa katılım kodu (ör. "Gel.com"). Boşsa kısa kod yayını kapalıdır.
+    /// Uzun GTC1 kodu bu ayardan bağımsız olarak çalışır.
+    /// </summary>
+    public string ShortCode { get; set; } = "";
+
     public static string SettingsPath(string dataFolder) =>
         Path.Combine(dataFolder, "myServer.json");
 
