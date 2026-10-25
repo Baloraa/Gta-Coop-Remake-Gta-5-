@@ -121,7 +121,7 @@ public sealed class AboutTab : UserControl
     private static string AppVersion()
     {
         var v = typeof(AboutTab).Assembly.GetName().Version;
-        return v == null ? "2.1.7" : $"{v.Major}.{v.Minor}.{v.Build}";
+        return v == null ? "2.2.0" : $"{v.Major}.{v.Minor}.{v.Build}";
     }
 
     private LinkLabel MakeLink(string text, string url)

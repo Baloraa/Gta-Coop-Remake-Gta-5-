@@ -1,7 +1,8 @@
 # GTACoop Remake — Türkçe Mod + Sunucu Yöneticisi
 
-2.1.7 sürümü — kendi sunucu yönetimi, otomatik mod indirme, **oturum modu**,
-**kısa kod** (ör. `Gel.com`) ile internetten sunucu bulma ve **otomatik relay**:
+2.2.0 sürümü — kendi sunucu yönetimi, otomatik mod indirme, **oturum modu**,
+**kısa kod** (ör. `Gel.com`) ile internetten sunucu bulma, **otomatik relay** ve
+**Bileşenler** sekmesinden ScriptHookV / ScriptHookVDotNet / OpenIV alternatifi kurulumu:
 port yönlendirme veya Radmin VPN olmadan da arkadaşlarınız bağlanabilir. Sunucu modları
 yalnızca oyun açıkken kurulu kalır, oyundan çıkınca otomatik kaldırılır.
 
@@ -39,11 +40,51 @@ yalnızca oyun açıkken kurulu kalır, oyundan çıkınca otomatik kaldırılı
 
 - **Oyun**: oyun klasörünü seçme, istemciyi kurma (GTACoOp), **oyuncu adınızı** seçme, oyun
   durumu, yedekler.
+- **Bileşenler**: ScriptHookV, ScriptHookVDotNet (stable / nightly / Enhanced) ve OpenIV
+  alternatifi RageOpenV'yi sürüm seçerek kurma/güncelleme; eski dosyaları yedekleme ve geri
+  yükleme. NativeTrainer.asi hiçbir zaman kurulmaz; kendi script/modlarınıza dokunulmaz.
 - **Sunucular**: sunucu ekleme, **Bağlan ve Oyna** (modlar otomatik iner-kurulur), oturum modu
   ayarı, modları önceden indirme, oturumu bitirme.
 - **Sunucum**: kendi sunucunuzu başlatma/durdurma, ayarlar, mod ekleme, **kısa kod**
   (ör. `Gel.com`) ile sunucuyu internetten bulunur yapma.
 - **Günlük / Araçlar**: günlük, yedekten geri yükleme, kalıntı temizleme.
+
+---
+
+## Bileşenler (ScriptHookV / ScriptHookVDotNet / OpenIV)
+
+**Bileşenler** sekmesi, oyunun çalışması için gereken temel mod dosyalarını internetten
+indirip oyun kök klasörüne kurar. Paket içinde bu dosyalar **gelmez**; yalnızca siz
+istediğinizde indirilir.
+
+| Bileşen | Kaynak | Not |
+|---|---|---|
+| **ScriptHookV** | `dev-c.com` (resmî, Alexander Blade) | GitHub'da resmî sürüm yoktur ve yeniden dağıtım yasaktır. Yalnızca güncel resmî sürüm sunulur. |
+| **ScriptHookVDotNet — Stable** | GitHub `scripthookvdotnet/scripthookvdotnet` | Kararlı sürümler; istediğiniz eski sürümü seçebilirsiniz. |
+| **ScriptHookVDotNet — Nightly** | GitHub `scripthookvdotnet/scripthookvdotnet-nightly` | Günlük derlemeler; yeni oyun sürümleri için daha güncel olabilir. |
+| **ScriptHookVDotNet — Enhanced** | GitHub `Chiheb-Bacha/ScriptHookVDotNetEnhanced` | Legacy + Enhanced uyumlu genişletilmiş sürüm. |
+| **OpenIV.asi alternatifi** | GitHub `Chiheb-Bacha/RageOpenV` (GPL) | OpenIV.asi'nin açık kaynak alternatifi. `OpenIV.asi` veya `OpenRPF.asi` zaten kuruluysa **çakışmayı önlemek için kurulmaz**; mevcut dosyanız korunur. RageOpenV için ASI loader gerekir (ScriptHookV ile birlikte kurun). |
+
+Kurallar:
+
+- **NativeTrainer.asi asla kurulmaz.** ScriptHookV arşivinde bulunsa bile dışarıda bırakılır.
+  Daha önce kendi kurduğunuz bir trainer varsa silinmez.
+- Yalnızca bilinen dosyalar değiştirilir: `ScriptHookV.dll`, gerekirse ASI loader
+  (`dinput8.dll` / `xinput1_4.dll`), `ScriptHookVDotNet.asi`, `ScriptHookVDotNet2/3.dll`,
+  `RageOpenV.asi`. `scripts/`, `mods/` ve kendi dosyalarınız **taranmaz/silinmez**.
+- Mevcut `dinput8.dll` / `xinput1_4.dll` ve `ScriptHookVDotNet.ini` kullanıcı dosyası olarak
+  korunur; yalnızca bu launcher'ın daha önce kurduğu ve siz değiştirmediğiniz dosyalar
+  güncellenir.
+- Değiştirilecek her dosya önce
+  `mods/GTACoop/backups/components/<bileşen>/<tarih>/` altına yedeklenir. **Son Yedeği Geri
+  Yükle** ile geri dönebilirsiniz; geri yüklemeden önce mevcut dosyalar da ayrıca saklanır.
+- Aynı sürüm zaten kuruluysa **yeniden indirilmez**; dosyalardan biri eksik/bozuksa **Onar**
+  düğmesi görünür. Farklı bir sürüm seçerseniz **Güncelle** denir.
+- Sürüm listesi 6 saat önbellekte tutulur; GitHub API'sine gereksiz istek gitmez. İnternet
+  yoksa son başarılı liste kullanılır.
+- ScriptHookV ve RageOpenV lisansları yeniden dağıtıma izin vermediği için bu dosyalar
+  paylaşım ZIP'ine **konmaz**; indirme yalnızca kullanıcının kendi bilgisayarında yapılır.
+  Kurulumdan önce oyunu kapatın; launcher bunu kontrol eder.
 
 ---
 
@@ -67,7 +108,7 @@ yalnızca oyun açıkken kurulu kalır, oyundan çıkınca otomatik kaldırılı
 - Bu betik uygulamayı `%LOCALAPPDATA%\Programs\GTACoop Remake` klasörüne kopyalar ve
   **masaüstü** + **Başlat menüsü** kısayollarını buraya bağlar. Hiçbir şey silinmez
   (eski `dist` klasörü olduğu yerde kalır).
-- Uygulama simgesi ve sürüm bilgisi (2.1.7) exe dosyasına işlenmiştir.
+- Uygulama simgesi ve sürüm bilgisi (2.2.0) exe dosyasına işlenmiştir.
 
 ---
 
@@ -172,6 +213,9 @@ Notlar:
 
 - dlclist (update.rpf) her düzenlemeden önce `mods/GTACoop/backups/` altına yedeklenir
   (günde bir kez, son 3 yedek saklanır).
+- Bileşenler sekmesinde değiştirilen dosyalar
+  `mods/GTACoop/backups/components/<bileşen>/<tarih>/` altına yedeklenir; her bileşen için
+  son yedek geri yüklenebilir.
 - **Orijinal** `update/update.rpf` dosyasına asla dokunulmaz; yalnızca `mods/update/update.rpf`
   düzenlenir.
 - Silme işlemleri yalnızca launcher'ın kurduğu dosyaları kapsar; kendi dosyalarınıza ve
@@ -243,11 +287,13 @@ Oyun sırasında geçici kurulur/bağlanır; oyundan çıkınca kaldırılır. A
   → `dist\GTACoop-Remake-Share.zip` (uygulama + arkadaş okubeni + lisans) oluşur.
   Pakette Türkçe (`OKUBENI-ARKADASLAR.txt`, `KODLA-KATIL.txt`) ve İngilizce
   (`READ-ME-EN.txt`, `JOIN-WITH-CODE-EN.txt`) rehberler birlikte yer alır.
-- **Pakete asla eklemeyin:** GTA V oyun dosyaları; ScriptHook V / ScriptHookVDotNet dosyaları
-  (lisansları yeniden dağıtıma izin vermez). Arkadaşınız bunları kendisi kurar — gerekli
-  liste `OKUBENI-ARKADASLAR.txt` içinde yazılıdır.
-- Arkadaşınızda olması gerekenler: orijinal GTA V + ScriptHook V + ScriptHookVDotNet v3 +
-  **.NET 8 Desktop Runtime** (launcher için). Kendi sunucusunu kurarsa ayrıca **.NET 10**.
+- **Pakete asla eklemeyin:** GTA V oyun dosyaları; ScriptHook V / ScriptHookVDotNet /
+  RageOpenV dosyaları (lisansları yeniden dağıtıma izin vermez). Bileşenler sekmesi bunları
+  yalnızca kullanıcının bilgisayarında, resmî/GitHub kaynağından indirir; ZIP'e konmaz.
+- Arkadaşınızda olması gerekenler: orijinal GTA V + **.NET 8 Desktop Runtime** (launcher
+  için). ScriptHookV ve ScriptHookVDotNet'i artık **Bileşenler** sekmesinden kendisi
+  kurabilir; ayrıntılı liste `OKUBENI-ARKADASLAR.txt` içinde de yazılıdır. Kendi sunucusunu
+  kurarsa ayrıca **.NET 10**.
 - Ücretsiz, arkadaş arası paylaşım sorun değildir. **Satmayın / ticari dağıtmayın**;
   sunucunuza eklediğiniz modların paylaşım izni olduğundan emin olun (başkasına ait telifli
   araç/ped paketlerini arkadaşlarınıza otomatik indirtmeyin — modun kendi lisansına bakın).

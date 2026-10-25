@@ -25,11 +25,14 @@ KURULUM
      (GTA5.exe'nin bulunduğu klasör).
    - "İstemciyi Kur / Güncelle" düğmesine basın.
 
-   GEREKLİ (pakete dahil değildir, kendiniz kurmalısınız):
+   GEREKLİ:
    - Orijinal GTA V (Steam/Epic/Rockstar, hikaye modu)
-   - ScriptHook V            https://www.dev-c.com/gtav/scripthookv/
-   - ScriptHookVDotNet v3    https://github.com/scripthookvdotnet/scripthookvdotnet/releases
    - Microsoft Visual C++ çalışma zamanı (çoğu PC'de zaten vardır)
+
+   ScriptHookV ve ScriptHookVDotNet'i "Bileşenler" sekmesinden
+   sürüm seçerek kurabilirsiniz. NativeTrainer.asi kurulmaz;
+   kendi scriptleriniz ve modlarınız korunur. Paket içinde bu
+   dosyalar yoktur (lisansları yeniden dağıtıma izin vermez).
 
 4) "Sunucular" sekmesi:
    - EN KOLAY: Sunucu sahibinin gönderdiği KISA KOD'u (ör. Gel.com)
@@ -67,7 +70,10 @@ KURULUM
   sunucuyu seçip "Yeniden İndir..." deyin; o sunucunun dosyaları
   silinip baştan indirilir (oyuna kurulmaz). Modlar oyuna
   kuruluyken bu işlem çalışmaz; önce "Oturumu Bitir".
-- Oyun dosyalarınız ve ScriptHook dosyalarınız değiştirilmez.
+- Oyun dosyalarınız değiştirilmez. "Bileşenler" sekmesinde
+  yalnızca seçtiğiniz bileşen dosyaları güncellenir; değiştirilen
+  dosyalar önce mods\GTACoop\backups\components altına yedeklenir.
+  Kendi modlarınız ve mevcut ScriptHook ayarlarınız korunur.
 - Kısa kod/otomatik relay kullanıyorsanız oyun sırasında
   GTACoop.Launcher açık kalsın; relay oyun trafiğini launcher
   üzerinden taşır. Oyunu kapatınca launcher'ı kapatabilirsiniz.

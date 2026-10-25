@@ -45,6 +45,7 @@ public sealed class GameTab : UserControl
         buttons.Controls.Add(Ui.Btn(T("Durumu Yenile"), (_, _) => RefreshStatus()));
         _clientBtn = Ui.Btn(T("İstemciyi Kur / Güncelle"), (_, _) => InstallClient());
         buttons.Controls.Add(_clientBtn);
+        buttons.Controls.Add(Ui.Btn(T("Bileşenleri Yönet..."), (_, _) => (FindForm() as MainForm)?.ShowComponentsTab()));
         buttons.Controls.Add(Ui.Btn(T("Oyunu Başlat"), (_, _) => LaunchGame()));
 
         // --- oyuncu adı
@@ -117,7 +118,7 @@ public sealed class GameTab : UserControl
         AddRow("GTA5_Enhanced.exe", s.HasEnhancedExe, s.HasEnhancedExe ? T("var") : T("yok"));
         AddRow("ScriptHookV.dll", s.HasScriptHookV, s.HasScriptHookV ? T("var") : T("YOK - oyun modlanamaz"));
         AddRow("ScriptHookVDotNet.asi", s.HasShvdn, s.HasShvdn ? T("var") : T("YOK - scriptler çalışmaz"));
-        AddRow("OpenIV.asi", s.HasOpenIvAsi, s.HasOpenIvAsi ? T("var") : T("YOK - mods klasörü okunmaz"));
+        AddRow(T("OpenIV.asi / RageOpenV.asi"), s.HasOpenIvAsi, s.HasOpenIvAsi ? T("var") : T("YOK - mods klasörü okunmaz"));
         AddRow("mods/update/update.rpf", s.HasModsUpdateRpf,
             s.HasModsUpdateRpf ? T("var") : T("YOK - dlc paketleri kurulamaz"));
         AddRow(T("scripts klasörü"), s.HasScriptsFolder, s.HasScriptsFolder ? T("var") : T("yok (oluşturulur)"));
@@ -127,7 +128,7 @@ public sealed class GameTab : UserControl
         if (!s.HasGameExe) missing.Add("GTA5.exe");
         if (!s.HasScriptHookV) missing.Add("ScriptHookV");
         if (!s.HasShvdn) missing.Add("ScriptHookVDotNet");
-        if (!s.HasOpenIvAsi) missing.Add("OpenIV.asi");
+        if (!s.HasOpenIvAsi) missing.Add(T("OpenIV.asi / RageOpenV.asi"));
 
         if (missing.Count == 0)
         {

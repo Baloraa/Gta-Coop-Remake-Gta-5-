@@ -94,7 +94,10 @@ public static class GameFolder
             HasEnhancedExe = File.Exists(Path.Combine(folder, "GTA5_Enhanced.exe")),
             HasScriptHookV = File.Exists(Path.Combine(folder, "ScriptHookV.dll")),
             HasShvdn = File.Exists(Path.Combine(folder, "ScriptHookVDotNet.asi")),
-            HasOpenIvAsi = File.Exists(Path.Combine(folder, "OpenIV.asi")),
+            // RageOpenV, OpenIV.asi'nin açık kaynak alternatifidir; ikisi de mods/ köprüsünü açar.
+            HasOpenIvAsi = File.Exists(Path.Combine(folder, "OpenIV.asi")) ||
+                           File.Exists(Path.Combine(folder, "RageOpenV.asi")),
+            HasRageOpenVAsi = File.Exists(Path.Combine(folder, "RageOpenV.asi")),
             HasModsFolder = Directory.Exists(Path.Combine(folder, "mods")),
             HasModsUpdateRpf = File.Exists(Path.Combine(folder, "mods", "update", "update.rpf")),
             HasScriptsFolder = Directory.Exists(Path.Combine(folder, "scripts")),
@@ -117,6 +120,7 @@ public sealed class GameFolderStatus
     public bool HasScriptHookV;
     public bool HasShvdn;
     public bool HasOpenIvAsi;
+    public bool HasRageOpenVAsi;
     public bool HasModsFolder;
     public bool HasModsUpdateRpf;
     public bool HasScriptsFolder;

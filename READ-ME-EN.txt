@@ -1,5 +1,5 @@
 ==========================================================
- GTACoop Remake - Friend Edition (English, v2.1.7)
+ GTACoop Remake - Friend Edition (English, v2.2.0)
 ==========================================================
 
 This is a friend-to-friend co-op tool for GTA V (Story Mode).
@@ -25,11 +25,15 @@ INSTALLATION
      (the folder that contains GTA5.exe).
    - Click "Install / Update Client".
 
-   REQUIRED (NOT included in this package - install it yourself):
+   REQUIRED:
    - Original GTA V (Steam/Epic/Rockstar, Story Mode)
-   - ScriptHook V            https://www.dev-c.com/gtav/scripthookv/
-   - ScriptHookVDotNet v3    https://github.com/scripthookvdotnet/scripthookvdotnet/releases
    - Microsoft Visual C++ runtime (already present on most PCs)
+
+   Install ScriptHookV and ScriptHookVDotNet from the
+   "Components" tab by choosing a version. NativeTrainer.asi is
+   never installed; your own scripts and mods are preserved.
+   These files are not bundled (their licenses do not allow
+   redistribution).
 
 4) Open the "Servers" tab:
    - EASIEST: ask the server owner for the SHORT CODE
@@ -72,7 +76,10 @@ IMPORTANT NOTES
   download that server's files again (they are not installed
   into the game). This is blocked while that server's mods are
   installed in the game; use "End Session" first.
-- Your game files and ScriptHook files are not modified.
+- Your game files are not modified. The "Components" tab updates
+  only the component files you choose; changed files are backed up
+  under mods\GTACoop\backups\components first. Your own mods and
+  existing ScriptHook settings are preserved.
 - If you use a short code/automatic relay, keep GTACoop.Launcher
   open while playing; the relay carries game traffic through the
   launcher. You can close it after exiting the game.

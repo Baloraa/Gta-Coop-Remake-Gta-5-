@@ -11,6 +11,7 @@ public sealed class MainForm : Form
     private readonly TabControl _tabs = new();
 
     private readonly GameTab _gameTab = new();
+    private readonly ComponentsTab _componentsTab = new();
     private readonly ServersTab _serversTab = new();
     private readonly MyServerTab _serverTab = new();
     private readonly LogTab _logTab = new();
@@ -49,7 +50,13 @@ public sealed class MainForm : Form
             _serversTab.RecoverSessionIfAny();
         };
 
-        _tabs.SelectedIndexChanged += (_, _) => _serverTab.RefreshStatus();
+        _componentsTab.ComponentsChanged += _gameTab.RefreshStatus;
+        _tabs.SelectedIndexChanged += (_, _) =>
+        {
+            _serverTab.RefreshStatus();
+            if (_tabs.SelectedTab?.Controls.Contains(_componentsTab) == true)
+                _componentsTab.OnShown();
+        };
     }
 
     /// <summary>Pencereyi ekrana sığdır (yüksek DPI'da taşmasın).</summary>
@@ -140,6 +147,7 @@ public sealed class MainForm : Form
         _tabs.Dock = DockStyle.Fill;
 
         AddTab(T("Oyun"), _gameTab);
+        AddTab(T("Bileşenler"), _componentsTab);
         AddTab(T("Sunucular"), _serversTab);
         AddTab(T("Sunucum"), _serverTab);
         AddTab(T("Günlük / Araçlar"), _logTab);
@@ -219,6 +227,13 @@ public sealed class MainForm : Form
     }
 
     public void RefreshGamePath() => _gamePathBox.Text = AppEnv.Settings.GameFolder;
+
+    public void ShowComponentsTab()
+    {
+        var page = _tabs.TabPages.Cast<TabPage>()
+            .FirstOrDefault(p => p.Controls.Contains(_componentsTab));
+        if (page != null) _tabs.SelectedTab = page;
+    }
 
     public void SetStatus(string text) => _status.Text = text;
 
