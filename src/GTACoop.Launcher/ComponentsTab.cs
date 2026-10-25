@@ -5,8 +5,8 @@ using GTACoop.Sync;
 namespace GTACoop.Remake;
 
 /// <summary>
-/// ScriptHookV / ScriptHookVDotNet / OpenIV alternatifini indirip oyun köküne kurar.
-/// Yalnızca bilinen dosyaları değiştirir; mevcut modları taramaz veya silmez.
+/// ScriptHookV / ScriptHookVDotNet / OpenIV.asi (paket içi) / RageOpenV alternatifini
+/// kurar. Yalnızca bilinen dosyaları değiştirir; mevcut modları taramaz veya silmez.
 /// </summary>
 public sealed class ComponentsTab : UserControl
 {
@@ -54,7 +54,7 @@ public sealed class ComponentsTab : UserControl
 
         var info = new Label
         {
-            Text = T("Bileşenler yalnızca oyun köküne kurulur: ScriptHookV.dll, ScriptHookVDotNet.asi/DLL'leri ve isteğe bağlı OpenIV alternatifi. NativeTrainer.asi asla kurulmaz. scripts/ ve mods/ klasörleriniz silinmez; değiştirilen dosyalar önce yedeklenir."),
+            Text = T("Bileşenler yalnızca oyun köküne kurulur: ScriptHookV.dll, ScriptHookVDotNet.asi/DLL'leri ve isteğe bağlı OpenIV.asi veya RageOpenV alternatifi. NativeTrainer.asi asla kurulmaz. scripts/ ve mods/ klasörleriniz silinmez; değiştirilen dosyalar önce yedeklenir."),
             AutoSize = true,
             MaximumSize = new Size(1020, 0),
             ForeColor = Color.DimGray,
@@ -95,7 +95,8 @@ public sealed class ComponentsTab : UserControl
         _component.Margin = new Padding(2, 5, 4, 4);
         _component.Items.Add(new ComponentOption(ComponentKind.ScriptHookV, T("ScriptHookV (resmî)")));
         _component.Items.Add(new ComponentOption(ComponentKind.ScriptHookVDotNet, T("ScriptHookVDotNet (stable / nightly / enhanced)")));
-        _component.Items.Add(new ComponentOption(ComponentKind.OpenIvAlternative, T("OpenIV.asi alternatifi (RageOpenV)")));
+        _component.Items.Add(new ComponentOption(ComponentKind.OpenIV, T("OpenIV.asi (paket içi)")));
+        _component.Items.Add(new ComponentOption(ComponentKind.OpenIvAlternative, T("RageOpenV (alternatif)")));
         _component.SelectedIndex = 0;
         componentRow.Controls.Add(_component);
         form.Controls.Add(componentRow);
@@ -238,7 +239,9 @@ public sealed class ComponentsTab : UserControl
         (_component.SelectedItem as ComponentOption)?.Kind ?? ComponentKind.ScriptHookV;
 
     private ShvdnChannel SelectedChannel =>
-        (_channel.SelectedItem as ChannelOption)?.Channel ?? ShvdnChannel.Stable;
+        SelectedKind == ComponentKind.ScriptHookVDotNet
+            ? (_channel.SelectedItem as ChannelOption)?.Channel ?? ShvdnChannel.Stable
+            : ShvdnChannel.Stable;
 
     /// <summary>Sekme ilk kez açıldığında sürümleri (önbellekten) yükler.</summary>
     public void OnShown()
@@ -364,7 +367,9 @@ public sealed class ComponentsTab : UserControl
 
         _busy = true;
         SetBusy(true);
-        _status.Text = T("Bileşen indiriliyor ve kuruluyor...");
+        _status.Text = release.Kind == ComponentKind.OpenIV
+            ? T("Bileşen kuruluyor...")
+            : T("Bileşen indiriliyor ve kuruluyor...");
         _progress.Style = ProgressBarStyle.Continuous;
         _progress.Value = 0;
         AppendDetail($"=== {release.Version} ({release.Source}) ===");
@@ -392,10 +397,18 @@ public sealed class ComponentsTab : UserControl
                 _status.Text = T("Bu bileşen zaten kurulu.");
                 Ui.Info(FindForm()!, T("Bu bileşen zaten kurulu ve dosyaları sağlam.\r\nİndirme yapılmadı."));
             }
-            else if (result.SkipReason is "openiv-present" or "openrpf-present")
+            else if (result.SkipReason is "openiv-present" or "openrpf-present" or "rageopenv-present")
             {
-                _status.Text = T("RageOpenV kurulmadı (mevcut OpenIV/OpenRPF korundu).");
-                Ui.Info(FindForm()!, T("OpenIV.asi veya OpenRPF.asi zaten kurulu. Çakışmayı önlemek için RageOpenV kurulmadı; mevcut mods köprünüz korunuyor."));
+                if (release.Kind == ComponentKind.OpenIV)
+                {
+                    _status.Text = T("OpenIV.asi kurulmadı (mevcut mods köprüsü korundu).");
+                    Ui.Info(FindForm()!, T("OpenIV.asi, OpenRPF.asi veya RageOpenV.asi zaten kurulu. Çakışmayı önlemek için yeni dosya kurulmadı; mevcut mods köprünüz korunuyor."));
+                }
+                else
+                {
+                    _status.Text = T("RageOpenV kurulmadı (mevcut mods köprüsü korundu).");
+                    Ui.Info(FindForm()!, T("OpenIV.asi, OpenRPF.asi veya RageOpenV.asi zaten kurulu. Çakışmayı önlemek için RageOpenV kurulmadı; mevcut mods köprünüz korunuyor."));
+                }
             }
             else
             {
@@ -528,7 +541,7 @@ public sealed class ComponentsTab : UserControl
     {
         if (_busy || _version.SelectedItem is not ReleaseOption option)
         {
-            _installBtn.Text = T("İndir ve Kur");
+            _installBtn.Text = SelectedKind == ComponentKind.OpenIV ? T("Kur") : T("İndir ve Kur");
             _installBtn.Enabled = false;
             return;
         }
@@ -563,7 +576,7 @@ public sealed class ComponentsTab : UserControl
         }
         else
         {
-            _installBtn.Text = T("İndir ve Kur");
+            _installBtn.Text = release.Kind == ComponentKind.OpenIV ? T("Kur") : T("İndir ve Kur");
             _installBtn.Enabled = true;
         }
     }
@@ -607,6 +620,8 @@ public sealed class ComponentsTab : UserControl
                 T("Kaynak: dev-c.com (resmî). GitHub'da resmî ScriptHookV sürümü yoktur; yeniden dağıtım yasaktır."),
             ComponentKind.ScriptHookVDotNet =>
                 T("Kaynak: resmî GitHub sürümleri (stable / nightly / enhanced)."),
+            ComponentKind.OpenIV =>
+                T("Kaynak: paket içi OpenIV.asi (kullanıcı tarafından sağlandı). Mevcut OpenIV.asi, OpenRPF.asi veya RageOpenV.asi varsa korunur. ASI loader gerekir (ScriptHookV ile birlikte kurun)."),
             ComponentKind.OpenIvAlternative =>
                 T("Kaynak: GitHub · RageOpenV (GPL). OpenIV.asi resmî GitHub'da yok; kuruluysa korunur. RageOpenV için ASI loader gerekir (ScriptHookV ile birlikte kurun)."),
             _ => ""

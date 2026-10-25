@@ -47,6 +47,12 @@ if (-not (Test-Path $serverSrc)) { throw "Dağıtım bulunamadı: $serverSrc" }
 robocopy $serverSrc (Join-Path $dist "Distribution\Server") /E /NFL /NDL /NJH /NJS /NP | Out-Null
 robocopy $scriptsSrc (Join-Path $dist "Distribution\Scripts") /E /NFL /NDL /NJH /NJS /NP | Out-Null
 
+# --- paket içi OpenIV.asi (kullanıcı tarafından sağlandı) ---
+$componentsSrc = Join-Path $vendor "Components"
+$openIv = Join-Path $componentsSrc "OpenIV.asi"
+if (-not (Test-Path $openIv)) { throw "Paket içi OpenIV.asi bulunamadı: $openIv" }
+robocopy $componentsSrc (Join-Path $dist "Distribution\Components") /E /NFL /NDL /NJH /NJS /NP | Out-Null
+
 # --- lisans + atıf dosyaları (GPL v3 paylaşım uyumu) ---
 Copy-Item (Join-Path $vendor "LICENSE.md") (Join-Path $dist "Distribution") -Force
 Copy-Item (Join-Path $vendor "README.md") (Join-Path $dist "Distribution\ATIF-README.md") -Force

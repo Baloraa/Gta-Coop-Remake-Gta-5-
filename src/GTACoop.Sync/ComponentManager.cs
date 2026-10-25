@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.IO.Compression;
 using System.Net;
 using System.Net.Http;
@@ -12,6 +13,7 @@ public enum ComponentKind
 {
     ScriptHookV,
     ScriptHookVDotNet,
+    OpenIV,
     OpenIvAlternative
 }
 
@@ -113,11 +115,13 @@ public sealed class ComponentRestoreResult
 }
 
 /// <summary>
-/// ScriptHookV, ScriptHookVDotNet (stable/nightly/enhanced) ve OpenIV.asi
-/// alternatifi RageOpenV'yi resmî/GitHub kaynaklarından indirir.
+/// ScriptHookV, ScriptHookVDotNet (stable/nightly/enhanced) ve RageOpenV'yi
+/// resmî/GitHub kaynaklarından indirir; kullanıcı tarafından sağlanan OpenIV.asi'yi
+/// uygulama paketinden kurar.
 ///
 /// Önemli güvenlik kuralları:
-/// - Bileşenler uygulama paketine konmaz; yalnızca kullanıcı isterse indirilir.
+/// - ScriptHookV/SHVDN/RageOpenV indirilir; OpenIV.asi yalnızca paket içindeki
+///   doğrulanmış kullanıcı dosyasından alınır.
 /// - Yalnızca bilinen dosyalar oyun köküne kopyalanır; scripts/ ve mods/ taranmaz.
 /// - NativeTrainer.asi hiçbir zaman kurulmaz; mevcut dosyalar silinmez.
 /// - Değiştirilen her dosya önce mods/GTACoop/backups/components altına yedeklenir.
@@ -129,6 +133,8 @@ public static class ComponentManager
     private const long MaxDownloadBytes = 64L * 1024 * 1024;
     private const long MaxEntryBytes = 32L * 1024 * 1024;
     private const string ShvPage = "https://www.dev-c.com/gtav/scripthookv/";
+    private const string BundledOpenIvSha256 =
+        "B12DDC9CE256DC89A9C8BB77D6DD1C61683D18F0884097458658AB48BD1A4EC2";
     private const string BrowserUserAgent =
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
         "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
@@ -166,6 +172,13 @@ public static class ComponentManager
         Action<string>? log = null)
     {
         log ??= _ => { };
+        if (kind == ComponentKind.OpenIV)
+        {
+            var bundled = GetBundledOpenIvRelease();
+            log($"Paket içi OpenIV.asi hazır: {bundled.Version}");
+            return new List<ComponentRelease> { bundled };
+        }
+
         Directory.CreateDirectory(dataFolder);
         var cachePath = CachePath(dataFolder, kind, channel);
         var cache = SyncJson.Load<ComponentCache>(cachePath);
@@ -216,6 +229,55 @@ public static class ComponentManager
             }
             throw;
         }
+    }
+
+    private static string GetBundledOpenIvPathOrThrow()
+    {
+        var candidates = new List<string>();
+        void AddBase(string? baseDir)
+        {
+            if (string.IsNullOrWhiteSpace(baseDir)) return;
+            candidates.Add(Path.Combine(baseDir, "Distribution", "Components", "OpenIV.asi"));
+            candidates.Add(Path.Combine(baseDir, "Components", "OpenIV.asi"));
+        }
+
+        AddBase(AppContext.BaseDirectory);
+        AddBase(Path.GetDirectoryName(Environment.ProcessPath));
+
+        var path = candidates.FirstOrDefault(File.Exists);
+        if (path == null)
+            throw new SyncException("Paket içi OpenIV.asi bulunamadı. Launcher paketini yeniden kurun.");
+
+        var info = new FileInfo(path);
+        if (info.Length <= 0 || info.Length > MaxEntryBytes)
+            throw new SyncException("Paket içi OpenIV.asi boyutu geçersiz.");
+
+        var hash = HashFile(path);
+        if (!hash.Equals(BundledOpenIvSha256, StringComparison.OrdinalIgnoreCase))
+            throw new SyncException("Paket içi OpenIV.asi doğrulanamadı (hash uyuşmuyor).");
+
+        return path;
+    }
+
+    private static ComponentRelease GetBundledOpenIvRelease()
+    {
+        var path = GetBundledOpenIvPathOrThrow();
+        var version = FileVersionInfo.GetVersionInfo(path).FileVersion;
+        if (string.IsNullOrWhiteSpace(version)) version = "1.2.0.1";
+
+        return new ComponentRelease
+        {
+            Kind = ComponentKind.OpenIV,
+            Channel = ShvdnChannel.Stable,
+            Tag = $"openiv-{version}-{BundledOpenIvSha256[..12].ToLowerInvariant()}",
+            Version = version,
+            AssetName = "OpenIV.asi",
+            DownloadUrl = "",
+            Source = "Paket içi OpenIV.asi",
+            Notes = "Kullanıcı tarafından sağlanan OpenIV.asi.",
+            PublishedAt = File.GetLastWriteTimeUtc(path),
+            DownloadSize = new FileInfo(path).Length
+        };
     }
 
     private static async Task<List<ComponentRelease>> FetchScriptHookVAsync(
@@ -456,21 +518,55 @@ public static class ComponentManager
             };
         }
 
-        // OpenIV.asi/OpenRPF.asi zaten varsa iki mods-folder köprüsü çakışmasın.
-        if (kind == ComponentKind.OpenIvAlternative)
+        // OpenIV.asi/OpenRPF.asi/RageOpenV.asi aynı mods-folder köprüsünü açar.
+        // Mevcut kullanıcı dosyasını ezmeden yalnızca uyumlu durumda kur.
+        if (kind == ComponentKind.OpenIV)
+        {
+            var bundledPath = GetBundledOpenIvPathOrThrow();
+            var bundledHash = HashFile(bundledPath);
+            var target = Path.Combine(gameFolder, "OpenIV.asi");
+            if (File.Exists(Path.Combine(gameFolder, "OpenRPF.asi")))
+                return Skipped("openrpf-present", "OpenRPF.asi zaten kurulu; OpenIV.asi kurulmadı.");
+            if (File.Exists(Path.Combine(gameFolder, "RageOpenV.asi")))
+                return Skipped("rageopenv-present", "RageOpenV.asi zaten kurulu; OpenIV.asi kurulmadı.");
+            if (File.Exists(target))
+            {
+                var targetHash = HashFile(target);
+                var previousFile = installed?.Files?.FirstOrDefault(f =>
+                    f.RelativePath.Equals("OpenIV.asi", StringComparison.OrdinalIgnoreCase));
+                if (!targetHash.Equals(bundledHash, StringComparison.OrdinalIgnoreCase) &&
+                    (previousFile == null ||
+                     !targetHash.Equals(previousFile.Sha256, StringComparison.OrdinalIgnoreCase)))
+                    return Skipped("openiv-present", "OpenIV.asi zaten kurulu; mevcut dosya korundu.");
+            }
+        }
+        else if (kind == ComponentKind.OpenIvAlternative)
         {
             if (File.Exists(Path.Combine(gameFolder, "OpenIV.asi")))
                 return Skipped("openiv-present", "OpenIV.asi zaten kurulu; RageOpenV kurulmadı.");
             if (File.Exists(Path.Combine(gameFolder, "OpenRPF.asi")))
                 return Skipped("openrpf-present", "OpenRPF.asi zaten kurulu; RageOpenV kurulmadı.");
+            var ragePath = Path.Combine(gameFolder, "RageOpenV.asi");
+            if (File.Exists(ragePath))
+            {
+                var previousFile = installed?.Files?.FirstOrDefault(f =>
+                    f.RelativePath.Equals("RageOpenV.asi", StringComparison.OrdinalIgnoreCase));
+                if (previousFile == null ||
+                    !HashFile(ragePath).Equals(previousFile.Sha256, StringComparison.OrdinalIgnoreCase))
+                    return Skipped("rageopenv-present", "RageOpenV.asi zaten kurulu; mevcut dosya korundu.");
+            }
         }
 
         await InstallLock.WaitAsync(cancellationToken);
         string? stagingRoot = null;
         try
         {
-            log($"Bileşen indiriliyor: {release.Version} ({release.Source})");
-            var staging = await DownloadAndStageAsync(kind, release, progress, log, cancellationToken);
+            log(kind == ComponentKind.OpenIV
+                ? $"Bileşen hazırlanıyor: {release.Version} ({release.Source})"
+                : $"Bileşen indiriliyor: {release.Version} ({release.Source})");
+            var staging = kind == ComponentKind.OpenIV
+                ? StageBundledOpenIv()
+                : await DownloadAndStageAsync(kind, release, progress, log, cancellationToken);
             stagingRoot = staging.RootDirectory;
             if (AddonApplier.IsGameRunning())
                 throw new SyncException("GTA V açıkken bileşen kurulamaz. Önce oyunu kapatın.");
@@ -669,12 +765,47 @@ public static class ComponentManager
             new() { SourcePath = "ScriptHookVDotNet.ini", BaseName = "ScriptHookVDotNet.ini", TargetRelative = "ScriptHookVDotNet.ini", Policy = FilePolicy.PreserveAlways },
             new() { SourcePath = "MinHook.x64.dll", BaseName = "MinHook.x64.dll", TargetRelative = "MinHook.x64.dll", Policy = FilePolicy.PreserveIfUnmanaged }
         },
+        ComponentKind.OpenIV => new List<FileSpec>
+        {
+            new() { SourcePath = "OpenIV.asi", BaseName = "OpenIV.asi", TargetRelative = "OpenIV.asi", Policy = FilePolicy.Replace, Required = true }
+        },
         ComponentKind.OpenIvAlternative => new List<FileSpec>
         {
             new() { SourcePath = "RageOpenV.asi", BaseName = "RageOpenV.asi", TargetRelative = "RageOpenV.asi", Policy = FilePolicy.Replace, Required = true }
         },
         _ => new List<FileSpec>()
     };
+
+    private static Staging StageBundledOpenIv()
+    {
+        var source = GetBundledOpenIvPathOrThrow();
+        var root = Path.Combine(Path.GetTempPath(), "GTACoopRemake", "components",
+            Guid.NewGuid().ToString("N"));
+        try
+        {
+            Directory.CreateDirectory(root);
+            var stagedPath = Path.Combine(root, "OpenIV.asi");
+            File.Copy(source, stagedPath, overwrite: true);
+            return new Staging
+            {
+                RootDirectory = root,
+                Files = new List<StagedFile>
+                {
+                    new()
+                    {
+                        StagedPath = stagedPath,
+                        TargetRelative = "OpenIV.asi",
+                        Policy = FilePolicy.Replace
+                    }
+                }
+            };
+        }
+        catch
+        {
+            TryDeleteDirectory(root);
+            throw;
+        }
+    }
 
     private static async Task<Staging> DownloadAndStageAsync(
         ComponentKind kind,

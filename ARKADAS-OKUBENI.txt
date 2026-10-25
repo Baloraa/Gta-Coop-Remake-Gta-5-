@@ -30,9 +30,11 @@ KURULUM
    - Microsoft Visual C++ çalışma zamanı (çoğu PC'de zaten vardır)
 
    ScriptHookV ve ScriptHookVDotNet'i "Bileşenler" sekmesinden
-   sürüm seçerek kurabilirsiniz. NativeTrainer.asi kurulmaz;
-   kendi scriptleriniz ve modlarınız korunur. Paket içinde bu
-   dosyalar yoktur (lisansları yeniden dağıtıma izin vermez).
+   sürüm seçerek kurabilirsiniz. OpenIV.asi paketle gelir;
+   "Bileşenler > OpenIV.asi (paket içi)" ile kurabilirsiniz.
+   NativeTrainer.asi kurulmaz; kendi scriptleriniz ve modlarınız
+   korunur. ScriptHookV/SHVDN dosyaları lisansları nedeniyle
+   pakette yoktur; yalnızca siz istediğinizde indirilir.
 
 4) "Sunucular" sekmesi:
    - EN KOLAY: Sunucu sahibinin gönderdiği KISA KOD'u (ör. Gel.com)

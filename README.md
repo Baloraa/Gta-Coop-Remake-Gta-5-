@@ -1,8 +1,8 @@
 # GTACoop Remake — Türkçe Mod + Sunucu Yöneticisi
 
-2.2.1 sürümü — kendi sunucu yönetimi, otomatik mod indirme, **oturum modu**,
+2.2.2 sürümü — kendi sunucu yönetimi, otomatik mod indirme, **oturum modu**,
 **kısa kod** (ör. `Gel.com`) ile internetten sunucu bulma, **otomatik relay** ve
-**Bileşenler** sekmesinden ScriptHookV / ScriptHookVDotNet / OpenIV alternatifi kurulumu:
+**Bileşenler** sekmesinden ScriptHookV / ScriptHookVDotNet / OpenIV.asi / RageOpenV kurulumu:
 port yönlendirme veya Radmin VPN olmadan da arkadaşlarınız bağlanabilir. Sunucu modları
 yalnızca oyun açıkken kurulu kalır, oyundan çıkınca otomatik kaldırılır.
 
@@ -40,9 +40,10 @@ yalnızca oyun açıkken kurulu kalır, oyundan çıkınca otomatik kaldırılı
 
 - **Oyun**: oyun klasörünü seçme, istemciyi kurma (GTACoOp), **oyuncu adınızı** seçme, oyun
   durumu, yedekler.
-- **Bileşenler**: ScriptHookV, ScriptHookVDotNet (stable / nightly / Enhanced) ve OpenIV
-  alternatifi RageOpenV'yi sürüm seçerek kurma/güncelleme; eski dosyaları yedekleme ve geri
-  yükleme. NativeTrainer.asi hiçbir zaman kurulmaz; kendi script/modlarınıza dokunulmaz.
+- **Bileşenler**: ScriptHookV, ScriptHookVDotNet (stable / nightly / Enhanced), paket içi
+  OpenIV.asi ve RageOpenV alternatifini sürüm seçerek kurma/güncelleme; eski dosyaları
+  yedekleme ve geri yükleme. NativeTrainer.asi hiçbir zaman kurulmaz; kendi
+  script/modlarınıza dokunulmaz.
 - **Sunucular**: sunucu ekleme, **Bağlan ve Oyna** (modlar otomatik iner-kurulur), oturum modu
   ayarı, modları önceden indirme, oturumu bitirme.
 - **Sunucum**: kendi sunucunuzu başlatma/durdurma, ayarlar, mod ekleme, **kısa kod**
@@ -51,11 +52,11 @@ yalnızca oyun açıkken kurulu kalır, oyundan çıkınca otomatik kaldırılı
 
 ---
 
-## Bileşenler (ScriptHookV / ScriptHookVDotNet / OpenIV)
+## Bileşenler (ScriptHookV / ScriptHookVDotNet / OpenIV.asi / RageOpenV)
 
-**Bileşenler** sekmesi, oyunun çalışması için gereken temel mod dosyalarını internetten
-indirip oyun kök klasörüne kurar. Paket içinde bu dosyalar **gelmez**; yalnızca siz
-istediğinizde indirilir.
+**Bileşenler** sekmesi, oyunun çalışması için gereken temel mod dosyalarını oyun kök
+klasörüne kurar. ScriptHookV / ScriptHookVDotNet / RageOpenV internetten indirilir;
+OpenIV.asi ise kullanıcı tarafından sağlanan dosya olarak **paylaşım paketinde gelir**.
 
 | Bileşen | Kaynak | Not |
 |---|---|---|
@@ -63,7 +64,8 @@ istediğinizde indirilir.
 | **ScriptHookVDotNet — Stable** | GitHub `scripthookvdotnet/scripthookvdotnet` | Kararlı sürümler; istediğiniz eski sürümü seçebilirsiniz. |
 | **ScriptHookVDotNet — Nightly** | GitHub `scripthookvdotnet/scripthookvdotnet-nightly` | Günlük derlemeler; yeni oyun sürümleri için daha güncel olabilir. |
 | **ScriptHookVDotNet — Enhanced** | GitHub `Chiheb-Bacha/ScriptHookVDotNetEnhanced` | Legacy + Enhanced uyumlu genişletilmiş sürüm. |
-| **OpenIV.asi alternatifi** | GitHub `Chiheb-Bacha/RageOpenV` (GPL) | OpenIV.asi'nin açık kaynak alternatifi. `OpenIV.asi` veya `OpenRPF.asi` zaten kuruluysa **çakışmayı önlemek için kurulmaz**; mevcut dosyanız korunur. RageOpenV için ASI loader gerekir (ScriptHookV ile birlikte kurun). |
+| **OpenIV.asi (paket içi)** | Paylaşım paketindeki kullanıcı dosyası | ZIP ile gelir; **Bileşenler > OpenIV.asi (paket içi)** seçilince oyun köküne kurulur. `OpenIV.asi`, `OpenRPF.asi` veya `RageOpenV.asi` zaten kuruluysa **çakışmayı önlemek için kurulmaz**; mevcut dosyanız korunur. ASI loader gerekir (ScriptHookV ile birlikte kurun). |
+| **RageOpenV (alternatif)** | GitHub `Chiheb-Bacha/RageOpenV` (GPL) | OpenIV.asi'nin açık kaynak alternatifi. Yukarıdaki köprülerden biri zaten kuruluysa **kurulmaz**; mevcut dosyanız korunur. RageOpenV için ASI loader gerekir (ScriptHookV ile birlikte kurun). |
 
 Kurallar:
 
@@ -71,7 +73,8 @@ Kurallar:
   Daha önce kendi kurduğunuz bir trainer varsa silinmez.
 - Yalnızca bilinen dosyalar değiştirilir: `ScriptHookV.dll`, gerekirse ASI loader
   (`dinput8.dll` / `xinput1_4.dll`), `ScriptHookVDotNet.asi`, `ScriptHookVDotNet2/3.dll`,
-  `RageOpenV.asi`. `scripts/`, `mods/` ve kendi dosyalarınız **taranmaz/silinmez**.
+  `OpenIV.asi`, `RageOpenV.asi`. `scripts/`, `mods/` ve kendi dosyalarınız
+  **taranmaz/silinmez**.
 - Mevcut `dinput8.dll` / `xinput1_4.dll` ve `ScriptHookVDotNet.ini` kullanıcı dosyası olarak
   korunur; yalnızca bu launcher'ın daha önce kurduğu ve siz değiştirmediğiniz dosyalar
   güncellenir.
@@ -84,11 +87,13 @@ Kurallar:
   yoksa son başarılı liste kullanılır.
 - ScriptHookV ve RageOpenV lisansları yeniden dağıtıma izin vermediği için bu dosyalar
   paylaşım ZIP'ine **konmaz**; indirme yalnızca kullanıcının kendi bilgisayarında yapılır.
-  Kurulumdan önce oyunu kapatın; launcher bunu kontrol eder.
-- Kendi `OpenIV.asi` dosyanızı arkadaşlarınızla paylaşmak için **Sunucum > ASI Eklentisi
-  Ekle...** ile sunucuya ekleyin. Sunucuya bağlanan oyuncuda `OpenIV.asi`, `OpenRPF.asi`
-  veya `RageOpenV.asi` yoksa dosya otomatik kurulur; varsa kendi köprüsü korunur. Bu dosya
-  paylaşım ZIP'ine **konmaz**; yalnızca sunucudan indirilir ve oturum bitince kaldırılır.
+  OpenIV.asi kullanıcı tarafından sağlandığı için ZIP içinde
+  `Distribution\Components\OpenIV.asi` olarak gelir. Kurulumdan önce oyunu kapatın;
+  launcher bunu kontrol eder.
+- Arkadaşlarınız OpenIV.asi'yi **Bileşenler > OpenIV.asi (paket içi)** ile kalıcı olarak
+  kurabilir. Ayrıca **Sunucum > ASI Eklentisi Ekle...** ile sunucuya eklerseniz, bağlanan
+  oyuncuda uyumlu bir mods köprüsü yoksa oturum sırasında otomatik kurulur; varsa kendi
+  dosyası korunur.
 
 ---
 
@@ -112,7 +117,7 @@ Kurallar:
 - Bu betik uygulamayı `%LOCALAPPDATA%\Programs\GTACoop Remake` klasörüne kopyalar ve
   **masaüstü** + **Başlat menüsü** kısayollarını buraya bağlar. Hiçbir şey silinmez
   (eski `dist` klasörü olduğu yerde kalır).
-- Uygulama simgesi ve sürüm bilgisi (2.2.1) exe dosyasına işlenmiştir.
+- Uygulama simgesi ve sürüm bilgisi (2.2.2) exe dosyasına işlenmiştir.
 
 ---
 

@@ -1,5 +1,5 @@
 ==========================================================
- GTACoop Remake - Friend Edition (English, v2.2.1)
+ GTACoop Remake - Friend Edition (English, v2.2.2)
 ==========================================================
 
 This is a friend-to-friend co-op tool for GTA V (Story Mode).
@@ -30,10 +30,12 @@ INSTALLATION
    - Microsoft Visual C++ runtime (already present on most PCs)
 
    Install ScriptHookV and ScriptHookVDotNet from the
-   "Components" tab by choosing a version. NativeTrainer.asi is
-   never installed; your own scripts and mods are preserved.
-   These files are not bundled (their licenses do not allow
-   redistribution).
+   "Components" tab by choosing a version. OpenIV.asi is bundled;
+   install it with "Components > OpenIV.asi (bundled)".
+   NativeTrainer.asi is never installed; your own scripts and mods
+   are preserved. ScriptHookV/SHVDN files are not bundled (their
+   licenses do not allow redistribution); they are downloaded only
+   when you choose them.
 
 4) Open the "Servers" tab:
    - EASIEST: ask the server owner for the SHORT CODE
