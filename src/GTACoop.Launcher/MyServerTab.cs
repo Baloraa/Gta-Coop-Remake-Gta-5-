@@ -24,6 +24,10 @@ public sealed class MyServerTab : UserControl
 
     private MyServer? _server;
     private CancellationTokenSource? _publishCts;
+    private CancellationTokenSource? _relayCts;
+    private RelayHostService? _relayService;
+    private string _relayStatus = "";
+    private readonly SemaphoreSlim _publishWake = new(0);
     private string _publisherCode = "";
     private string _publishStatus = "";
     private bool _publishOk;
@@ -131,7 +135,7 @@ public sealed class MyServerTab : UserControl
         {
             Text = T("Sunucu Kontrolü"),
             Dock = DockStyle.Top,
-            Height = 174,
+            Height = 205,
             Padding = new Padding(8)
         };
         var controlButtons = Ui.Flow();
@@ -147,7 +151,7 @@ public sealed class MyServerTab : UserControl
         _syncServerStatus.AutoSize = true;
         _addressInfo.Dock = DockStyle.Bottom;
         _addressInfo.AutoSize = false;
-        _addressInfo.Height = 46;
+        _addressInfo.Height = 88;
         _addressInfo.ForeColor = Color.DimGray;
 
         var statusPanel = new FlowLayoutPanel
@@ -284,7 +288,8 @@ public sealed class MyServerTab : UserControl
             }
         }
 
-        using var dlg = new ShareCodeDialog(ToSettings(info), serverRunning, status, ok);
+        using var dlg = new ShareCodeDialog(ToSettings(info), serverRunning, status, ok,
+            _relayService?.Endpoints, _relayStatus);
         dlg.ShowDialog(FindForm());
     }
 
@@ -306,8 +311,10 @@ public sealed class MyServerTab : UserControl
             Server.GetOrCreateIdentity(info.Name);
             Server.WriteSettings(settings);
 
+            StopRelay();
             Server.StartGameServer();
             Server.StartSyncServer(settings);
+            StartRelay(settings);
             StartPublisher(settings);
 
             AppEnv.Log($"Sunucu başlatıldı: {info.Name} " +
@@ -328,6 +335,7 @@ public sealed class MyServerTab : UserControl
         try
         {
             StopPublisher(publishOffline: true);
+            StopRelay();
             Server.StopAll();
             RefreshStatus();
         }
@@ -346,6 +354,7 @@ public sealed class MyServerTab : UserControl
             // Uygulama kapatılırken de kısa kodu çevrimdışı bırak; aksi halde
             // arkadaşlar 5 dakikaya kadar eski sunucu bilgisini görebilir.
             StopPublisher(publishOffline: true);
+            StopRelay();
             Server.StopAll();
         }
         catch (Exception ex)
@@ -369,12 +378,126 @@ public sealed class MyServerTab : UserControl
         _syncServerStatus.ForeColor = sync ? Ui.OkColor : Color.DimGray;
 
         var ips = GetLocalIPv4();
-        _addressInfo.Text = game || sync
+        var baseText = game || sync
             ? T("Bağlantı adresleri: ") + string.Join(", ", ips.Select(ip =>
                 T("{0}:{1} (oyun) / {2}:{3} (sync)", ip, info.GamePort, ip, info.SyncPort)))
             : T("Sunucu kapalıyken modlar değiştirilebilir; başlatınca otomatik güncellenir.");
 
+        var relay = _relayService?.Endpoints;
+        var lines = new List<string> { baseText };
+        if (relay != null)
+        {
+            lines.Add(T("Otomatik relay: {0} (sync {1}, oyun {2})",
+                relay.Host, relay.SyncPort, relay.GamePort));
+        }
+        else if ((game || sync) && _relayStatus.Length > 0)
+        {
+            lines.Add(_relayStatus);
+        }
+        _addressInfo.Text = string.Join("\r\n", lines);
+
         RefreshShortCodeStatus();
+    }
+
+    // ------------------------------------------------------------------ otomatik relay
+
+    private void StartRelay(MyServerSettings settings)
+    {
+        if (string.IsNullOrWhiteSpace(settings.ShortCode)) return;
+
+        var cts = new CancellationTokenSource();
+        _relayCts = cts;
+        _relayStatus = T("Otomatik relay başlatılıyor...");
+        AppEnv.Log("Otomatik relay başlatılıyor (port yönlendirme/Radmin gerekmez)...");
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                var svc = await RelayHostService.StartAsync(
+                    settings.GamePort, settings.SyncPort, AppEnv.Log, cts.Token).ConfigureAwait(false);
+
+                if (svc == null)
+                {
+                    _relayStatus = T("Otomatik relay kullanılamıyor; doğrudan bağlantı adresleri yayınlanacak.");
+                    AppEnv.Log("Otomatik relay kullanılamıyor; yalnızca doğrudan adresler yayınlanacak.");
+                    return;
+                }
+
+                if (cts.IsCancellationRequested || !ReferenceEquals(_relayCts, cts))
+                {
+                    await svc.DisposeAsync().ConfigureAwait(false);
+                    return;
+                }
+
+                svc.Changed += OnRelayChanged;
+                _relayService = svc;
+
+                // StopRelay, yukarıdaki ilk kontrol ile bu atama arasında
+                // çalışmış olabilir; bu durumda servis sahipsiz kalmasın.
+                if (cts.IsCancellationRequested || !ReferenceEquals(_relayCts, cts))
+                {
+                    if (ReferenceEquals(_relayService, svc)) _relayService = null;
+                    svc.Changed -= OnRelayChanged;
+                    await svc.DisposeAsync().ConfigureAwait(false);
+                    return;
+                }
+
+                _relayStatus = "";
+                _publishWake.Release();
+
+                try
+                {
+                    if (IsHandleCreated && !IsDisposed) BeginInvoke(RefreshStatus);
+                }
+                catch { /* pencere kapanırken */ }
+            }
+            catch (Exception ex)
+            {
+                _relayStatus = T("Otomatik relay kullanılamıyor; doğrudan bağlantı adresleri yayınlanacak.");
+                AppEnv.LogError("Otomatik relay hatası: " + ex.Message);
+            }
+            finally
+            {
+                // StopRelay yalnızca iptal eder; CTS'yi onu kullanan görev kapatır.
+                cts.Dispose();
+            }
+        });
+    }
+
+    private void OnRelayChanged()
+    {
+        try { _publishWake.Release(); } catch { }
+        try
+        {
+            if (IsHandleCreated && !IsDisposed) BeginInvoke(RefreshStatus);
+        }
+        catch { /* pencere kapanırken */ }
+    }
+
+    private void StopRelay()
+    {
+        var cts = _relayCts;
+        _relayCts = null;
+        try { cts?.Cancel(); } catch { /* görev zaten bitmiş olabilir */ }
+        _relayStatus = "";
+
+        var svc = _relayService;
+        _relayService = null;
+        if (svc != null)
+        {
+            try
+            {
+                // UI iş parçacığını kilitlemeden kısa süre bekle.
+                if (!Task.Run(async () => await svc.DisposeAsync().ConfigureAwait(false))
+                        .Wait(TimeSpan.FromSeconds(6)))
+                    AppEnv.Log("Otomatik relay kapatılması arka planda sürüyor.");
+            }
+            catch (Exception ex)
+            {
+                AppEnv.Log("Otomatik relay kapatılırken hata: " + ex.Message);
+            }
+        }
     }
 
     // ------------------------------------------------------------------ kısa kod yayını
@@ -382,6 +505,7 @@ public sealed class MyServerTab : UserControl
     private void StartPublisher(MyServerSettings settings)
     {
         StopPublisher(publishOffline: false);
+        while (_publishWake.Wait(0)) { /* eski uyandırmaları temizle */ }
         _publishStatus = "";
         _publishOk = false;
 
@@ -429,17 +553,33 @@ public sealed class MyServerTab : UserControl
         var hosts = new List<string>();
         var hostsAt = DateTime.MinValue;
         var lastOk = false;
+        var firstPublish = true;
+        string lastLogged = "";
 
         while (!ct.IsCancellationRequested)
         {
             try
             {
+                // Relay genellikle 1-2 saniyede hazır olur. İlk yayını hemen
+                // yaparsak arkadaş kısa kodu çok erken sorguladığında yalnızca
+                // doğrudan adresleri görür; kısa bir süre relay'i bekle.
+                if (firstPublish)
+                {
+                    firstPublish = false;
+                    for (int i = 0; i < 10 && _relayCts != null && _relayService == null; i++)
+                    {
+                        if (ct.IsCancellationRequested) break;
+                        await Task.Delay(200, ct);
+                    }
+                }
+
                 if (hosts.Count == 0 || (DateTime.UtcNow - hostsAt).TotalMinutes >= 10)
                 {
                     hosts = await BuildAdvertiseHostsAsync(ct);
                     hostsAt = DateTime.UtcNow;
                 }
 
+                var relay = _relayService?.Endpoints;
                 var offer = new ShortCodeDirectory.ShortCodeOffer(
                     settings.ServerName,
                     hosts,
@@ -447,13 +587,25 @@ public sealed class MyServerTab : UserControl
                     settings.SyncPort,
                     settings.Password,
                     settings.SyncToken,
-                    DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+                    DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
+                    relay?.Host ?? "",
+                    relay?.SyncPort ?? 0,
+                    relay?.GamePort ?? 0);
 
                 await ShortCodeDirectory.PublishAsync(code, offer, ct);
                 SetPublishStatus(T("Kısa kod yayında: {0}", settings.ShortCode), ok: true);
 
-                if (!lastOk)
-                    AppEnv.Log($"Kısa kod yayınlandı: {settings.ShortCode} ({hosts.Count} adres)");
+                var logKey = string.Join(",", hosts) + "|" + (relay?.Host ?? "") +
+                             ":" + (relay?.SyncPort ?? 0) + "/" + (relay?.GamePort ?? 0);
+                if (!lastOk || !string.Equals(lastLogged, logKey, StringComparison.Ordinal))
+                {
+                    AppEnv.Log($"Kısa kod yayınlandı: {settings.ShortCode} " +
+                               $"({hosts.Count} adres: {string.Join(", ", hosts)})" +
+                               (relay != null
+                                   ? $"; relay {relay.Host} sync {relay.SyncPort}, oyun {relay.GamePort}"
+                                   : "; relay yok"));
+                    lastLogged = logKey;
+                }
                 lastOk = true;
             }
             catch (OperationCanceledException)
@@ -469,7 +621,9 @@ public sealed class MyServerTab : UserControl
 
             try
             {
-                await Task.Delay(TimeSpan.FromSeconds(ShortCodeDirectory.HeartbeatSeconds), ct);
+                var delay = Task.Delay(TimeSpan.FromSeconds(ShortCodeDirectory.HeartbeatSeconds), ct);
+                var wake = _publishWake.WaitAsync(ct);
+                await Task.WhenAny(delay, wake);
             }
             catch (OperationCanceledException)
             {

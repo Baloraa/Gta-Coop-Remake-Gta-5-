@@ -34,10 +34,11 @@ KURULUM
 4) "Sunucular" sekmesi:
    - EN KOLAY: Sunucu sahibinin gönderdiği KISA KOD'u (ör. Gel.com)
      "Kod ile Katıl..." düğmesine yazın; "Ekle ve Bağlan" deyin.
-     Launcher sunucu bilgilerini internetten alır; sunucu açık ve
-     internetiniz çalışır olmalıdır.
+     Launcher sunucu bilgilerini internetten alır; gerekirse
+     otomatik relay ile bağlanır. Port yönlendirme veya Radmin VPN
+     gerekmez. Sunucu açık ve internetiniz çalışır olmalıdır.
    - Sunucu sahibi uzun GTC1 kodu gönderdiyse onu da aynı ekrana
-     yapıştırabilirsiniz; uzun kod bilgileri kendi taşır.
+     yapıştırabilirsiniz; uzun kod bilgileri kendi taşır (relay yok).
    - Alternatif: "Sunucu Ekle" deyin; sunucu sahibinin verdiği
      adresi ve portları girin (oyun portu 4499 UDP, sync 4599 TCP).
    - "Bağlan ve Oyna"ya basın. Sunucu modları otomatik iner,
@@ -67,6 +68,9 @@ KURULUM
   silinip baştan indirilir (oyuna kurulmaz). Modlar oyuna
   kuruluyken bu işlem çalışmaz; önce "Oturumu Bitir".
 - Oyun dosyalarınız ve ScriptHook dosyalarınız değiştirilmez.
+- Kısa kod/otomatik relay kullanıyorsanız oyun sırasında
+  GTACoop.Launcher açık kalsın; relay oyun trafiğini launcher
+  üzerinden taşır. Oyunu kapatınca launcher'ı kapatabilirsiniz.
 - Kendi sunucunuzu kurmak isterseniz ayrıca .NET 10 gerekir.
 
 ------------------------------------------------------------------

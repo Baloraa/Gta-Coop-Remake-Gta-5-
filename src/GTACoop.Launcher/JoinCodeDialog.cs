@@ -103,7 +103,8 @@ public sealed class JoinCodeDialog : Form
             MaximumSize = new Size(720, 0),
             Text = T("İpucu: Kısa kod (ör. Gel.com) sunucuyu internet üzerinden bulur; sunucu açık olmalı. " +
                      "Uzun GTC1 kodu bağlantı bilgilerini kendi taşır ve internet gerektirmez. " +
-                     "Kod şifre/token içerebilir; yalnızca güvendiğiniz kişilerle paylaşın."),
+                     "Kod şifre/token içerebilir; yalnızca güvendiğiniz kişilerle paylaşın.") +
+                   "\r\n" + T("Otomatik relay sayesinde port yönlendirme/Radmin gerekmez; oyun sırasında launcher açık kalmalı."),
             Margin = new Padding(2, 2, 2, 0)
         };
 
@@ -248,21 +249,36 @@ public sealed class JoinCodeDialog : Form
                 return;
             }
 
-            SetSummary(T("Sunucu bulundu, adresler deneniyor..."), Color.DimGray);
+            SetSummary(T("Sunucu bulundu, doğrudan adresler ve otomatik relay deneniyor..."), Color.DimGray);
             var resolved = await ResolveOfferAsync(offer, cts.Token);
             if (cts.IsCancellationRequested || IsDisposed || !IsCurrentShortCode(code)) return;
 
             if (resolved == null)
             {
-                SetSummary(T("Sunucuya ulaşılamadı. Sunucu açık mı, adres/port doğru mu? Radmin VPN veya port yönlendirme gerekebilir.\r\nUzun GTC1 kodunu da deneyebilirsiniz."),
+                SetSummary(T("Sunucuya ulaşılamadı. Sunucu açık mı, kod doğru mu? Doğrudan adres ve otomatik relay denendi.\r\nSunucu sahibiyle ikiniz de güncel sürümü kullanın; uzun GTC1 kodunu da deneyebilirsiniz."),
                     Ui.WarnColor);
                 return;
             }
 
             _parsed = resolved;
-            SetSummary(T("Kısa kod bulundu ✓\r\nSunucu: {0}\r\nAdres: {1}\r\nOyun portu: {2}  |  Sync portu: {3}\r\nŞifre: {4}",
-                resolved.Name, resolved.Host, resolved.GamePort, resolved.SyncPort,
-                string.IsNullOrEmpty(resolved.Password) ? T("yok") : T("var")), Ui.OkColor);
+            if (resolved.UsesRelay)
+            {
+                var direct = offer.Hosts is { Count: > 0 }
+                    ? $"{resolved.Host}:{resolved.SyncPort}"
+                    : T("yok");
+                SetSummary(T("Kısa kod bulundu ✓\r\nSunucu: {0}\r\nDoğrudan adres: {1}\r\nOtomatik relay: {2}\r\nOyun portu: {3}  |  Sync portu: {4}\r\nŞifre: {5}",
+                    resolved.Name, direct, resolved.RelayHost,
+                    resolved.GamePort, resolved.SyncPort,
+                    string.IsNullOrEmpty(resolved.Password) ? T("yok") : T("var")), Ui.OkColor);
+            }
+            else
+            {
+                SetSummary(T("Kısa kod bulundu ✓\r\nSunucu: {0}\r\nAdres: {1}:{2} ({3})\r\nOyun portu: {4}  |  Sync portu: {5}\r\nŞifre: {6}",
+                    resolved.Name, resolved.Host, resolved.GamePort,
+                    T("doğrudan"),
+                    resolved.GamePort, resolved.SyncPort,
+                    string.IsNullOrEmpty(resolved.Password) ? T("yok") : T("var")), Ui.OkColor);
+            }
             _addBtn.Enabled = _connectBtn.Enabled = true;
         }
         catch (OperationCanceledException)
@@ -284,25 +300,80 @@ public sealed class JoinCodeDialog : Form
     private async Task<ServerEntry?> ResolveOfferAsync(
         ShortCodeDirectory.ShortCodeOffer offer, CancellationToken ct)
     {
-        // Adresleri sırayla denemek yerine paralel dene: uzak bir arkadaş için
-        // yerel/virtual adreslerin zaman aşımını beklemeden genel IP'ye ulaşılsın.
-        var groupCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        var tasks = offer.Hosts
+        // Doğrudan adresler (LAN/Radmin/port yönlendirme) ve otomatik relay paralel
+        // denenir. Doğrudan bağlantı genellikle daha hızlıdır; relay ise CGNAT
+        // arkasındaki sunucular için port yönlendirme gerektirmeden çalışır.
+        using var groupCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        var directTasks = offer.Hosts
             .Select(host => TryHostAsync(host, offer, groupCts.Token))
             .ToList();
+        var relayTask = TryRelayAsync(offer, groupCts.Token);
+        var relayPending = true;
 
-        while (tasks.Count > 0)
+        while (directTasks.Count > 0)
         {
-            var done = await Task.WhenAny(tasks);
-            tasks.Remove(done);
+            var candidates = new List<Task<ServerEntry?>>(directTasks);
+            if (relayPending) candidates.Add(relayTask);
+            var done = await Task.WhenAny(candidates);
+            if (relayPending && done == relayTask)
+            {
+                relayPending = false;
+                var relayEntry = await relayTask;
+                if (relayEntry != null)
+                {
+                    groupCts.Cancel();
+                    return relayEntry;
+                }
+                continue;
+            }
+
+            directTasks.Remove(done);
             var entry = await done;
             if (entry == null) continue;
 
-            groupCts.Cancel(); // diğer adres denemelerini bırak
+            groupCts.Cancel();
             return entry;
         }
 
-        return null;
+        var fallback = relayPending ? await relayTask : null;
+        if (fallback != null) groupCts.Cancel();
+        return fallback;
+    }
+
+    private static async Task<ServerEntry?> TryRelayAsync(
+        ShortCodeDirectory.ShortCodeOffer offer, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(offer.RelayHost) ||
+            offer.RelaySyncPort <= 0 || offer.RelayGamePort <= 0)
+            return null;
+
+        try
+        {
+            using var linkCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            linkCts.CancelAfter(TimeSpan.FromSeconds(10));
+
+            using var client = new SyncClient(offer.RelayHost, offer.RelaySyncPort, offer.SyncToken);
+            var mf = await client.GetManifestAsync(linkCts.Token);
+
+            return new ServerEntry
+            {
+                Name = string.IsNullOrWhiteSpace(mf.ServerName) ? offer.Name : mf.ServerName,
+                Host = offer.Hosts.FirstOrDefault() ?? offer.RelayHost,
+                GamePort = offer.GamePort,
+                SyncPort = offer.SyncPort,
+                Password = offer.Password,
+                SyncToken = offer.SyncToken,
+                AutoConnect = true,
+                RelayHost = offer.RelayHost,
+                RelaySyncPort = offer.RelaySyncPort,
+                RelayGamePort = offer.RelayGamePort
+            };
+        }
+        catch
+        {
+            // Relay yoksa/erişilemezse doğrudan adresler denenmeye devam eder.
+            return null;
+        }
     }
 
     private static async Task<ServerEntry?> TryHostAsync(string host,
@@ -311,7 +382,7 @@ public sealed class JoinCodeDialog : Form
         try
         {
             using var linkCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-            linkCts.CancelAfter(TimeSpan.FromSeconds(3));
+            linkCts.CancelAfter(TimeSpan.FromSeconds(6));
 
             using var client = new SyncClient(host, offer.SyncPort, offer.SyncToken);
             var mf = await client.GetManifestAsync(linkCts.Token);

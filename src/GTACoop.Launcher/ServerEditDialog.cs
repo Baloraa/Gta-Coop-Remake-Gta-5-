@@ -85,6 +85,10 @@ public sealed class ServerEditDialog : Form
 
         ok.Click += (_, _) =>
         {
+            var oldHost = Entry.Host;
+            var oldGamePort = Entry.GamePort;
+            var oldSyncPort = Entry.SyncPort;
+
             Entry.Name = string.IsNullOrWhiteSpace(_name.Text) ? _host.Text : _name.Text.Trim();
             Entry.Host = _host.Text.Trim();
             Entry.GamePort = (int)_gamePort.Value;
@@ -92,6 +96,16 @@ public sealed class ServerEditDialog : Form
             Entry.Password = _password.Text;
             Entry.SyncToken = _token.Text.Trim();
             Entry.AutoConnect = _autoConnect.Checked;
+
+            // Adres veya port değiştiyse eski relay uç noktaları artık bu
+            // sunucuya ait değildir; yanlış yere bağlanmayı önle.
+            if (!string.Equals(oldHost, Entry.Host, StringComparison.OrdinalIgnoreCase) ||
+                oldGamePort != Entry.GamePort || oldSyncPort != Entry.SyncPort)
+            {
+                Entry.RelayHost = "";
+                Entry.RelaySyncPort = 0;
+                Entry.RelayGamePort = 0;
+            }
         };
     }
 

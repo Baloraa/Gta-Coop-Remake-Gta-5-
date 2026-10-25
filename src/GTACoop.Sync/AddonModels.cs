@@ -121,6 +121,15 @@ public sealed class ServerEntry
     public string Password { get; set; } = "";
     public string SyncToken { get; set; } = "";
     public bool AutoConnect { get; set; } = true;
+
+    // Otomatik relay (port yönlendirme/Radmin gerekmeden). Boşsa doğrudan bağlantı.
+    public string RelayHost { get; set; } = "";
+    public int RelaySyncPort { get; set; }
+    public int RelayGamePort { get; set; }
+
+    [JsonIgnore]
+    public bool UsesRelay =>
+        !string.IsNullOrWhiteSpace(RelayHost) && RelaySyncPort > 0 && RelayGamePort > 0;
 }
 
 public static class SyncJson

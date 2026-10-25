@@ -47,6 +47,11 @@ public static class ShortCodeDirectory
         public string? p { get; set; }
         public string? t { get; set; }
         public long ts { get; set; }
+
+        // Otomatik relay (bore.pub uyumlu TCP tüneli). Eski istemciler bu alanları yok sayar.
+        public string? rh { get; set; }
+        public int rs { get; set; }
+        public int rg { get; set; }
     }
 
     /// <summary>Kısa kodun çözdüğü sunucu bilgisi.</summary>
@@ -57,7 +62,10 @@ public static class ShortCodeDirectory
         int SyncPort,
         string Password,
         string SyncToken,
-        long TimestampUnix);
+        long TimestampUnix,
+        string RelayHost = "",
+        int RelaySyncPort = 0,
+        int RelayGamePort = 0);
 
     /// <summary>
     /// Kullanıcının yazdığı kısa kodu doğrular ve karşılaştırma için küçük harfe çevirir.
@@ -140,7 +148,10 @@ public static class ShortCodeDirectory
             t = string.IsNullOrEmpty(offer.SyncToken) ? null : offer.SyncToken,
             ts = offer.TimestampUnix > 0
                 ? offer.TimestampUnix
-                : DateTimeOffset.UtcNow.ToUnixTimeSeconds()
+                : DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
+            rh = string.IsNullOrWhiteSpace(offer.RelayHost) ? null : offer.RelayHost.Trim(),
+            rs = offer.RelaySyncPort is > 0 and <= 65535 ? offer.RelaySyncPort : 0,
+            rg = offer.RelayGamePort is > 0 and <= 65535 ? offer.RelayGamePort : 0
         };
 
         await PublishPayloadAsync(normalized, payload, ct);
@@ -276,7 +287,19 @@ public static class ShortCodeDirectory
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Take(12)
             .ToArray();
-        if (hosts.Length == 0) return null;
+
+        var relayHost = NormalizeRelayHost(payload.rh);
+        var relaySync = payload.rs is > 0 and <= 65535 ? payload.rs : 0;
+        var relayGame = payload.rg is > 0 and <= 65535 ? payload.rg : 0;
+        if (relayHost.Length == 0 || relaySync == 0 || relayGame == 0)
+        {
+            relayHost = "";
+            relaySync = 0;
+            relayGame = 0;
+        }
+
+        // Relay tek başına yeterli olabilir; doğrudan adres yoksa da teklifi kabul et.
+        if (hosts.Length == 0 && relayHost.Length == 0) return null;
 
         var gamePort = payload.g is >= 1 and <= 65535 ? payload.g : 4499;
         var syncPort = payload.s is >= 1 and <= 65535 ? payload.s : 4599;
@@ -286,7 +309,28 @@ public static class ShortCodeDirectory
 
         return new ShortCodeOffer(
             name, hosts, gamePort, syncPort,
-            payload.p ?? "", payload.t ?? "", payload.ts);
+            payload.p ?? "", payload.t ?? "", payload.ts,
+            relayHost, relaySync, relayGame);
+    }
+
+    /// <summary>
+    /// Relay sunucusu alan adı (ör. bore.pub) veya IPv4 adresi. Şema/port kabul edilmez;
+    /// yalnızca harf, rakam, nokta ve tire kullanılabilir.
+    /// </summary>
+    private static string NormalizeRelayHost(string? input)
+    {
+        var host = (input ?? "").Trim();
+        if (host.Length is 0 or > 255) return "";
+        foreach (var c in host)
+        {
+            var ok = c is >= 'a' and <= 'z'
+                or >= 'A' and <= 'Z'
+                or >= '0' and <= '9'
+                or '.' or '-';
+            if (!ok) return "";
+        }
+        if (host.StartsWith('.') || host.EndsWith('.') || host.Contains("..")) return "";
+        return host;
     }
 
     private static async Task<string?> FetchTopicAsync(string url, CancellationToken ct)
@@ -322,8 +366,7 @@ public static class ShortCodeDirectory
             if (!resp.IsSuccessStatusCode) return null;
 
             var text = (await resp.Content.ReadAsStringAsync(ct)).Trim();
-            return IPAddress.TryParse(text, out var ip) &&
-                   ip.AddressFamily == AddressFamily.InterNetwork
+            return IPAddress.TryParse(text, out var ip) && IsPublicIPv4(ip)
                 ? text
                 : null;
         }
@@ -331,6 +374,23 @@ public static class ShortCodeDirectory
         {
             return null;
         }
+    }
+
+    /// <summary>
+    /// Adres gerçekten internete açılabilir bir IPv4 mü? Özel ağ, CGNAT,
+    /// loopback, link-local ve çoklu yayın adresleri genel IP sayılmaz.
+    /// </summary>
+    public static bool IsPublicIPv4(IPAddress ip)
+    {
+        if (ip.AddressFamily != AddressFamily.InterNetwork) return false;
+        var b = ip.GetAddressBytes();
+        if (b[0] == 0 || b[0] == 10 || b[0] == 127) return false;
+        if (b[0] == 100 && b[1] is >= 64 and <= 127) return false; // CGNAT
+        if (b[0] == 169 && b[1] == 254) return false;              // link-local
+        if (b[0] == 172 && b[1] is >= 16 and <= 31) return false;
+        if (b[0] == 192 && b[1] == 168) return false;
+        if (b[0] >= 224) return false;                             // multicast/reserved
+        return true;
     }
 
     private static string Encrypt(string normalized, OfferPayload payload)

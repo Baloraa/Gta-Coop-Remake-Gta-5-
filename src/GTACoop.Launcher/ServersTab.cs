@@ -17,6 +17,9 @@ public sealed class ServersTab : UserControl
     private readonly System.Windows.Forms.Timer _sessionTimer = new();
     private CancellationTokenSource? _cts;
     private CancellationTokenSource? _fallbackWatcherCts;
+    private RelaySession? _activeRelay;
+    private DateTime? _relayIdleSince;
+    private bool _relayGameSeen;
     private bool _busy;
 
     public ServersTab()
@@ -138,9 +141,9 @@ public sealed class ServersTab : UserControl
             var item = new ListViewItem(new[]
             {
                 s.Name,
-                s.Host,
-                s.GamePort.ToString(),
-                s.SyncPort.ToString(),
+                s.UsesRelay ? T("{0} (relay)", s.Host) : s.Host,
+                s.UsesRelay ? s.RelayGamePort.ToString() : s.GamePort.ToString(),
+                s.UsesRelay ? s.RelaySyncPort.ToString() : s.SyncPort.ToString(),
                 string.IsNullOrEmpty(s.Password) ? "-" : T("var")
             });
             item.Tag = s;
@@ -178,6 +181,9 @@ public sealed class ServersTab : UserControl
             existing.Name = entry.Name;
             existing.Password = entry.Password;
             existing.SyncToken = entry.SyncToken;
+            existing.RelayHost = entry.RelayHost;
+            existing.RelaySyncPort = entry.RelaySyncPort;
+            existing.RelayGamePort = entry.RelayGamePort;
             entry = existing;
             AppEnv.Log($"Katılım kodu mevcut kaydı güncelledi: {entry.Name} ({entry.Host})");
         }
@@ -290,6 +296,7 @@ public sealed class ServersTab : UserControl
         _cancelBtn.Enabled = true;
         _cts = new CancellationTokenSource();
         var ct = _cts.Token;
+        var keepRelay = false;
         SetStatus(T("Sunucuya bağlanılıyor..."), Ui.WarnColor);
         SetProgress(0);
 
@@ -302,11 +309,49 @@ public sealed class ServersTab : UserControl
                 SetProgress((int)(p.Fraction * 100));
             });
 
+            DisposeActiveRelay();
+
+            var syncHost = sel.Host;
+            var syncPort = sel.SyncPort;
+            var gameHost = sel.Host;
+            var gamePort = sel.GamePort;
+            var viaRelay = false;
+
+            if (sel.UsesRelay)
+            {
+                SetStatus(T("Otomatik relay bağlantısı kuruluyor..."), Ui.WarnColor);
+                var relay = await TryStartRelayAsync(sel, ct);
+                if (relay != null)
+                {
+                    _activeRelay = relay;
+                    syncHost = "127.0.0.1";
+                    syncPort = relay.SyncPort;
+                    gameHost = "127.0.0.1";
+                    gamePort = relay.GamePort;
+                    viaRelay = true;
+                    AppEnv.Log($"Otomatik relay bağlantısı kuruldu: {sel.RelayHost} " +
+                               $"(sync {sel.RelaySyncPort} -> yerel {relay.SyncPort}, " +
+                               $"oyun {sel.RelayGamePort} -> yerel {relay.GamePort})");
+                }
+                else if (CanTryDirect(sel))
+                {
+                    SetStatus(T("Otomatik relay kurulamadı; doğrudan adres deneniyor..."), Ui.WarnColor);
+                    AppEnv.Log($"Otomatik relay kurulamadı; doğrudan adres denenecek: {sel.Host}:{sel.SyncPort}");
+                }
+                else
+                {
+                    throw new SyncException(T(
+                        "Otomatik relay bağlantısı kurulamadı. İnternet bağlantınızı kontrol edip yeniden deneyin."));
+                }
+            }
+
             var manifest = await Task.Run<Manifest?>(async () =>
             {
-                using var client = new SyncClient(sel.Host, sel.SyncPort, sel.SyncToken);
+                using var client = new SyncClient(syncHost, syncPort, sel.SyncToken);
 
-                AppEnv.Log($"Sunucuya bağlanılıyor: {sel.Host}:{sel.SyncPort}");
+                AppEnv.Log(viaRelay
+                    ? $"Sunucuya bağlanılıyor (relay): {sel.RelayHost}:{sel.RelaySyncPort}"
+                    : $"Sunucuya bağlanılıyor: {syncHost}:{syncPort}");
                 var serverName = await client.PingAsync(ct);
                 AppEnv.Log($"Sunucu adı: {serverName}");
 
@@ -314,7 +359,7 @@ public sealed class ServersTab : UserControl
                 var state = SyncStateStore.Load(AppEnv.DataFolder, mf.ServerId);
                 var plan = applier.BuildPlan(mf, state);
 
-                ShowDetails(sel, mf, plan, state);
+                ShowDetails(sel, mf, plan, state, viaRelay);
 
                 // Onay (indirilecek varsa)
                 if (plan.ToInstall.Count > 0)
@@ -355,8 +400,8 @@ public sealed class ServersTab : UserControl
             }
 
             // İstemci ayarları: oyun açılınca bu sunucuya otomatik bağlan (isteğe göre)
-            ClientSettingsEditor.Apply(gameFolder, AppEnv.Settings.Username, sel.Host,
-                sel.GamePort, sel.Password, autoConnect: sel.AutoConnect, AppEnv.Log);
+            ClientSettingsEditor.Apply(gameFolder, AppEnv.Settings.Username, gameHost,
+                gamePort, sel.Password, autoConnect: sel.AutoConnect, AppEnv.Log);
 
             if (launch)
             {
@@ -366,8 +411,8 @@ public sealed class ServersTab : UserControl
                     {
                         ServerId = manifest.ServerId,
                         ServerName = manifest.ServerName,
-                        Host = sel.Host,
-                        GamePort = sel.GamePort,
+                        Host = gameHost,
+                        GamePort = gamePort,
                         StartedUtc = DateTime.UtcNow
                     };
                     SessionStore.Save(AppEnv.DataFolder, rec);
@@ -389,6 +434,8 @@ public sealed class ServersTab : UserControl
                 SetStatus(T("Hazır: sunucu modları kurulu."), Ui.OkColor);
                 SetProgress(100);
             }
+
+            keepRelay = true;
         }
         catch (OperationCanceledException)
         {
@@ -403,6 +450,7 @@ public sealed class ServersTab : UserControl
         }
         finally
         {
+            if (!keepRelay) DisposeActiveRelay();
             _busy = false;
             _connectBtn.Enabled = true;
             _cancelBtn.Enabled = false;
@@ -431,6 +479,7 @@ public sealed class ServersTab : UserControl
         _cancelBtn.Enabled = true;
         _cts = new CancellationTokenSource();
         var ct = _cts.Token;
+        RelaySession? relay = null;
         SetStatus(T(force ? "Mod dosyaları yeniden indiriliyor (oyuna kurulmayacak)..." : "Mod dosyaları indiriliyor (oyuna kurulmayacak)..."), Ui.WarnColor);
         SetProgress(0);
 
@@ -443,9 +492,34 @@ public sealed class ServersTab : UserControl
                 SetProgress((int)(p.Fraction * 100));
             });
 
+            var syncHost = sel.Host;
+            var syncPort = sel.SyncPort;
+            if (sel.UsesRelay)
+            {
+                SetStatus(T("Otomatik relay bağlantısı kuruluyor..."), Ui.WarnColor);
+                relay = await TryStartRelayAsync(sel, ct);
+                if (relay != null)
+                {
+                    syncHost = "127.0.0.1";
+                    syncPort = relay.SyncPort;
+                    AppEnv.Log($"Ön indirme relay bağlantısı: {sel.RelayHost} " +
+                               $"(sync {sel.RelaySyncPort} -> yerel {relay.SyncPort})");
+                }
+                else if (CanTryDirect(sel))
+                {
+                    SetStatus(T("Otomatik relay kurulamadı; doğrudan adres deneniyor..."), Ui.WarnColor);
+                    AppEnv.Log($"Ön indirme: relay kurulamadı; doğrudan adres denenecek: {sel.Host}:{sel.SyncPort}");
+                }
+                else
+                {
+                    throw new SyncException(T(
+                        "Otomatik relay bağlantısı kurulamadı. İnternet bağlantınızı kontrol edip yeniden deneyin."));
+                }
+            }
+
             await Task.Run(async () =>
             {
-                using var client = new SyncClient(sel.Host, sel.SyncPort, sel.SyncToken);
+                using var client = new SyncClient(syncHost, syncPort, sel.SyncToken);
                 var mf = await client.GetManifestAsync(ct);
                 AppEnv.Log($"Ön indirme: {mf.ServerName} ({mf.Addons.Count} eklenti)");
                 var contentDir = AppEnv.ServerContentFolder(sel, mf);
@@ -482,6 +556,12 @@ public sealed class ServersTab : UserControl
         }
         finally
         {
+            if (relay != null)
+            {
+                try { await relay.DisposeAsync(); }
+                catch (Exception ex) { AppEnv.Log("Relay kapatılırken hata: " + ex.Message); }
+            }
+
             _busy = false;
             _connectBtn.Enabled = true;
             _cancelBtn.Enabled = false;
@@ -592,8 +672,71 @@ public sealed class ServersTab : UserControl
         }
         finally
         {
+            DisposeActiveRelay();
             RefreshSessionUi();
         }
+    }
+
+    private static bool CanTryDirect(ServerEntry entry) =>
+        !string.IsNullOrWhiteSpace(entry.Host) &&
+        !string.Equals(entry.Host, entry.RelayHost, StringComparison.OrdinalIgnoreCase) &&
+        entry.SyncPort is > 0 and <= 65535;
+
+    /// <summary>
+    /// Relay kurulamazsa doğrudan bağlantıya düşebilmek için hatayı yutar.
+    /// Kullanıcı iptal ettiyse iptal istisnası yukarı çıkar.
+    /// </summary>
+    private static async Task<RelaySession?> TryStartRelayAsync(ServerEntry entry, CancellationToken ct)
+    {
+        try
+        {
+            return await RelaySession.StartAsync(entry, ct);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            AppEnv.Log("Otomatik relay bağlantısı kurulamadı: " + ex.Message);
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Aktif relay oturumunu kapatır. Relay üzerinden oynanan oyunda bağlantı
+    /// launcher süreci üzerinden geçtiği için launcher açık kalmalıdır.
+    /// </summary>
+    private void DisposeActiveRelay()
+    {
+        var relay = _activeRelay;
+        _activeRelay = null;
+        _relayIdleSince = null;
+        _relayGameSeen = false;
+        if (relay == null) return;
+
+        try
+        {
+            if (!Task.Run(async () => await relay.DisposeAsync().ConfigureAwait(false))
+                    .Wait(TimeSpan.FromSeconds(4)))
+                AppEnv.Log("Relay oturumu arka planda kapatılıyor.");
+        }
+        catch (Exception ex)
+        {
+            AppEnv.Log("Relay oturumu kapatılırken hata: " + ex.Message);
+        }
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            try { _cts?.Cancel(); } catch { }
+            try { _fallbackWatcherCts?.Cancel(); } catch { }
+            _sessionTimer.Stop();
+            DisposeActiveRelay();
+        }
+        base.Dispose(disposing);
     }
 
     private void RefreshSessionUi()
@@ -601,6 +744,28 @@ public sealed class ServersTab : UserControl
         var rec = SessionStore.Load(AppEnv.DataFolder);
         bool active = rec != null;
         _endSessionBtn.Enabled = active && !_busy;
+
+        // Relay oyun bağlantısı launcher üzerinden geçer. Oyun çalışırken relay'i
+        // açık tut; oyun kapandıktan sonra kısa bir süre sonra temizle.
+        if (_activeRelay != null && !_busy)
+        {
+            if (AddonApplier.IsGameRunning())
+            {
+                _relayGameSeen = true;
+                _relayIdleSince = null;
+            }
+            else if (_relayGameSeen)
+            {
+                _relayIdleSince ??= DateTime.UtcNow;
+                if ((DateTime.UtcNow - _relayIdleSince.Value).TotalSeconds >= 12)
+                    DisposeActiveRelay();
+            }
+        }
+        else if (_activeRelay == null)
+        {
+            _relayGameSeen = false;
+            _relayIdleSince = null;
+        }
 
         if (active)
         {
@@ -615,10 +780,15 @@ public sealed class ServersTab : UserControl
         }
     }
 
-    private void ShowDetails(ServerEntry sel, Manifest manifest, AddonApplier.InstallPlan plan, SyncState state)
+    private void ShowDetails(ServerEntry sel, Manifest manifest, AddonApplier.InstallPlan plan, SyncState state,
+        bool viaRelay = false)
     {
         var sb = new System.Text.StringBuilder();
-        sb.AppendLine(T("Sunucu : {0}  ({1}:{2})", manifest.ServerName, sel.Host, sel.SyncPort));
+        sb.AppendLine(viaRelay
+            ? T("Sunucu : {0}  (otomatik relay: {1})", manifest.ServerName, sel.RelayHost)
+            : T("Sunucu : {0}  ({1}:{2})", manifest.ServerName, sel.Host, sel.SyncPort));
+        if (viaRelay)
+            sb.AppendLine(T("Bağlantı: otomatik relay (oyun sırasında launcher açık kalmalı)."));
         sb.AppendLine(T("Kimlik : {0}", manifest.ServerId));
         sb.AppendLine(T("Eklenti: {0}  |  kurulacak: {1}  |  güncel: {2}  |  kaldırılacak: {3}  |  sizde var: {4}",
             manifest.Addons.Count, plan.ToInstall.Count, plan.UpToDate.Count, plan.ToRemove.Count,

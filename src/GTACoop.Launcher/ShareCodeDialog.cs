@@ -20,21 +20,26 @@ public sealed class ShareCodeDialog : Form
     private readonly bool _serverRunning;
     private readonly string _publishStatus;
     private readonly bool _publishOk;
+    private readonly RelayEndpoints? _relay;
+    private readonly string _relayStatus;
 
     public ShareCodeDialog(MyServerSettings settings, bool serverRunning = false,
-        string? publishStatus = null, bool publishOk = false)
+        string? publishStatus = null, bool publishOk = false,
+        RelayEndpoints? relay = null, string? relayStatus = null)
     {
         _settings = settings;
         _serverRunning = serverRunning;
         _publishStatus = publishStatus ?? "";
         _publishOk = publishOk;
+        _relay = relay;
+        _relayStatus = relayStatus ?? "";
 
         Text = T("Katılım Kodu Oluştur");
         AutoScaleMode = AutoScaleMode.Dpi;
         AutoScaleDimensions = new SizeF(96f, 96f);
         Width = 680;
-        Height = 660;
-        MinimumSize = new Size(580, 580);
+        Height = 700;
+        MinimumSize = new Size(580, 620);
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
         MinimizeBox = false;
@@ -58,7 +63,7 @@ public sealed class ShareCodeDialog : Form
         {
             Text = T("Kısa Kod (arkadaşınızın yazacağı kod)"),
             Dock = DockStyle.Fill,
-            Height = 126,
+            Height = 150,
             Padding = new Padding(8),
             Margin = new Padding(2, 0, 2, 8)
         };
@@ -205,9 +210,20 @@ public sealed class ShareCodeDialog : Form
             return T("Kısa kod kapalı. 'Sunucum' sekmesindeki 'Kısa kod' alanına ör. Gel.com yazın.");
         if (!_serverRunning)
             return T("Sunucu kapalı: kısa kod ancak sunucu başlatılınca çalışır.");
-        if (!string.IsNullOrEmpty(_publishStatus))
-            return _publishStatus;
-        return T("Kısa kod yayınlanıyor... Arkadaşınız 'Kod ile Katıl' ekranına bu kodu yazsın.");
+
+        var text = !string.IsNullOrEmpty(_publishStatus)
+            ? _publishStatus
+            : T("Kısa kod yayınlanıyor... Arkadaşınız 'Kod ile Katıl' ekranına bu kodu yazsın.");
+
+        if (_relay != null)
+            text += "\r\n" + T("Otomatik relay hazır: {0} (sync {1}, oyun {2}). Port yönlendirme/Radmin gerekmez.",
+                _relay.Host, _relay.SyncPort, _relay.GamePort);
+        else if (_relayStatus.Length > 0)
+            text += "\r\n" + _relayStatus;
+        else
+            text += "\r\n" + T("Otomatik relay başlatılıyor...");
+
+        return text;
     }
 
     private Color ShortStatusColor()
@@ -222,7 +238,7 @@ public sealed class ShareCodeDialog : Form
     {
         if (!string.IsNullOrWhiteSpace(_settings.ShortCode))
         {
-            var text = T("Arkadaşınıza sadece kısa kodu gönderin; 'Sunucular' sekmesinde 'Kod ile Katıl...' deyip kodu yazsın. Kısa kod, sunucu bilgilerini şifreli olarak internet üzerinden yayınlar. Sunucu açık olmalı; bağlantı için Radmin VPN ya da port yönlendirme gerekir.");
+            var text = T("Arkadaşınıza sadece kısa kodu gönderin; 'Sunucular' sekmesinde 'Kod ile Katıl...' deyip kodu yazsın. Kısa kod, sunucu bilgilerini şifreli olarak internet üzerinden yayınlar. Sunucu ve launcher açık olmalı. Otomatik relay sayesinde port yönlendirme veya Radmin VPN gerekmez.");
             text += "\r\n" + T("Kısa kodu yalnızca güvendiğiniz kişilerle paylaşın; kodu bilen sunucuya bağlanabilir.");
 
             if (!string.IsNullOrEmpty(_settings.Password) || !string.IsNullOrEmpty(_settings.SyncToken))

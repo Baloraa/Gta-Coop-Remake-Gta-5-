@@ -1,5 +1,5 @@
 ==========================================================
- GTACoop Remake - Friend Edition (English, v2.1.6)
+ GTACoop Remake - Friend Edition (English, v2.1.7)
 ==========================================================
 
 This is a friend-to-friend co-op tool for GTA V (Story Mode).
@@ -35,11 +35,13 @@ INSTALLATION
    - EASIEST: ask the server owner for the SHORT CODE
      (for example Gel.com). Click "Join with Code...", type the
      short code and click "Add and Connect". The launcher looks
-     the server up over the internet, so the server must be
-     running and you need an internet connection.
+     the server up over the internet and uses the automatic relay
+     if direct addresses do not work. No port forwarding or
+     Radmin VPN is required. The server must be running and you
+     need an internet connection.
    - The owner may instead send a long GTC1 code. That code
      carries the address/ports/password by itself and needs no
-     internet lookup.
+     internet lookup (no relay; direct connectivity is required).
    - Alternative: click "Add Server..." and enter the address and
      ports given by the server owner (game port 4499 UDP,
      sync port 4599 TCP).
@@ -71,6 +73,9 @@ IMPORTANT NOTES
   into the game). This is blocked while that server's mods are
   installed in the game; use "End Session" first.
 - Your game files and ScriptHook files are not modified.
+- If you use a short code/automatic relay, keep GTACoop.Launcher
+  open while playing; the relay carries game traffic through the
+  launcher. You can close it after exiting the game.
 - Hosting your own server additionally requires .NET 10.
 
 ------------------------------------------------------------------

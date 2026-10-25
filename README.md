@@ -1,8 +1,9 @@
 # GTACoop Remake — Türkçe Mod + Sunucu Yöneticisi
 
-2.1.6 sürümü — kendi sunucu yönetimi, otomatik mod indirme, **oturum modu** ve
-**kısa kod** (ör. `Gel.com`) ile internetten sunucu bulma: sunucu modları yalnızca oyun
-açıkken kurulu kalır, oyundan çıkınca otomatik kaldırılır.
+2.1.7 sürümü — kendi sunucu yönetimi, otomatik mod indirme, **oturum modu**,
+**kısa kod** (ör. `Gel.com`) ile internetten sunucu bulma ve **otomatik relay**:
+port yönlendirme veya Radmin VPN olmadan da arkadaşlarınız bağlanabilir. Sunucu modları
+yalnızca oyun açıkken kurulu kalır, oyundan çıkınca otomatik kaldırılır.
 
 ---
 
@@ -12,6 +13,9 @@ açıkken kurulu kalır, oyundan çıkınca otomatik kaldırılır.
   yönetmenize gerek yoktur — zaten kurulu hâlleriyle çalışır.
 - **Kendi sunucunuz olsun**: kendi GTACoOp sunucunuzu bu launcher'dan başlatın; addon araç/ped
   paketi, script, script klasörü, ASI eklentisi ekleyin.
+- **Port yönlendirme/Radmin olmadan**: kısa kod kullanırsanız launcher otomatik bir TCP relay
+  açar. Arkadaşınızın yönlendirici ayarı yapmasına gerek kalmaz; doğrudan bağlantı (LAN,
+  Radmin veya port yönlendirme) varsa önce o denenir, yoksa relay devreye girer.
 - **Sunucuya girince modlar inisin**: sunucunun tüm modları otomatik indirilir ve yalnızca siz
   oynarken kurulu kalır. Oyunu kapatınca **otomatik kaldırılır**; tek oyunculu (offline) modda
   sunucu modları çalışmaz.
@@ -63,7 +67,7 @@ açıkken kurulu kalır, oyundan çıkınca otomatik kaldırılır.
 - Bu betik uygulamayı `%LOCALAPPDATA%\Programs\GTACoop Remake` klasörüne kopyalar ve
   **masaüstü** + **Başlat menüsü** kısayollarını buraya bağlar. Hiçbir şey silinmez
   (eski `dist` klasörü olduğu yerde kalır).
-- Uygulama simgesi ve sürüm bilgisi (2.1.6) exe dosyasına işlenmiştir.
+- Uygulama simgesi ve sürüm bilgisi (2.1.7) exe dosyasına işlenmiştir.
 
 ---
 
@@ -83,9 +87,10 @@ açıkken kurulu kalır, oyundan çıkınca otomatik kaldırılır.
 1. **Sunucum** sekmesinden **Sunucuyu Başlat** düğmesine basın.
 2. Sunucunuz otomatik oluşturulur ve başlar (ilk seferde birkaç saniye sürebilir). Durum
    kutusunda "çalışıyor" yazısını görün.
-3. Kapılar: oyun portu **4499 UDP**, senkronizasyon portu **4599 TCP**. Arkadaşlarınız için
-   yönlendirici (router) ayarında bu portları açın; Windows Güvenlik Duvarı ilk başlatmada izin
-   ister.
+3. Kapılar: oyun portu **4499 UDP**, senkronizasyon portu **4599 TCP**. Kısa kod kullanırsanız
+   **otomatik relay** devreye girer; arkadaşlarınız için yönlendirici (router) ayarı veya
+   Radmin VPN gerekmez. Doğrudan bağlantı/uzun kod kullanacaksanız bu portları yönlendirin;
+   Windows Güvenlik Duvarı ilk başlatmada izin ister.
 
 ### 3. Sunucuya bağlanın
 
@@ -191,9 +196,12 @@ Notlar:
 4. Sunucuyu durdurunca (veya uygulamayı kapatınca) kod çevrimdışı olur; arkadaşınız bağlanamaz.
 
 Kısa kod, sunucu bilgilerini şifreli olarak **ntfy.sh** üzerinden yayınlar; hesap açmanız veya
-kendi sunucunuzu kurmanız gerekmez. Kısa kod yalnızca **adresi bulur**: bağlantı için yine
-**Radmin VPN** (26.x.x.x) ya da **4499 UDP + 4599 TCP** port yönlendirmesi gerekir. Sunucu açık
-ve internet bağlantınız çalışır olmalıdır.
+kendi sunucunuzu kurmanız gerekmez. Sunucu başlayınca launcher ayrıca **otomatik relay**
+(`bore.pub`) açar ve kısa koda relay uç noktalarını da ekler. Arkadaşınızın launcher'ı önce
+doğrudan adresleri (LAN/Radmin/port yönlendirme) dener; ulaşamazsa relay'e geçer. Böylece
+**port yönlendirme veya Radmin VPN gerekmeden** internetten oynayabilirsiniz. Relay, doğrudan
+bağlantıdan biraz daha yavaş olabilir; sunucu sahibi ve arkadaşın launcher'ı oyun sırasında
+**açık kalmalıdır**. Sunucu açık ve internet bağlantınız çalışır olmalıdır.
 
 **Uzun kod (`GTC1...`) — internet gerektirmez:**
 
@@ -204,6 +212,9 @@ ve internet bağlantınız çalışır olmalıdır.
    sunucusu gerekmez, sunucu kapalıyken de oluşturulabilir (şifre/token içerebilir, yalnızca
    güvendiğiniz kişiye verin).
 3. Siz **Sunucuyu Başlat** deyin; arkadaşınız bağlanınca modlar otomatik iner.
+
+**Not:** Uzun kod relay bilgisi taşımaz; CGNAT/port yönlendirme sorunu varsa **kısa kod**
+kullanın. Kısa kodla gelen arkadaşınızın launcher'ı oyun boyunca açık kalmalıdır.
 
 **IP ile (kod olmadan):**
 

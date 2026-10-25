@@ -1,16 +1,18 @@
 ==========================================================
- GTACoop Remake - Joining a Server (v2.1.6)
+ GTACoop Remake - Joining a Server (v2.1.7)
 ==========================================================
 
 There are two ways to join:
 
-  1) SHORT CODE (for example Gel.com)
+  1) SHORT CODE (for example Gel.com)  ->  RECOMMENDED
      The launcher looks the server details up over the internet.
-     The server must be running and you need internet access.
+     It also opens an automatic relay, so no port forwarding or
+     Radmin VPN is required.
 
   2) LONG CODE (GTC1...)
-     The code carries the connection details itself; no
-     internet lookup or account is required.
+     The code carries the connection details itself; no internet
+     lookup or account is required. The long code does not carry
+     relay details (direct connectivity is required).
 
 Both are pasted into "Join with Code..." on the "Servers" tab.
 
@@ -29,22 +31,24 @@ SERVER OWNER - SHORT CODE (recommended)
    - Codes starting with "GTC1." cannot be used as short codes.
 
 3) Click "Start Server". Under the short code field you should
-   see "Short code online: Gel.com".
+   see "Short code online: Gel.com" and "Automatic relay:
+   bore.pub ...". The relay is usually ready in 1-2 seconds.
    The launcher publishes the code encrypted via ntfy.sh and
    refreshes it every 60 seconds; it goes offline when the
    server stops.
 
 4) Send ONLY the short code to your friend (WhatsApp/Discord).
 
-5) When your friend enters the code, the launcher fetches the
-   server details from the internet and connects if the server
-   is running.
+5) When your friend enters the code, the launcher first tries the
+   direct addresses (LAN/Radmin/port forwarding) and falls back
+   to the automatic relay. The server and your friend's launcher
+   MUST stay open while playing.
 
-Note: the short code only finds the address. Radmin VPN
-(26.x.x.x) or 4499 UDP + 4599 TCP port forwarding is still
-required for the connection. The code also carries the server
-password and sync token (encrypted); only give it to people
-you trust.
+Note: the short code also carries the server password and sync
+token (encrypted); only give it to people you trust. Relay traffic
+goes through bore.pub on a random public port. The relay can be a
+little slower than a direct connection. If port forwarding/Radmin
+is available, the launcher already prefers it.
 
 ------------------------------------------------------------------
 SERVER OWNER - LONG CODE (GTC1...)
@@ -69,7 +73,9 @@ SERVER OWNER - LONG CODE (GTC1...)
 Note: the long code carries the connection details itself. It
 needs no internet account and can be created while the server
 is stopped. It may contain the password/token; only give it to
-people you trust.
+people you trust. The long code has no relay information; if the
+server is behind CGNAT or port forwarding is a problem, use a
+short code instead.
 
 ------------------------------------------------------------------
 FRIEND (JOINING)
@@ -80,15 +86,29 @@ FRIEND (JOINING)
    the window fills it in automatically; otherwise paste it.
 
 3) If you enter a short code (Gel.com), the launcher fetches the
-   server details from the internet; the server must be running.
-   If you enter a long code (GTC1...), the details are read from
-   the code itself.
+   server details from the internet and connects through the
+   automatic relay if direct addresses do not work. The server
+   and your launcher must be running. If you enter a long code
+   (GTC1...), the details are read from the code itself; that
+   path needs direct connectivity/port forwarding.
 
 4) When the details appear, click "Add and Connect". The server
    is added to the list, mods download, and the game starts.
 
+5) DO NOT CLOSE THE LAUNCHER while playing. The relay carries the
+   game traffic through the launcher; closing it disconnects you.
+   You can close the launcher after exiting the game; server mods
+   are removed automatically.
+
+6) On first join, open chat with T and type:
+      /register password
+   Later sessions:
+      /login password
+   Player list: Z. GTA Coop menu: F9.
+
 You can still play without a code: "Add Server..." and manual
-IP/port entry work exactly as before.
+IP/port entry work as before (direct connectivity or Radmin VPN
+is required for that path).
 
 ------------------------------------------------------------------
 WHERE ARE MODS STORED? / RE-DOWNLOAD
@@ -120,13 +140,21 @@ per server, and the original game files are not modified.
 FAQ
 ------------------------------------------------------------------
 - Short code not found: is the server running, did you type the
-  code correctly, and is your internet working? You can also try
-  the long GTC1 code.
-- A short code is only published after the server starts; while
-  the server is stopped, the lookup finds nothing.
-- The long code does not work: make sure you copied all of it.
+  code correctly, and is your internet working? A short code is
+  published only after the server starts. You can also try the
+  long GTC1 code.
+- Short code found but no connection: make sure both you and the
+  server owner use v2.1.7 or newer. The server should show
+  "Automatic relay: bore.pub ...". Wait a few seconds and click
+  "Search Again".
+- Relay not working: bore.pub may be unreachable. Use Radmin VPN
+  (free) or forward 4499 UDP + 4599 TCP for a direct connection,
+  or try the long GTC1 code.
+- Long code does not work: make sure you copied all of it.
   Line breaks are fine; the launcher strips whitespace.
-- Same network: a local IP is enough. For internet play, use
-  Radmin VPN (free) or forward 4499 UDP + 4599 TCP.
+- Same network: a local IP is enough. For internet play, the
+  short code plus automatic relay is the easiest path.
 - You can create a long code while the server is stopped; your
   friend will connect once you start it.
+- Do not close the launcher while playing; the relay connection
+  would drop.
