@@ -90,6 +90,26 @@ public sealed class AddonApplier
         // güncelleme akışı dosya bazında kullanıcı dosyalarını zaten korur.
         if (state.Addons.Any(x => x.Id == addon.Id)) return null;
 
+        // OpenIV.asi / OpenRPF.asi / RageOpenV.asi aynı mods-folder köprüsünü açar.
+        // Bir arkadaşta bunlardan biri varsa diğerini üzerine kurup çakışma yaratmayalım.
+        if (addon.Type == AddonType.AsiPlugin)
+        {
+            var hooks = new[] { "OpenIV.asi", "OpenRPF.asi", "RageOpenV.asi" };
+            var addonHooks = addon.Files
+                .Select(f => Path.GetFileName(f.Path))
+                .Where(n => hooks.Contains(n, StringComparer.OrdinalIgnoreCase))
+                .ToList();
+            if (addonHooks.Count > 0)
+            {
+                foreach (var hook in hooks)
+                {
+                    if (addonHooks.Contains(hook, StringComparer.OrdinalIgnoreCase)) continue;
+                    var existing = Path.Combine(_gameFolder, hook);
+                    if (File.Exists(existing)) return existing;
+                }
+            }
+        }
+
         switch (addon.Type)
         {
             case AddonType.DlcPack:
