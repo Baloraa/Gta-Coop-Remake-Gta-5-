@@ -8,6 +8,7 @@ public sealed class GameTab : UserControl
     private readonly TableLayoutPanel _table = new();
     private readonly Label _summary = new();
     private readonly Label _backupInfo = new();
+    private readonly Label _launchInfo = new();
     private readonly Button _clientBtn;
     private readonly TextBox _playerName = new();
 
@@ -26,7 +27,7 @@ public sealed class GameTab : UserControl
         {
             Text = T("Oyun Durumu"),
             Dock = DockStyle.Top,
-            Height = 280,
+            Height = 272,
             Padding = new Padding(10)
         };
         statusGroup.Controls.Add(_table);
@@ -41,6 +42,12 @@ public sealed class GameTab : UserControl
         _backupInfo.Height = 22;
         _backupInfo.ForeColor = Color.DimGray;
 
+        _launchInfo.Dock = DockStyle.Top;
+        _launchInfo.AutoSize = false;
+        _launchInfo.Height = 22;
+        _launchInfo.AutoEllipsis = true;
+        _launchInfo.ForeColor = Color.DimGray;
+
         var buttons = Ui.Flow();
         buttons.Controls.Add(Ui.Btn(T("Durumu Yenile"), (_, _) => RefreshStatus()));
         _clientBtn = Ui.Btn(T("İstemciyi Kur / Güncelle"), (_, _) => InstallClient());
@@ -48,12 +55,17 @@ public sealed class GameTab : UserControl
         buttons.Controls.Add(Ui.Btn(T("Bileşenleri Yönet..."), (_, _) => (FindForm() as MainForm)?.ShowComponentsTab()));
         buttons.Controls.Add(Ui.Btn(T("Oyunu Başlat"), (_, _) => LaunchGame()));
 
+        // Çalıştırma dosyası seçimi ana buton satırını taşırmasın diye ayrı satırda.
+        var launchButtons = Ui.Flow();
+        launchButtons.Controls.Add(Ui.Btn(T("Çalıştırma Yolu..."), (_, _) => ChooseLaunchExe()));
+        launchButtons.Controls.Add(Ui.Btn(T("Varsayılana Dön"), (_, _) => ResetLaunchExe()));
+
         // --- oyuncu adı
         var playerGroup = new GroupBox
         {
             Text = T("Oyuncu"),
             Dock = DockStyle.Top,
-            Height = 108,
+            Height = 100,
             Padding = new Padding(10, 6, 10, 6)
         };
 
@@ -82,16 +94,19 @@ public sealed class GameTab : UserControl
         var info = new Label
         {
             Dock = DockStyle.Fill,
-            Text = T("Bu launcher oyunun orijinal dosyalarını değiştirmez. Sunucu modları yalnızca scripts/ ve mods/ içine (ASI eklentileri oyun köküne) kurulur; oyundan çıkınca otomatik kaldırılır (oturum modu).\r\nİstemciyi Kur: scripts klasörüne GTACoOp.dll ve gerekli dosyaları yerleştirir."),
+            Text = T("Oyun dosyalarınız değiştirilmez; sunucu modları scripts/ ve mods/ içine kurulur, çıkışta kaldırılır."),
             ForeColor = Color.DimGray,
-            Padding = new Padding(4, 10, 4, 4)
+            TextAlign = ContentAlignment.TopLeft,
+            Padding = new Padding(4, 2, 4, 0)
         };
 
-        // Yerleşim: grup -> özet -> yedek -> butonlar -> oyuncu -> bilgi
+        // Yerleşim: durum -> özet -> çalıştırma yolu -> yedek -> butonlar -> oyuncu -> bilgi
         Controls.Add(info);
         Controls.Add(playerGroup);
         Controls.Add(buttons);
         Controls.Add(_backupInfo);
+        Controls.Add(launchButtons);
+        Controls.Add(_launchInfo);
         Controls.Add(_summary);
         Controls.Add(statusGroup);
     }
@@ -110,12 +125,16 @@ public sealed class GameTab : UserControl
             _summary.Text = T("⚠ GTA V klasörü seçilmedi (üstteki 'Gözat...' düğmesini kullanın).");
             _summary.ForeColor = Ui.WarnColor;
             _backupInfo.Text = T("");
+            _launchInfo.Text = T("Çalıştırma dosyası: GTA V klasörü seçilmedi.");
+            _launchInfo.ForeColor = Ui.WarnColor;
+            _clientBtn.Enabled = false;
             return;
         }
 
         var s = GameFolder.Inspect(gameFolder);
         AddRow("GTA5.exe", s.HasGameExe, s.HasGameExe ? T("var") : T("YOK"));
         AddRow("GTA5_Enhanced.exe", s.HasEnhancedExe, s.HasEnhancedExe ? T("var") : T("yok"));
+        AddRow("PlayGTAV.exe", s.HasPlayGtaVExe, s.HasPlayGtaVExe ? T("var") : T("yok"));
         AddRow("ScriptHookV.dll", s.HasScriptHookV, s.HasScriptHookV ? T("var") : T("YOK - oyun modlanamaz"));
         AddRow("ScriptHookVDotNet.asi", s.HasShvdn, s.HasShvdn ? T("var") : T("YOK - scriptler çalışmaz"));
         AddRow(T("OpenIV.asi / RageOpenV.asi"), s.HasOpenIvAsi, s.HasOpenIvAsi ? T("var") : T("YOK - mods klasörü okunmaz"));
@@ -145,6 +164,12 @@ public sealed class GameTab : UserControl
         _backupInfo.Text = backups.Count == 0
             ? T("update.rpf yedeği: henüz yok (ilk dlclist düzenlemesinde otomatik alınır).")
             : T("update.rpf yedeği: {0} adet (en yeni: {1}).", backups.Count, Path.GetFileName(backups[0]));
+
+        var configured = GameFolder.ResolveConfiguredLaunchExe(gameFolder, AppEnv.Settings.LaunchExe);
+        var launchExe = configured ?? GameFolder.DefaultLaunchExe(gameFolder);
+        var suffix = configured == null ? T(" (varsayılan)") : T(" (özel)");
+        _launchInfo.Text = T("Çalıştırma dosyası: {0}{1}", launchExe, suffix);
+        _launchInfo.ForeColor = File.Exists(launchExe) ? Color.DimGray : Ui.ErrColor;
 
         _clientBtn.Enabled = s.IsUsable;
     }
@@ -210,6 +235,53 @@ public sealed class GameTab : UserControl
         }
     }
 
+    private void ChooseLaunchExe()
+    {
+        var gameFolder = AppEnv.Settings.GameFolder;
+        if (string.IsNullOrWhiteSpace(gameFolder) || !Directory.Exists(gameFolder))
+        {
+            Ui.Warn(FindForm()!, T("Önce GTA V klasörünü seçin."));
+            return;
+        }
+
+        var current = GameFolder.ResolveLaunchExe(gameFolder, AppEnv.Settings.LaunchExe);
+        using var dlg = new OpenFileDialog
+        {
+            Title = T("GTA V çalıştırma dosyasını seçin"),
+            Filter = T("Çalıştırılabilir dosya (*.exe)|*.exe"),
+            InitialDirectory = gameFolder,
+            FileName = Path.GetFileName(current),
+            CheckFileExists = true,
+            Multiselect = false
+        };
+        if (dlg.ShowDialog(FindForm()) != DialogResult.OK) return;
+
+        var selected = Path.GetFullPath(dlg.FileName);
+        if (!selected.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) || !File.Exists(selected))
+        {
+            Ui.Warn(FindForm()!, T("Seçilen çalıştırma dosyası bulunamadı:\r\n{0}", selected));
+            return;
+        }
+
+        var root = Path.GetFullPath(gameFolder)
+            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+            + Path.DirectorySeparatorChar;
+        AppEnv.Settings.LaunchExe = selected.StartsWith(root, StringComparison.OrdinalIgnoreCase)
+            ? Path.GetRelativePath(gameFolder, selected)
+            : selected;
+        AppEnv.SaveSettings();
+        AppEnv.Log($"Çalıştırma dosyası ayarlandı: {selected}");
+        RefreshStatus();
+    }
+
+    private void ResetLaunchExe()
+    {
+        AppEnv.Settings.LaunchExe = "";
+        AppEnv.SaveSettings();
+        AppEnv.Log("Varsayılan çalıştırma dosyası PlayGTAV.exe olarak ayarlandı.");
+        RefreshStatus();
+    }
+
     private void LaunchGame()
     {
         if (!MainForm.RequireGameFolder(FindForm()!, out var gameFolder)) return;
@@ -222,7 +294,7 @@ public sealed class GameTab : UserControl
 
         try
         {
-            GameLauncher.Launch(gameFolder, AppEnv.Log);
+            GameLauncher.Launch(gameFolder, AppEnv.Settings.LaunchExe, AppEnv.Log);
         }
         catch (Exception ex)
         {

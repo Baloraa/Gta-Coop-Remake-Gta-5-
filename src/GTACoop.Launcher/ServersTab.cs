@@ -435,7 +435,7 @@ public sealed class ServersTab : UserControl
 
                 SetProgress(100);
                 AppEnv.Log("Oyun başlatılıyor...");
-                GameLauncher.Launch(gameFolder, AppEnv.Log);
+                GameLauncher.Launch(gameFolder, AppEnv.Settings.LaunchExe, AppEnv.Log);
             }
             else
             {
@@ -853,7 +853,7 @@ public sealed class ServersTab : UserControl
         try
         {
             ClientSettingsEditor.DisableAutoConnect(gameFolder, AppEnv.Log);
-            GameLauncher.Launch(gameFolder, AppEnv.Log);
+            GameLauncher.Launch(gameFolder, AppEnv.Settings.LaunchExe, AppEnv.Log);
         }
         catch (Exception ex)
         {

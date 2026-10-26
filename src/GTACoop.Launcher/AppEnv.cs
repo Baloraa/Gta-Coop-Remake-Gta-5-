@@ -54,7 +54,10 @@ public static class AppEnv
         SaveSettings();
         Log($"Launcher başlatıldı. Veri klasörü: {DataFolder}");
         if (!string.IsNullOrEmpty(Settings.GameFolder))
+        {
             Log($"GTA V klasörü: {Settings.GameFolder}");
+            Log($"Çalıştırma dosyası: {GameFolder.ResolveLaunchExe(Settings.GameFolder, Settings.LaunchExe)}");
+        }
     }
 
     public static void SaveSettings() => SyncJson.Save(SettingsPath, Settings);

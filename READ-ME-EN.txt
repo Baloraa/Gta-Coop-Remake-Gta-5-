@@ -1,5 +1,5 @@
 ==========================================================
- GTACoop Remake - Friend Edition (English, v2.2.3)
+ GTACoop Remake - Friend Edition (English, v2.2.4)
 ==========================================================
 
 This is a friend-to-friend co-op tool for GTA V (Story Mode).
@@ -24,6 +24,8 @@ INSTALLATION
    - Click "Browse..." and select your GTA V folder
      (the folder that contains GTA5.exe).
    - Click "Install / Update Client".
+   - The default launch executable is PlayGTAV.exe. If you launch
+     GTA5.exe directly, choose it with "Launch Path...".
 
    REQUIRED:
    - Original GTA V (Steam/Epic/Rockstar, Story Mode)

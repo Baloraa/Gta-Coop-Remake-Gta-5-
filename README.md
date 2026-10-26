@@ -1,10 +1,11 @@
 # GTACoop Remake — Türkçe Mod + Sunucu Yöneticisi
 
-2.2.3 sürümü — kendi sunucu yönetimi, otomatik mod indirme, **oturum modu**,
+2.2.4 sürümü — kendi sunucu yönetimi, otomatik mod indirme, **oturum modu**,
 **kısa kod** (ör. `Gel.com`) ile internetten sunucu bulma, **otomatik relay** ve
 **Bileşenler** sekmesinden ScriptHookV / ScriptHookVDotNet / OpenIV.asi / RageOpenV kurulumu:
 port yönlendirme veya Radmin VPN olmadan da arkadaşlarınız bağlanabilir. Sunucu modları
 yalnızca oyun açıkken kurulu kalır, oyundan çıkınca otomatik kaldırılır.
+Oyun başlatma dosyası seçilebilir; varsayılan **PlayGTAV.exe**'dir (GTA5.exe de seçilebilir).
 
 ---
 
@@ -121,7 +122,7 @@ Kurallar:
 - Bu betik uygulamayı `%LOCALAPPDATA%\Programs\GTACoop Remake` klasörüne kopyalar ve
   **masaüstü** + **Başlat menüsü** kısayollarını buraya bağlar. Hiçbir şey silinmez
   (eski `dist` klasörü olduğu yerde kalır).
-- Uygulama simgesi ve sürüm bilgisi (2.2.3) exe dosyasına işlenmiştir.
+- Uygulama simgesi ve sürüm bilgisi (2.2.4) exe dosyasına işlenmiştir.
 
 ---
 

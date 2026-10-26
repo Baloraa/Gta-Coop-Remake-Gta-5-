@@ -11,9 +11,9 @@
     <NoWarn>$(NoWarn);CA1416</NoWarn>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
     <ApplicationIcon>Assets\app.ico</ApplicationIcon>
-    <Version>2.2.3</Version>
-    <AssemblyVersion>2.2.3.0</AssemblyVersion>
-    <FileVersion>2.2.3.0</FileVersion>
+    <Version>2.2.4</Version>
+    <AssemblyVersion>2.2.4.0</AssemblyVersion>
+    <FileVersion>2.2.4.0</FileVersion>
     <AssemblyTitle>GTACoop Remake</AssemblyTitle>
     <Product>GTACoop Remake</Product>
     <Description>GTA V mod ve sunucu yöneticisi (GTACoOp) - Türkçe/İngilizce</Description>

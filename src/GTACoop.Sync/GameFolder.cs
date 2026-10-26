@@ -92,6 +92,7 @@ public static class GameFolder
             Folder = folder,
             HasGameExe = File.Exists(Path.Combine(folder, "GTA5.exe")),
             HasEnhancedExe = File.Exists(Path.Combine(folder, "GTA5_Enhanced.exe")),
+            HasPlayGtaVExe = File.Exists(Path.Combine(folder, "PlayGTAV.exe")),
             HasScriptHookV = File.Exists(Path.Combine(folder, "ScriptHookV.dll")),
             HasShvdn = File.Exists(Path.Combine(folder, "ScriptHookVDotNet.asi")),
             // RageOpenV, OpenIV.asi'nin açık kaynak alternatifidir; ikisi de mods/ köprüsünü açar.
@@ -104,12 +105,44 @@ public static class GameFolder
             HasGtaCoopClient = File.Exists(Path.Combine(folder, "scripts", "GTACoOp.dll"))
         };
 
-    /// <summary>Başlatılacak oyun exe yolu (varsa Enhanced, yoksa klasik).</summary>
-    public static string GameExe(string folder)
+    /// <summary>
+    /// Varsayılan başlatma dosyası: önce PlayGTAV.exe, sonra Enhanced, sonra klasik GTA5.exe.
+    /// </summary>
+    public static string DefaultLaunchExe(string folder)
     {
+        var play = Path.Combine(folder, "PlayGTAV.exe");
+        if (File.Exists(play)) return play;
+
         var enhanced = Path.Combine(folder, "GTA5_Enhanced.exe");
-        return File.Exists(enhanced) ? enhanced : Path.Combine(folder, "GTA5.exe");
+        if (File.Exists(enhanced)) return enhanced;
+
+        return Path.Combine(folder, "GTA5.exe");
     }
+
+    /// <summary>
+    /// Ayarlanmış başlatma dosyasını çözer. Dosya yoksa null döner.
+    /// Göreli yol oyun klasörüne göre yorumlanır.
+    /// </summary>
+    public static string? ResolveConfiguredLaunchExe(string folder, string? configured)
+    {
+        if (string.IsNullOrWhiteSpace(configured)) return null;
+
+        try
+        {
+            var path = Path.IsPathRooted(configured)
+                ? configured
+                : Path.Combine(folder, configured);
+            return File.Exists(path) ? Path.GetFullPath(path) : null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>Ayarlanmış dosya yoksa varsayılana döner.</summary>
+    public static string ResolveLaunchExe(string folder, string? configured) =>
+        ResolveConfiguredLaunchExe(folder, configured) ?? DefaultLaunchExe(folder);
 }
 
 public sealed class GameFolderStatus
@@ -117,6 +150,7 @@ public sealed class GameFolderStatus
     public string Folder { get; set; } = "";
     public bool HasGameExe;
     public bool HasEnhancedExe;
+    public bool HasPlayGtaVExe;
     public bool HasScriptHookV;
     public bool HasShvdn;
     public bool HasOpenIvAsi;
@@ -130,7 +164,8 @@ public sealed class GameFolderStatus
     public bool IsModReady => IsUsable && HasScriptHookV && HasShvdn && HasOpenIvAsi;
 
     public override string ToString() =>
-        $"GTA5.exe: {HasGameExe}, ScriptHookV: {HasScriptHookV}, SHVDN: {HasShvdn}, " +
+        $"GTA5.exe: {HasGameExe}, PlayGTAV.exe: {HasPlayGtaVExe}, " +
+        $"ScriptHookV: {HasScriptHookV}, SHVDN: {HasShvdn}, " +
         $"OpenIV.asi: {HasOpenIvAsi}, mods/update.rpf: {HasModsUpdateRpf}, " +
         $"GTACoOp.dll: {HasGtaCoopClient}";
 }

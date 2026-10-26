@@ -111,21 +111,25 @@ public static class GameLauncher
 {
     public static bool IsRunning() => AddonApplier.IsGameRunning();
 
-    /// <summary>GTA5.exe'yi başlatır (Steam açık olmalı).</summary>
-    public static System.Diagnostics.Process Launch(string gameFolder, Action<string>? log = null)
+    /// <summary>
+    /// Oyunu başlatır. Varsayılan PlayGTAV.exe'dir; kullanıcı isterse GTA5.exe seçebilir.
+    /// </summary>
+    public static System.Diagnostics.Process Launch(
+        string gameFolder, string? launchExe = null, Action<string>? log = null)
     {
-        var exe = GameFolder.GameExe(gameFolder);
+        var exe = GameFolder.ResolveLaunchExe(gameFolder, launchExe);
         if (!File.Exists(exe))
-            throw new SyncException($"Oyun çalıştırılabilir dosyası bulunamadı: {exe}");
+            throw new SyncException(SyncText.T(
+                "Oyun çalıştırılabilir dosyası bulunamadı: {0}", exe));
 
-        log?.Invoke($"Oyun başlatılıyor: {Path.GetFileName(exe)}");
+        log?.Invoke($"Oyun başlatılıyor: {exe}");
         var psi = new System.Diagnostics.ProcessStartInfo(exe)
         {
             WorkingDirectory = gameFolder,
             UseShellExecute = true
         };
         var proc = System.Diagnostics.Process.Start(psi)
-            ?? throw new SyncException("Oyun süreci başlatılamadı.");
+            ?? throw new SyncException(SyncText.T("Oyun süreci başlatılamadı."));
         return proc;
     }
 }

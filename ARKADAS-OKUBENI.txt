@@ -24,6 +24,8 @@ KURULUM
    - "Gözat..." ile GTA V klasörünüzü seçin
      (GTA5.exe'nin bulunduğu klasör).
    - "İstemciyi Kur / Güncelle" düğmesine basın.
+   - Varsayılan başlatma dosyası PlayGTAV.exe'dir. GTA5.exe'yi
+     doğrudan kullanıyorsanız "Çalıştırma Yolu..." ile GTA5.exe'yi seçin.
 
    GEREKLİ:
    - Orijinal GTA V (Steam/Epic/Rockstar, hikaye modu)

@@ -109,6 +109,13 @@ public sealed class LauncherSettings
 
     /// <summary>Oturum modu: oyun kapanınca sunucu modları otomatik kaldırılsın mı?</summary>
     public bool RemoveModsOnExit { get; set; } = true;
+
+    /// <summary>
+    /// Kullanıcının seçtiği oyun başlatma dosyası. Boşsa otomatik seçim:
+    /// PlayGTAV.exe -> GTA5_Enhanced.exe -> GTA5.exe.
+    /// Oyun klasörü içindeyse göreli dosya adı olarak saklanır.
+    /// </summary>
+    public string LaunchExe { get; set; } = "";
 }
 
 /// <summary>Sunucu listesindeki kayıt.</summary>
