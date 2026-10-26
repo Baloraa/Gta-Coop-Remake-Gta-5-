@@ -1,5 +1,5 @@
 ==========================================================
- GTACoop Remake - Friend Edition (English, v2.2.4)
+ GTACoop Remake - Friend Edition (English, v2.2.5)
 ==========================================================
 
 This is a friend-to-friend co-op tool for GTA V (Story Mode).
@@ -71,6 +71,9 @@ IMPORTANT NOTES
   on your PC, it is skipped: not downloaded, not overwritten.
 - Server mods are installed only while you play; they are removed
   automatically when you exit the game.
+- If the server owner disables server mods, they are not downloaded
+  or installed on your next connection; previously installed server
+  mods are removed.
 - Downloaded server files are stored per server in the program
   folder: Servers\<server name>__<server id>\
   (open it via "My Server" -> "Open Server Folders").

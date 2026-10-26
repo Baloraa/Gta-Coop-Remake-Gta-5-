@@ -22,6 +22,12 @@ public sealed class MyServerSettings
     /// </summary>
     public string ShortCode { get; set; } = "";
 
+    /// <summary>
+    /// Sunucu modlarını oyunculara gönderme. Açıkken SyncServer boş manifest döndürür;
+    /// Addons klasöründeki dosyalar silinmez.
+    /// </summary>
+    public bool ServerModsDisabled { get; set; }
+
     public static string SettingsPath(string dataFolder) =>
         Path.Combine(dataFolder, "myServer.json");
 
@@ -154,7 +160,7 @@ public sealed class MyServer : IDisposable
     }
 
     /// <summary>Senkronizasyon sunucusunu başlatır.</summary>
-    public void StartSyncServer(MyServerSettings settings)
+    public void StartSyncServer(MyServerSettings settings, string? settingsPath = null)
     {
         if (IsSyncServerRunning) return;
 
@@ -166,6 +172,8 @@ public sealed class MyServer : IDisposable
         args.Append($"--port {settings.SyncPort}");
         args.Append($" --addons \"{AddonsDir}\"");
         args.Append($" --name \"{settings.ServerName}\"");
+        if (!string.IsNullOrWhiteSpace(settingsPath))
+            args.Append($" --settings \"{settingsPath}\"");
         if (!string.IsNullOrEmpty(settings.SyncToken))
             args.Append($" --token \"{settings.SyncToken}\"");
 

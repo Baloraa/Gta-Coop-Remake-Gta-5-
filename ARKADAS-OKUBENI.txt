@@ -1,5 +1,5 @@
 ==========================================================
- GTACoop Remake - Arkadaş Sürümü (Türkçe)
+ GTACoop Remake - Arkadaş Sürümü (Türkçe, v2.2.5)
 ==========================================================
 
 Bu bir GTA V (Hikaye Modu) arkadaş-arası co-op aracıdır.
@@ -73,6 +73,8 @@ KURULUM
   zaten varsa o mod atlanır: indirilmez, üzerine yazılmaz.
 - Sunucu modları yalnızca siz oynarken kuruludur; oyundan
   çıkınca otomatik olarak kaldırılır.
+- Sunucu sahibi modları devre dışı bırakırsa bağlanınca mod
+  inmez/kurulmaz; daha önce kurulmuş sunucu modları kaldırılır.
 - Sunucudan indirilen mod dosyaları program klasöründe her sunucu
   için ayrı saklanır: Servers\<sunucu adı>__<sunucu kimliği>\
   ("Sunucum" -> "Sunucu Klasörlerini Aç" ile görebilirsiniz).

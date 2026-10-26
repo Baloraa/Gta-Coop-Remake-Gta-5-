@@ -1,5 +1,5 @@
 ==========================================================
- GTACoop Remake - Sunucuya Katılma (v2.2.4)
+ GTACoop Remake - Sunucuya Katılma (v2.2.5)
 ==========================================================
 
 Sunucuya katılmanın iki yolu var:

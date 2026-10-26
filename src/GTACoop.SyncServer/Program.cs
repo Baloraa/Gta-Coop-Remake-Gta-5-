@@ -15,6 +15,7 @@ Console.WriteLine("== GTACoop Senkronizasyon Sunucusu v1.0 ==");
 string addonsDir = "";
 string serverName = "GTACoop Sunucu";
 string token = "";
+string settingsPath = "";
 int port = 4599;
 
 for (int i = 0; i < args.Length; i++)
@@ -25,8 +26,9 @@ for (int i = 0; i < args.Length; i++)
         case "--port" when i + 1 < args.Length: port = int.Parse(args[++i]); break;
         case "--name" when i + 1 < args.Length: serverName = args[++i]; break;
         case "--token" when i + 1 < args.Length: token = args[++i]; break;
+        case "--settings" when i + 1 < args.Length: settingsPath = args[++i]; break;
         case "--help":
-            Console.WriteLine("Kullanım: GTACoop.SyncServer.exe --addons <klasör> [--port 4599] [--name \"Sunucum\"] [--token ŞİFRE]");
+            Console.WriteLine("Kullanım: GTACoop.SyncServer.exe --addons <klasör> [--port 4599] [--name \"Sunucum\"] [--token ŞİFRE] [--settings <myServer.json>]");
             return 0;
     }
 }
@@ -39,6 +41,22 @@ if (string.IsNullOrWhiteSpace(addonsDir))
 
 addonsDir = Path.GetFullPath(addonsDir);
 ServerScanner.EnsureLayout(addonsDir);
+if (!string.IsNullOrWhiteSpace(settingsPath))
+    settingsPath = Path.GetFullPath(settingsPath);
+
+// Sunucu modları devre dışıysa boş manifest döndür; dosyalar diskte kalır.
+bool ModsDisabled()
+{
+    if (string.IsNullOrWhiteSpace(settingsPath)) return false;
+    try
+    {
+        return SyncJson.Load<MyServerSettings>(settingsPath)?.ServerModsDisabled == true;
+    }
+    catch
+    {
+        return false;
+    }
+}
 
 // Kalıcı sunucu kimliği
 var idPath = Path.Combine(addonsDir, ".gtacoop-server.json");
@@ -68,6 +86,7 @@ bool Authorized(HttpContext ctx) =>
 
 app.MapGet("/", () => Results.Text(
     $"GTACoop Senkronizasyon Sunucusu\nSunucu: {serverName}\nKimlik: {serverId}\n" +
+    $"Sunucu modları: {(ModsDisabled() ? "devre dışı" : "etkin")}\n" +
     $"Manifest: /api/v1/manifest\nDosyalar: /api/v1/files/<eklenti>/<yol>\n"));
 
 app.MapGet("/api/v1/ping", () => Results.Json(new
@@ -75,6 +94,7 @@ app.MapGet("/api/v1/ping", () => Results.Json(new
     serverName,
     serverId,
     syncPort = port,
+    modsDisabled = ModsDisabled(),
     app = "GTACoop.SyncServer",
     version = "1.0"
 }, SyncJson.Options));
@@ -82,6 +102,21 @@ app.MapGet("/api/v1/ping", () => Results.Json(new
 app.MapGet("/api/v1/manifest", (HttpContext ctx) =>
 {
     if (!Authorized(ctx)) return Results.Unauthorized();
+
+    if (ModsDisabled())
+    {
+        var empty = new Manifest
+        {
+            ServerName = serverName,
+            ServerId = serverId,
+            SyncPort = port,
+            GeneratedUtc = DateTime.UtcNow
+        };
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Sunucu modları devre dışı; boş manifest " +
+                          $"<- {ctx.Connection.RemoteIpAddress}");
+        ctx.Response.Headers["X-Warnings"] = "0";
+        return Results.Json(empty, SyncJson.Options);
+    }
 
     var scan = scanner.Scan(serverName, serverId, port);
     var manifest = scan.Manifest;
@@ -96,6 +131,8 @@ app.MapGet("/api/v1/manifest", (HttpContext ctx) =>
 app.MapGet("/api/v1/files/{addonId}/{**relPath}", (HttpContext ctx, string addonId, string relPath) =>
 {
     if (!Authorized(ctx)) return Results.Unauthorized();
+    if (ModsDisabled())
+        return Results.NotFound(new { error = "Sunucu modları devre dışı." });
 
     var scan = scanner.Scan(serverName, serverId, port);
     if (!scan.TryGetPhysicalPath(addonId, relPath, out var fullPath))
@@ -119,6 +156,7 @@ app.Lifetime.ApplicationStarted.Register(() =>
     Console.WriteLine($"Sunucu adı : {serverName}");
     Console.WriteLine($"Sunucu kimliği: {serverId}");
     Console.WriteLine($"Eklenti klasörü: {addonsDir}");
+    Console.WriteLine($"Sunucu modları: {(ModsDisabled() ? "devre dışı" : "etkin")}");
     Console.WriteLine($"Dinleniyor : http://0.0.0.0:{port}/");
     Console.WriteLine(token.Length > 0 ? "Kimlik doğrulama: AÇIK (X-Sync-Token)" : "Kimlik doğrulama: kapalı");
     Console.WriteLine("Durdurmak için Ctrl+C.");

@@ -1,5 +1,5 @@
 ==========================================================
- GTACoop Remake - Joining a Server (v2.2.4)
+ GTACoop Remake - Joining a Server (v2.2.5)
 ==========================================================
 
 There are two ways to join:

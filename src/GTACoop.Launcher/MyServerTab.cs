@@ -16,11 +16,14 @@ public sealed class MyServerTab : UserControl
     private readonly TextBox _motd = new();
     private readonly TextBox _token = new();
     private readonly TextBox _shortCode = new();
+    private readonly CheckBox _disableServerMods = new();
+    private readonly Label _serverModsStatus = new();
     private readonly Label _gameServerStatus = new();
     private readonly Label _syncServerStatus = new();
     private readonly Label _shortCodeStatus = new();
     private readonly Label _addressInfo = new();
     private readonly System.Windows.Forms.Timer _timer = new();
+    private bool _suppressModsToggle;
 
     private MyServer? _server;
     private CancellationTokenSource? _publishCts;
@@ -105,9 +108,24 @@ public sealed class MyServerTab : UserControl
         {
             Text = T("Sunucu Modları"),
             Dock = DockStyle.Top,
-            Height = 170,
+            Height = 210,
             Padding = new Padding(8)
         };
+
+        _disableServerMods.Text = T("Sunucu modlarını devre dışı bırak (oyunculara gönderilmez)");
+        _disableServerMods.AutoSize = true;
+        _disableServerMods.Checked = s.ServerModsDisabled;
+        _disableServerMods.Margin = new Padding(4, 4, 12, 4);
+        _disableServerMods.CheckedChanged += (_, _) => OnServerModsDisabledChanged();
+
+        _serverModsStatus.AutoSize = true;
+        _serverModsStatus.Margin = new Padding(4, 9, 4, 4);
+        _serverModsStatus.ForeColor = Color.DimGray;
+
+        var modsToggleRow = Ui.Flow();
+        modsToggleRow.Controls.Add(_disableServerMods);
+        modsToggleRow.Controls.Add(Ui.Btn(T("Sunucu Modlarını Kaldır..."), (_, _) => RemoveServerMods()));
+        modsToggleRow.Controls.Add(_serverModsStatus);
 
         var modsRow1 = Ui.Flow();
         modsRow1.Controls.Add(Ui.Btn(T("DLC Paketi Ekle (araç/ped)..."), (_, _) => AddDlcPack()));
@@ -129,6 +147,7 @@ public sealed class MyServerTab : UserControl
         modsGroup.Controls.Add(modsInfo);
         modsGroup.Controls.Add(modsRow2);
         modsGroup.Controls.Add(modsRow1);
+        modsGroup.Controls.Add(modsToggleRow);
 
         // --- kontrol
         var controlGroup = new GroupBox
@@ -224,10 +243,108 @@ public sealed class MyServerTab : UserControl
         Password = i.Password,
         Motd = i.Motd,
         SyncToken = i.Token,
-        ShortCode = i.ShortCode
+        ShortCode = i.ShortCode,
+        ServerModsDisabled = _disableServerMods.Checked
     };
 
     private MyServer Server => _server ??= new MyServer(AppEnv.ServerDir, AppEnv.Log);
+
+    private void OnServerModsDisabledChanged()
+    {
+        if (_suppressModsToggle) return;
+
+        try
+        {
+            var s = MyServerSettings.Load(AppEnv.DataFolder);
+            s.ServerModsDisabled = _disableServerMods.Checked;
+            s.Save(AppEnv.DataFolder);
+
+            AppEnv.Log(_disableServerMods.Checked
+                ? "Sunucu modları devre dışı bırakıldı; oyunculara gönderilmeyecek."
+                : "Sunucu modları etkinleştirildi; oyunculara gönderilecek.");
+
+            RefreshStatus();
+        }
+        catch (Exception ex)
+        {
+            AppEnv.LogError(ex.Message);
+            _suppressModsToggle = true;
+            _disableServerMods.Checked = !_disableServerMods.Checked;
+            _suppressModsToggle = false;
+            Ui.Error(FindForm()!, T("Sunucu modu ayarı kaydedilemedi:\r\n") + ex.Message);
+        }
+    }
+
+    private void RemoveServerMods()
+    {
+        if (Server.IsGameServerRunning || Server.IsSyncServerRunning)
+        {
+            Ui.Warn(FindForm()!, T("Sunucu çalışırken modlar kaldırılamaz. Önce 'Durdur'a basın."));
+            return;
+        }
+
+        try
+        {
+            var addonsDir = ServerDirAddons();
+            if (!Directory.Exists(addonsDir))
+            {
+                Ui.Info(FindForm()!, T("Sunucu modu yok."));
+                return;
+            }
+
+            var entries = Directory.GetFileSystemEntries(addonsDir)
+                .Where(p => !string.Equals(Path.GetFileName(p), ".gtacoop-server.json",
+                    StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            var hasFiles = entries.Any(p => File.Exists(p) ||
+                (Directory.Exists(p) &&
+                 Directory.EnumerateFiles(p, "*", SearchOption.AllDirectories).Any()));
+
+            if (!hasFiles)
+            {
+                Ui.Info(FindForm()!, T("Sunucu modu yok."));
+                return;
+            }
+
+            if (!Ui.Confirm(FindForm()!, T(
+                "Tüm sunucu modları Addons klasöründen kaldırılacak.\r\n" +
+                "Dosyalar silinmez; güvenli bir klasöre taşınır. Devam edilsin mi?")))
+                return;
+
+            UseWaitCursor = true;
+            var backupRoot = Path.Combine(AppEnv.ServerDir, "Addons-Removed",
+                DateTime.Now.ToString("yyyyMMdd-HHmmss-fff"));
+            Directory.CreateDirectory(backupRoot);
+
+            foreach (var entry in entries)
+            {
+                var target = Path.Combine(backupRoot, Path.GetFileName(entry));
+                if (Directory.Exists(entry))
+                    Directory.Move(entry, target);
+                else
+                    File.Move(entry, target, overwrite: true);
+            }
+
+            // Boş Addons klasör düzenini geri kur; sunucu kimliği (.gtacoop-server.json) korunur.
+            Server.EnsureLayout();
+
+            AppEnv.Log($"Sunucu modları kaldırıldı; yedek: {backupRoot}");
+            Ui.Info(FindForm()!, T(
+                "Sunucu modları kaldırıldı.\r\nDosyalar güvenli klasöre taşındı:\r\n{0}",
+                backupRoot));
+            RefreshStatus();
+        }
+        catch (Exception ex)
+        {
+            AppEnv.LogError(ex.Message);
+            Ui.Error(FindForm()!, T("Sunucu modları kaldırılamadı:\r\n") + ex.Message);
+        }
+        finally
+        {
+            UseWaitCursor = false;
+        }
+    }
 
     private bool SaveSettings()
     {
@@ -313,7 +430,7 @@ public sealed class MyServerTab : UserControl
 
             StopRelay();
             Server.StartGameServer();
-            Server.StartSyncServer(settings);
+            Server.StartSyncServer(settings, MyServerSettings.SettingsPath(AppEnv.DataFolder));
             StartRelay(settings);
             StartPublisher(settings);
 
@@ -368,6 +485,10 @@ public sealed class MyServerTab : UserControl
         var info = CurrentSettings();
         bool game = Server.IsGameServerRunning;
         bool sync = Server.IsSyncServerRunning;
+
+        var modsDisabled = _disableServerMods.Checked;
+        _serverModsStatus.Text = T("Sunucu modları: {0}", T(modsDisabled ? "devre dışı" : "etkin"));
+        _serverModsStatus.ForeColor = modsDisabled ? Ui.WarnColor : Ui.OkColor;
 
         _gameServerStatus.Text = (game ? "✔" : "✘") + " " +
                                  T("Oyun sunucusu: {0} (port {1})", T(game ? "ÇALIŞIYOR" : "kapalı"), info.GamePort);
