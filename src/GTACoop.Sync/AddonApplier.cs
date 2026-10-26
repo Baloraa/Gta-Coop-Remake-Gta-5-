@@ -320,8 +320,9 @@ public sealed class AddonApplier
         foreach (var inst in plan.ToRemove)
         {
             ct.ThrowIfCancellationRequested();
-            progress?.Report(new SyncProgress($"Kaldırılıyor: {inst.Id}", 0));
-            _log($"Kaldırılıyor: {inst.Id} ({inst.Type})");
+            progress?.Report(new SyncProgress(
+                SyncText.Translate($"Kaldırılıyor: {inst.Id}"), 0));
+            _log(SyncText.Translate($"Kaldırılıyor: {inst.Id} ({inst.Type})"));
             Uninstall(inst);
             state.Addons.Remove(inst);
             SyncStateStore.Save(dataFolder, state); // çökme güvenliği: artımlı kayıt
@@ -393,7 +394,8 @@ public sealed class AddonApplier
 
         state.LastSyncUtc = DateTime.UtcNow;
         SyncStateStore.Save(dataFolder, state);
-        progress?.Report(new SyncProgress("Senkronizasyon tamamlandı.", 1.0));
+        progress?.Report(new SyncProgress(
+            SyncText.T("Senkronizasyon tamamlandı."), 1.0));
         return state;
     }
 
@@ -421,7 +423,7 @@ public sealed class AddonApplier
                 var fileDone = 0L;
                 var fileProgress = new Progress<long>(b => fileDone = b);
                 progress?.Report(new SyncProgress(
-                    $"İndiriliyor: {addon.DisplayName} / {file.Path}",
+                    SyncText.Translate($"İndiriliyor: {addon.DisplayName} / {file.Path}"),
                     Fraction(doneBytes + addonDone, totalBytes)));
                 await client.DownloadFileAsync(addon.Id, file, dest, fileProgress, ct);
             }
@@ -429,7 +431,7 @@ public sealed class AddonApplier
             addonDone += file.Size;
             sidecar[file.Path] = file.Sha256;
             progress?.Report(new SyncProgress(
-                $"İndirildi: {addon.DisplayName} / {file.Path}",
+                SyncText.Translate($"İndirildi: {addon.DisplayName} / {file.Path}"),
                 Fraction(doneBytes + addonDone, totalBytes),
                 doneBytes + addonDone, totalBytes));
         }
@@ -687,12 +689,18 @@ public sealed class AddonApplier
         foreach (var addon in addons)
         {
             ct.ThrowIfCancellationRequested();
-            var addonCacheDir = Path.Combine(serverCacheDir, Safe(addon.Id));
+            var version = ServerScanner.ComputeVersion(addon);
+            // Ön indirme de DLC'lerde sürüm başına ayrı önbellek kullanmalı;
+            // aksi halde eski sürüme junction olan hedef klasörün dosyaları ezilir.
+            var addonCacheDir = addon.Type == AddonType.DlcPack
+                ? Path.Combine(serverCacheDir, Safe(addon.Id) + "__" + Safe(version))
+                : Path.Combine(serverCacheDir, Safe(addon.Id));
             doneBytes = await DownloadAddonAsync(
                 client, addon, addonCacheDir, progress, doneBytes, totalBytes, ct);
         }
 
-        progress?.Report(new SyncProgress("Tüm mod dosyaları indirildi (oyuna kurulmadı).", 1.0));
+        progress?.Report(new SyncProgress(
+            SyncText.T("Tüm mod dosyaları indirildi (oyuna kurulmadı)."), 1.0));
     }
 
     /// <summary>ClientScript / ClientFiles kurulumu (oyun köküne göreli kopyalama).</summary>
