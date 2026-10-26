@@ -1,6 +1,6 @@
 # GTACoop Remake — Türkçe Mod + Sunucu Yöneticisi
 
-2.2.5 sürümü — kendi sunucu yönetimi, otomatik mod indirme, **oturum modu**,
+2.2.6 sürümü — kendi sunucu yönetimi, otomatik mod indirme, **oturum modu**,
 **kısa kod** (ör. `Gel.com`) ile internetten sunucu bulma, **otomatik relay** ve
 **Bileşenler** sekmesinden ScriptHookV / ScriptHookVDotNet / OpenIV.asi / RageOpenV kurulumu:
 port yönlendirme veya Radmin VPN olmadan da arkadaşlarınız bağlanabilir. Sunucu modları
@@ -51,9 +51,9 @@ Oyun başlatma dosyası seçilebilir; varsayılan **PlayGTAV.exe**'dir (GTA5.exe
   script/modlarınıza dokunulmaz.
 - **Sunucular**: sunucu ekleme, **Bağlan ve Oyna** (modlar otomatik iner-kurulur), oturum modu
   ayarı, modları önceden indirme, oturumu bitirme.
-- **Sunucum**: kendi sunucunuzu başlatma/durdurma, ayarlar, mod ekleme, modları
-  **devre dışı bırakma/kaldırma**, **kısa kod** (ör. `Gel.com`) ile sunucuyu internetten
-  bulunur yapma.
+- **Sunucum**: kendi sunucunuzu başlatma/durdurma, ayarlar, mod ekleme, **mod yöneticisi**
+  (seçip tek tek devre dışı bırakma/kaldırma), **kısa kod** (ör. `Gel.com`) ile sunucuyu
+  internetten bulunur yapma.
 - **Günlük / Araçlar**: günlük, yedekten geri yükleme, kalıntı temizleme.
 
 ---
@@ -123,7 +123,7 @@ Kurallar:
 - Bu betik uygulamayı `%LOCALAPPDATA%\Programs\GTACoop Remake` klasörüne kopyalar ve
   **masaüstü** + **Başlat menüsü** kısayollarını buraya bağlar. Hiçbir şey silinmez
   (eski `dist` klasörü olduğu yerde kalır).
-- Uygulama simgesi ve sürüm bilgisi (2.2.5) exe dosyasına işlenmiştir.
+- Uygulama simgesi ve sürüm bilgisi (2.2.6) exe dosyasına işlenmiştir.
 
 ---
 
@@ -222,20 +222,22 @@ Notlar:
   OpenIV.asi + dlclist düzenini gerektirir (launcher bunu otomatik yönetir).
 - Ayrıntılı meta veri (görünen ad/açıklama) için paket klasörüne `addon.json` koyabilirsiniz.
 
-### Modları devre dışı bırakma ve kaldırma
+### Mod yöneticisi: seç, devre dışı bırak, kaldır
 
-**Sunucum > Sunucu Modları** bölümündeki iki kontrol:
+**Sunucum > Sunucu Modları** bölümünde kurulu modların listesi görünür:
 
-- **Sunucu modlarını devre dışı bırak (oyunculara gönderilmez)**: işaretliyken sunucu boş
-  manifest döndürür; oyuncular bağlanınca sunucu modlarını indirmez/kurmaz. Daha önce kurmuş
-  oyuncular bir sonraki bağlantıda bu modları otomatik kaldırır. `Addons` klasöründeki dosyalar
-  silinmez; ayarı kaldırınca modlar yeniden dağıtılır. Sunucu çalışırken de etkilidir.
-- **Sunucu Modlarını Kaldır...**: `Addons` klasöründeki tüm modları sunucudan kaldırır.
-  Dosyalar silinmez; `Addons-Removed\<tarih-saat>\` klasörüne taşınır. Sunucu kimliği
+- **Kurulu modlar (işaretli = etkin)**: her modun yanındaki onay kutusu o modu tek tek
+  etkinleştirir/devre dışı bırakır. İşaret kaldırıldığında mod oyunculara gönderilmez; daha önce
+  kurmuş oyuncular bir sonraki bağlantıda o modu otomatik kaldırır. Dosyalar sunucudan silinmez.
+  Addons modları için değişiklik sunucu çalışırken de etkilidir.
+- **Seçilenleri Kaldır...**: listeden bir veya birden fazla mod seçip kaldırır. Dosyalar
+  silinmez; `Addons-Removed\<tarih-saat>\` altına taşınır. Sunucu kimliği
   (`.gtacoop-server.json`) korunur. Güvenlik için sunucu durdurulmuş olmalıdır.
+- **Yenile**: listeyi diskten yeniden okur.
 
-Not: Bu kontroller yalnızca `Addons` içeriğini (oyunculara giden DLC/script/ASI modları) yönetir;
-`Plugins` klasöründeki sunucu tarafı eklentileri kapsamaz.
+Liste DLC paketlerini, istemci scriptlerini, ASI eklentilerini, istemci dosyalarını ve sunucu
+eklentilerini gösterir. Sunucu eklentisi (plugin) değişiklikleri sunucu yeniden başlatılınca
+etkili olur.
 
 ---
 

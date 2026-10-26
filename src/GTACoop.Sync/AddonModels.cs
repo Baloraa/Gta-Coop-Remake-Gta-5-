@@ -49,6 +49,10 @@ public sealed class AddonInfo
 
     public List<AddonFileInfo> Files { get; set; } = new();
 
+    /// <summary>Sunucu tarafında mod yöneticisi için benzersiz anahtar: "Tür:Id".</summary>
+    [JsonIgnore]
+    public string Key => $"{Type}:{Id}";
+
     [JsonIgnore]
     public long TotalSize => Files.Sum(f => f.Size);
 }

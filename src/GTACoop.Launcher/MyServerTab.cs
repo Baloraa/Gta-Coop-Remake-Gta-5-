@@ -1,6 +1,7 @@
 ﻿using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
+using System.Text.Json;
 using System.Windows.Forms;
 using GTACoop.Sync;
 
@@ -16,14 +17,15 @@ public sealed class MyServerTab : UserControl
     private readonly TextBox _motd = new();
     private readonly TextBox _token = new();
     private readonly TextBox _shortCode = new();
-    private readonly CheckBox _disableServerMods = new();
-    private readonly Label _serverModsStatus = new();
+    private readonly ListView _modsList = new();
+    private readonly Label _modsStatus = new();
     private readonly Label _gameServerStatus = new();
     private readonly Label _syncServerStatus = new();
     private readonly Label _shortCodeStatus = new();
     private readonly Label _addressInfo = new();
     private readonly System.Windows.Forms.Timer _timer = new();
-    private bool _suppressModsToggle;
+    private bool _suppressModsCheck;
+    private List<ModEntry> _modEntries = new();
 
     private MyServer? _server;
     private CancellationTokenSource? _publishCts;
@@ -108,24 +110,39 @@ public sealed class MyServerTab : UserControl
         {
             Text = T("Sunucu Modları"),
             Dock = DockStyle.Top,
-            Height = 210,
+            Height = 450,
             Padding = new Padding(8)
         };
 
-        _disableServerMods.Text = T("Sunucu modlarını devre dışı bırak (oyunculara gönderilmez)");
-        _disableServerMods.AutoSize = true;
-        _disableServerMods.Checked = s.ServerModsDisabled;
-        _disableServerMods.Margin = new Padding(4, 4, 12, 4);
-        _disableServerMods.CheckedChanged += (_, _) => OnServerModsDisabledChanged();
+        var modsListLabel = new Label
+        {
+            Dock = DockStyle.Top,
+            Height = 22,
+            Text = T("Kurulu modlar (işaretli = etkin):"),
+            ForeColor = Color.DimGray,
+            Padding = new Padding(4, 4, 0, 0)
+        };
 
-        _serverModsStatus.AutoSize = true;
-        _serverModsStatus.Margin = new Padding(4, 9, 4, 4);
-        _serverModsStatus.ForeColor = Color.DimGray;
+        Ui.StyleList(_modsList,
+            (T("Mod"), 330),
+            (T("Tür"), 170),
+            (T("Durum"), 100));
+        _modsList.Dock = DockStyle.Top;
+        _modsList.Height = 150;
+        _modsList.CheckBoxes = true;
+        _modsList.MultiSelect = true;
+        _modsList.HeaderStyle = ColumnHeaderStyle.Nonclickable;
+        _modsList.ItemChecked += OnModItemChecked;
 
-        var modsToggleRow = Ui.Flow();
-        modsToggleRow.Controls.Add(_disableServerMods);
-        modsToggleRow.Controls.Add(Ui.Btn(T("Sunucu Modlarını Kaldır..."), (_, _) => RemoveServerMods()));
-        modsToggleRow.Controls.Add(_serverModsStatus);
+        _modsStatus.Dock = DockStyle.Top;
+        _modsStatus.Height = 22;
+        _modsStatus.TextAlign = ContentAlignment.MiddleLeft;
+        _modsStatus.ForeColor = Color.DimGray;
+        _modsStatus.Padding = new Padding(4, 0, 0, 0);
+
+        var modsButtons = Ui.Flow();
+        modsButtons.Controls.Add(Ui.Btn(T("Yenile"), (_, _) => RefreshModsList()));
+        modsButtons.Controls.Add(Ui.Btn(T("Seçilenleri Kaldır..."), (_, _) => RemoveSelectedMods()));
 
         var modsRow1 = Ui.Flow();
         modsRow1.Controls.Add(Ui.Btn(T("DLC Paketi Ekle (araç/ped)..."), (_, _) => AddDlcPack()));
@@ -147,7 +164,10 @@ public sealed class MyServerTab : UserControl
         modsGroup.Controls.Add(modsInfo);
         modsGroup.Controls.Add(modsRow2);
         modsGroup.Controls.Add(modsRow1);
-        modsGroup.Controls.Add(modsToggleRow);
+        modsGroup.Controls.Add(modsButtons);
+        modsGroup.Controls.Add(_modsStatus);
+        modsGroup.Controls.Add(_modsList);
+        modsGroup.Controls.Add(modsListLabel);
 
         // --- kontrol
         var controlGroup = new GroupBox
@@ -198,6 +218,7 @@ public sealed class MyServerTab : UserControl
         _timer.Tick += (_, _) => RefreshStatus();
         _timer.Start();
 
+        RefreshModsList();
         RefreshStatus();
     }
 
@@ -234,116 +255,320 @@ public sealed class MyServerTab : UserControl
         string Name, int GamePort, int SyncPort, int MaxClients,
         string Password, string Motd, string Token, string ShortCode);
 
-    private MyServerSettings ToSettings(MyServerServerInfo i) => new()
+    private MyServerSettings ToSettings(MyServerServerInfo i)
     {
-        ServerName = i.Name,
-        GamePort = i.GamePort,
-        SyncPort = i.SyncPort,
-        MaxClients = i.MaxClients,
-        Password = i.Password,
-        Motd = i.Motd,
-        SyncToken = i.Token,
-        ShortCode = i.ShortCode,
-        ServerModsDisabled = _disableServerMods.Checked
-    };
+        var existing = MyServerSettings.Load(AppEnv.DataFolder);
+        return new MyServerSettings
+        {
+            ServerName = i.Name,
+            GamePort = i.GamePort,
+            SyncPort = i.SyncPort,
+            MaxClients = i.MaxClients,
+            Password = i.Password,
+            Motd = i.Motd,
+            SyncToken = i.Token,
+            ShortCode = i.ShortCode,
+            DisabledMods = existing.DisabledMods
+        };
+    }
 
     private MyServer Server => _server ??= new MyServer(AppEnv.ServerDir, AppEnv.Log);
 
-    private void OnServerModsDisabledChanged()
+    private void OnModItemChecked(object? sender, ItemCheckedEventArgs e)
     {
-        if (_suppressModsToggle) return;
+        if (_suppressModsCheck) return;
+        if (e.Item.Tag is not ModEntry entry) return;
 
         try
         {
             var s = MyServerSettings.Load(AppEnv.DataFolder);
-            s.ServerModsDisabled = _disableServerMods.Checked;
+            var disabled = new HashSet<string>(s.DisabledMods, StringComparer.OrdinalIgnoreCase);
+            if (e.Item.Checked) disabled.Remove(entry.Key);
+            else disabled.Add(entry.Key);
+
+            s.DisabledMods = disabled
+                .OrderBy(k => k, StringComparer.OrdinalIgnoreCase)
+                .ToList();
             s.Save(AppEnv.DataFolder);
 
-            AppEnv.Log(_disableServerMods.Checked
-                ? "Sunucu modları devre dışı bırakıldı; oyunculara gönderilmeyecek."
-                : "Sunucu modları etkinleştirildi; oyunculara gönderilecek.");
+            e.Item.SubItems[2].Text = T(e.Item.Checked ? "etkin" : "devre dışı");
+            UpdateModsStatus();
 
-            RefreshStatus();
+            AppEnv.Log(e.Item.Checked
+                ? $"Mod etkinleştirildi: {entry.DisplayName}"
+                : $"Mod devre dışı bırakıldı: {entry.DisplayName}");
+
+            if (entry.IsRootPlugin && Server.IsGameServerRunning)
+                AppEnv.Log("Sunucu eklentisi değişikliği sunucu yeniden başlatılınca etkili olur.");
         }
         catch (Exception ex)
         {
             AppEnv.LogError(ex.Message);
-            _suppressModsToggle = true;
-            _disableServerMods.Checked = !_disableServerMods.Checked;
-            _suppressModsToggle = false;
-            Ui.Error(FindForm()!, T("Sunucu modu ayarı kaydedilemedi:\r\n") + ex.Message);
+            _suppressModsCheck = true;
+            e.Item.Checked = !e.Item.Checked;
+            _suppressModsCheck = false;
+            Ui.Error(FindForm()!, T("Mod ayarı kaydedilemedi:\r\n") + ex.Message);
         }
     }
 
-    private void RemoveServerMods()
+    private void RefreshModsList()
     {
+        try
+        {
+            var entries = BuildModEntries();
+            var s = MyServerSettings.Load(AppEnv.DataFolder);
+            var disabled = new HashSet<string>(s.DisabledMods, StringComparer.OrdinalIgnoreCase);
+
+            var currentKeys = entries
+                .Select(e => e.Key)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var stale = s.DisabledMods
+                .Where(k => !currentKeys.Contains(k))
+                .ToList();
+            if (stale.Count > 0)
+            {
+                s.DisabledMods.RemoveAll(k => stale.Contains(k));
+                s.Save(AppEnv.DataFolder);
+                disabled = new HashSet<string>(s.DisabledMods, StringComparer.OrdinalIgnoreCase);
+            }
+
+            _modEntries = entries;
+            _suppressModsCheck = true;
+            _modsList.BeginUpdate();
+            _modsList.Items.Clear();
+            foreach (var entry in entries)
+            {
+                var enabled = !disabled.Contains(entry.Key);
+                var item = new ListViewItem(entry.DisplayName)
+                {
+                    Tag = entry,
+                    Checked = enabled
+                };
+                item.SubItems.Add(entry.TypeLabel);
+                item.SubItems.Add(T(enabled ? "etkin" : "devre dışı"));
+                _modsList.Items.Add(item);
+            }
+            _modsList.EndUpdate();
+        }
+        catch (Exception ex)
+        {
+            AppEnv.LogError("Mod listesi yenilenemedi: " + ex.Message);
+        }
+        finally
+        {
+            _suppressModsCheck = false;
+            UpdateModsStatus();
+        }
+    }
+
+    private void UpdateModsStatus()
+    {
+        var total = _modsList.Items.Count;
+        var enabled = _modsList.CheckedItems.Count;
+        _modsStatus.Text = T("Kurulu mod: {0} | Etkin: {1} | Devre dışı: {2}",
+            total, enabled, total - enabled);
+    }
+
+    private void RemoveSelectedMods()
+    {
+        var selected = _modsList.SelectedItems
+            .Cast<ListViewItem>()
+            .Select(i => i.Tag as ModEntry)
+            .Where(e => e != null)
+            .Cast<ModEntry>()
+            .GroupBy(e => e.SourcePath, StringComparer.OrdinalIgnoreCase)
+            .Select(g => g.First())
+            .ToList();
+
+        if (selected.Count == 0)
+        {
+            Ui.Info(FindForm()!, T("Kaldırmak için listeden en az bir mod seçin."));
+            return;
+        }
+
         if (Server.IsGameServerRunning || Server.IsSyncServerRunning)
         {
             Ui.Warn(FindForm()!, T("Sunucu çalışırken modlar kaldırılamaz. Önce 'Durdur'a basın."));
             return;
         }
 
+        var names = string.Join("\r\n", selected.Take(12).Select(e => "• " + e.DisplayName));
+        if (selected.Count > 12) names += "\r\n…";
+
+        if (!Ui.Confirm(FindForm()!, T(
+            "Seçilen modlar sunucudan kaldırılacak:\r\n{0}\r\n\r\n" +
+            "Dosyalar silinmez; güvenli bir klasöre taşınır. Devam edilsin mi?", names)))
+            return;
+
         try
         {
-            var addonsDir = ServerDirAddons();
-            if (!Directory.Exists(addonsDir))
-            {
-                Ui.Info(FindForm()!, T("Sunucu modu yok."));
-                return;
-            }
-
-            var entries = Directory.GetFileSystemEntries(addonsDir)
-                .Where(p => !string.Equals(Path.GetFileName(p), ".gtacoop-server.json",
-                    StringComparison.OrdinalIgnoreCase))
-                .ToList();
-
-            var hasFiles = entries.Any(p => File.Exists(p) ||
-                (Directory.Exists(p) &&
-                 Directory.EnumerateFiles(p, "*", SearchOption.AllDirectories).Any()));
-
-            if (!hasFiles)
-            {
-                Ui.Info(FindForm()!, T("Sunucu modu yok."));
-                return;
-            }
-
-            if (!Ui.Confirm(FindForm()!, T(
-                "Tüm sunucu modları Addons klasöründen kaldırılacak.\r\n" +
-                "Dosyalar silinmez; güvenli bir klasöre taşınır. Devam edilsin mi?")))
-                return;
-
             UseWaitCursor = true;
             var backupRoot = Path.Combine(AppEnv.ServerDir, "Addons-Removed",
                 DateTime.Now.ToString("yyyyMMdd-HHmmss-fff"));
-            Directory.CreateDirectory(backupRoot);
+            var removedKeys = selected
+                .Select(e => e.Key)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-            foreach (var entry in entries)
+            foreach (var entry in selected)
             {
-                var target = Path.Combine(backupRoot, Path.GetFileName(entry));
-                if (Directory.Exists(entry))
-                    Directory.Move(entry, target);
+                if (!Directory.Exists(entry.SourcePath) && !File.Exists(entry.SourcePath))
+                    continue;
+
+                var targetDir = Path.Combine(backupRoot, entry.BackupSubdir);
+                Directory.CreateDirectory(targetDir);
+                var target = Path.Combine(targetDir, entry.SourceName);
+
+                if (Directory.Exists(entry.SourcePath))
+                    Directory.Move(entry.SourcePath, target);
                 else
-                    File.Move(entry, target, overwrite: true);
+                    File.Move(entry.SourcePath, target, overwrite: true);
             }
+
+            var s = MyServerSettings.Load(AppEnv.DataFolder);
+            s.DisabledMods.RemoveAll(k => removedKeys.Contains(k));
+            s.Save(AppEnv.DataFolder);
 
             // Boş Addons klasör düzenini geri kur; sunucu kimliği (.gtacoop-server.json) korunur.
             Server.EnsureLayout();
 
-            AppEnv.Log($"Sunucu modları kaldırıldı; yedek: {backupRoot}");
+            AppEnv.Log($"Modlar kaldırıldı; yedek: {backupRoot}");
             Ui.Info(FindForm()!, T(
-                "Sunucu modları kaldırıldı.\r\nDosyalar güvenli klasöre taşındı:\r\n{0}",
+                "Modlar kaldırıldı.\r\nDosyalar güvenli klasöre taşındı:\r\n{0}",
                 backupRoot));
-            RefreshStatus();
+            RefreshModsList();
         }
         catch (Exception ex)
         {
             AppEnv.LogError(ex.Message);
-            Ui.Error(FindForm()!, T("Sunucu modları kaldırılamadı:\r\n") + ex.Message);
+            Ui.Error(FindForm()!, T("Mod kaldırılamadı:\r\n") + ex.Message);
         }
         finally
         {
             UseWaitCursor = false;
         }
+    }
+
+    private List<ModEntry> BuildModEntries()
+    {
+        var entries = new List<ModEntry>();
+        var addons = ServerDirAddons();
+
+        AddFolderEntries(entries, Path.Combine(addons, "dlcpacks"),
+            "dlcpacks", T("DLC Paketi"), AddonType.DlcPack);
+        AddFolderEntries(entries, Path.Combine(addons, "scripts"),
+            "scripts", T("Script"), AddonType.ClientScript);
+        AddFolderEntries(entries, Path.Combine(addons, "asi"),
+            "asi", T("ASI"), AddonType.AsiPlugin);
+        AddFolderEntries(entries, Path.Combine(addons, "files"),
+            "files", T("İstemci Dosyaları"), AddonType.ClientFiles);
+        AddPluginEntries(entries, Path.Combine(addons, "plugins"));
+        AddRootPluginEntries(entries, Path.Combine(AppEnv.ServerDir, "Plugins"));
+
+        return entries
+            .OrderBy(e => e.TypeLabel, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(e => e.DisplayName, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private static void AddFolderEntries(List<ModEntry> entries, string root,
+        string backupSubdir, string typeLabel, AddonType type)
+    {
+        if (!Directory.Exists(root)) return;
+        foreach (var dir in Directory.GetDirectories(root))
+        {
+            var id = Path.GetFileName(dir);
+            if (id.StartsWith('.')) continue;
+            entries.Add(new ModEntry
+            {
+                Key = $"{type}:{id}",
+                DisplayName = ReadDisplayName(dir) ?? id,
+                TypeLabel = typeLabel,
+                SourcePath = dir,
+                BackupSubdir = backupSubdir,
+                SourceName = id
+            });
+        }
+    }
+
+    private static void AddPluginEntries(List<ModEntry> entries, string root)
+    {
+        if (!Directory.Exists(root)) return;
+        var typeLabel = T("Sunucu Eklentisi");
+
+        foreach (var dll in Directory.GetFiles(root, "*.dll"))
+        {
+            var id = Path.GetFileNameWithoutExtension(dll);
+            entries.Add(new ModEntry
+            {
+                Key = $"ServerPlugin:{id}",
+                DisplayName = id,
+                TypeLabel = typeLabel,
+                SourcePath = dll,
+                BackupSubdir = "plugins",
+                SourceName = Path.GetFileName(dll)
+            });
+        }
+
+        foreach (var dir in Directory.GetDirectories(root))
+        {
+            var id = Path.GetFileName(dir);
+            if (id.StartsWith('.')) continue;
+            entries.Add(new ModEntry
+            {
+                Key = $"ServerPlugin:{id}",
+                DisplayName = ReadDisplayName(dir) ?? id,
+                TypeLabel = typeLabel,
+                SourcePath = dir,
+                BackupSubdir = "plugins",
+                SourceName = id
+            });
+        }
+    }
+
+    private static void AddRootPluginEntries(List<ModEntry> entries, string root)
+    {
+        if (!Directory.Exists(root)) return;
+        var typeLabel = T("Sunucu Eklentisi");
+        foreach (var dll in Directory.GetFiles(root, "*.dll"))
+        {
+            var name = Path.GetFileName(dll);
+            entries.Add(new ModEntry
+            {
+                Key = $"RootPlugin:{name}",
+                DisplayName = Path.GetFileNameWithoutExtension(name),
+                TypeLabel = typeLabel,
+                SourcePath = dll,
+                BackupSubdir = "Plugins",
+                SourceName = name,
+                IsRootPlugin = true
+            });
+        }
+    }
+
+    private static string? ReadDisplayName(string dir)
+    {
+        try
+        {
+            var path = Path.Combine(dir, "addon.json");
+            if (!File.Exists(path)) return null;
+            using var doc = JsonDocument.Parse(File.ReadAllText(path));
+            if (doc.RootElement.TryGetProperty("displayName", out var name) &&
+                name.ValueKind == JsonValueKind.String)
+                return name.GetString();
+        }
+        catch { /* meta okunamazsa klasör adı kullanılır */ }
+        return null;
+    }
+
+    private sealed class ModEntry
+    {
+        public string Key { get; init; } = "";
+        public string DisplayName { get; init; } = "";
+        public string TypeLabel { get; init; } = "";
+        public string SourcePath { get; init; } = "";
+        public string BackupSubdir { get; init; } = "";
+        public string SourceName { get; init; } = "";
+        public bool IsRootPlugin { get; init; }
     }
 
     private bool SaveSettings()
@@ -485,10 +710,6 @@ public sealed class MyServerTab : UserControl
         var info = CurrentSettings();
         bool game = Server.IsGameServerRunning;
         bool sync = Server.IsSyncServerRunning;
-
-        var modsDisabled = _disableServerMods.Checked;
-        _serverModsStatus.Text = T("Sunucu modları: {0}", T(modsDisabled ? "devre dışı" : "etkin"));
-        _serverModsStatus.ForeColor = modsDisabled ? Ui.WarnColor : Ui.OkColor;
 
         _gameServerStatus.Text = (game ? "✔" : "✘") + " " +
                                  T("Oyun sunucusu: {0} (port {1})", T(game ? "ÇALIŞIYOR" : "kapalı"), info.GamePort);
@@ -901,6 +1122,7 @@ public sealed class MyServerTab : UserControl
             FileUtil.CopyTree(dlg.SelectedPath, target);
             Ui.Info(FindForm()!, T("DLC paketi eklendi: {0}\r\nSunucu çalışıyorsa bir sonraki manifest isteğinde otomatik dağıtılır.", name));
             AppEnv.Log($"Sunucu DLC paketi eklendi: {name}");
+            RefreshModsList();
         }
         catch (Exception ex)
         {
@@ -939,6 +1161,7 @@ public sealed class MyServerTab : UserControl
             Ui.Info(FindForm()!, T("{0} dosya eklendi: Addons\\scripts\\{1}\r\nOyunculara bir sonraki bağlantıda otomatik indirilir.",
                 dlg.FileNames.Length, group));
             AppEnv.Log($"Sunucu scripti eklendi: {group} ({dlg.FileNames.Length} dosya)");
+            RefreshModsList();
         }
         catch (Exception ex)
         {
@@ -970,6 +1193,7 @@ public sealed class MyServerTab : UserControl
             FileUtil.CopyTree(dlg.SelectedPath, target);
             Ui.Info(FindForm()!, T("Script klasörü eklendi: {0}\r\nOyunculara bir sonraki bağlantıda otomatik indirilir.", name));
             AppEnv.Log($"Sunucu script klasörü eklendi: {name}");
+            RefreshModsList();
         }
         catch (Exception ex)
         {
@@ -1019,6 +1243,7 @@ public sealed class MyServerTab : UserControl
             Ui.Info(FindForm()!, T("ASI eklentisi eklendi: {0}\r\n{1}Oyuncuların oyun kök klasörüne oynarken kurulur; oyundan çıkınca otomatik kaldırılır.",
                 group, rejected > 0 ? T("{0} dosya desteklenmeyen türde olduğu için atlandı.\r\n", rejected) : ""));
             AppEnv.Log($"Sunucu ASI eklentisi eklendi: {group} ({files.Count} dosya)");
+            RefreshModsList();
         }
         catch (Exception ex)
         {
@@ -1045,6 +1270,7 @@ public sealed class MyServerTab : UserControl
                 File.Copy(file, Path.Combine(pluginsDir, Path.GetFileName(file)), overwrite: true);
 
             Ui.Info(FindForm()!, T("Eklenti(ler) Plugins klasörüne eklendi.\r\nSunucuyu yeniden başlatınca yüklenecek (ayarlar otomatik güncellenir)."));
+            RefreshModsList();
         }
         catch (Exception ex)
         {

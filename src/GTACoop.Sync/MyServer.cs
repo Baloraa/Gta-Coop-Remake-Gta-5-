@@ -23,16 +23,20 @@ public sealed class MyServerSettings
     public string ShortCode { get; set; } = "";
 
     /// <summary>
-    /// Sunucu modlarını oyunculara gönderme. Açıkken SyncServer boş manifest döndürür;
-    /// Addons klasöründeki dosyalar silinmez.
+    /// Tek tek devre dışı bırakılan modlar. Anahtar biçimi: "Tür:Id"
+    /// (ör. "DlcPack:araclarim", "RootPlugin:Plugin.dll").
     /// </summary>
-    public bool ServerModsDisabled { get; set; }
+    public List<string> DisabledMods { get; set; } = new();
 
     public static string SettingsPath(string dataFolder) =>
         Path.Combine(dataFolder, "myServer.json");
 
-    public static MyServerSettings Load(string dataFolder) =>
-        SyncJson.Load<MyServerSettings>(SettingsPath(dataFolder)) ?? new MyServerSettings();
+    public static MyServerSettings Load(string dataFolder)
+    {
+        var settings = SyncJson.Load<MyServerSettings>(SettingsPath(dataFolder)) ?? new MyServerSettings();
+        settings.DisabledMods ??= new();
+        return settings;
+    }
 
     public void Save(string dataFolder) => SyncJson.Save(SettingsPath(dataFolder), this);
 }
@@ -102,8 +106,13 @@ public sealed class MyServer : IDisposable
     public void WriteSettings(MyServerSettings s)
     {
         Directory.CreateDirectory(ConfigDir);
+        var disabled = new HashSet<string>(s.DisabledMods, StringComparer.OrdinalIgnoreCase);
         var pluginNames = Directory.Exists(PluginsDir)
-            ? Directory.GetFiles(PluginsDir, "*.dll").Select(f => Path.GetFileNameWithoutExtension(f)!).ToList()
+            ? Directory.GetFiles(PluginsDir, "*.dll")
+                .Select(f => Path.GetFileName(f)!)
+                .Where(f => !disabled.Contains("RootPlugin:" + f))
+                .Select(f => Path.GetFileNameWithoutExtension(f)!)
+                .ToList()
             : new List<string>();
 
         var doc = new XDocument(

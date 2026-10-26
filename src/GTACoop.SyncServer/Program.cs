@@ -44,17 +44,20 @@ ServerScanner.EnsureLayout(addonsDir);
 if (!string.IsNullOrWhiteSpace(settingsPath))
     settingsPath = Path.GetFullPath(settingsPath);
 
-// Sunucu modları devre dışıysa boş manifest döndür; dosyalar diskte kalır.
-bool ModsDisabled()
+// Sunucu mod yöneticisinde devre dışı bırakılan modların anahtarları.
+HashSet<string> DisabledMods()
 {
-    if (string.IsNullOrWhiteSpace(settingsPath)) return false;
+    if (string.IsNullOrWhiteSpace(settingsPath))
+        return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
     try
     {
-        return SyncJson.Load<MyServerSettings>(settingsPath)?.ServerModsDisabled == true;
+        var settings = SyncJson.Load<MyServerSettings>(settingsPath);
+        return new HashSet<string>(settings?.DisabledMods ?? new List<string>(),
+            StringComparer.OrdinalIgnoreCase);
     }
     catch
     {
-        return false;
+        return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
     }
 }
 
@@ -86,7 +89,7 @@ bool Authorized(HttpContext ctx) =>
 
 app.MapGet("/", () => Results.Text(
     $"GTACoop Senkronizasyon Sunucusu\nSunucu: {serverName}\nKimlik: {serverId}\n" +
-    $"Sunucu modları: {(ModsDisabled() ? "devre dışı" : "etkin")}\n" +
+    $"Devre dışı mod: {DisabledMods().Count}\n" +
     $"Manifest: /api/v1/manifest\nDosyalar: /api/v1/files/<eklenti>/<yol>\n"));
 
 app.MapGet("/api/v1/ping", () => Results.Json(new
@@ -94,7 +97,7 @@ app.MapGet("/api/v1/ping", () => Results.Json(new
     serverName,
     serverId,
     syncPort = port,
-    modsDisabled = ModsDisabled(),
+    disabledMods = DisabledMods().Count,
     app = "GTACoop.SyncServer",
     version = "1.0"
 }, SyncJson.Options));
@@ -103,26 +106,14 @@ app.MapGet("/api/v1/manifest", (HttpContext ctx) =>
 {
     if (!Authorized(ctx)) return Results.Unauthorized();
 
-    if (ModsDisabled())
-    {
-        var empty = new Manifest
-        {
-            ServerName = serverName,
-            ServerId = serverId,
-            SyncPort = port,
-            GeneratedUtc = DateTime.UtcNow
-        };
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Sunucu modları devre dışı; boş manifest " +
-                          $"<- {ctx.Connection.RemoteIpAddress}");
-        ctx.Response.Headers["X-Warnings"] = "0";
-        return Results.Json(empty, SyncJson.Options);
-    }
-
     var scan = scanner.Scan(serverName, serverId, port);
     var manifest = scan.Manifest;
 
+    var disabled = DisabledMods();
+    var hidden = disabled.Count == 0 ? 0 : manifest.Addons.RemoveAll(a => disabled.Contains(a.Key));
+
     Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Manifest istendi: {manifest.Addons.Count} eklenti " +
-                      $"({scan.Warnings.Count} not) <- {ctx.Connection.RemoteIpAddress}");
+                      $"({hidden} devre dışı, {scan.Warnings.Count} not) <- {ctx.Connection.RemoteIpAddress}");
 
     ctx.Response.Headers["X-Warnings"] = scan.Warnings.Count.ToString();
     return Results.Json(manifest, SyncJson.Options);
@@ -131,8 +122,12 @@ app.MapGet("/api/v1/manifest", (HttpContext ctx) =>
 app.MapGet("/api/v1/files/{addonId}/{**relPath}", (HttpContext ctx, string addonId, string relPath) =>
 {
     if (!Authorized(ctx)) return Results.Unauthorized();
-    if (ModsDisabled())
-        return Results.NotFound(new { error = "Sunucu modları devre dışı." });
+
+    var disabledIds = DisabledMods()
+        .Select(k => k[(k.IndexOf(':') + 1)..])
+        .ToHashSet(StringComparer.OrdinalIgnoreCase);
+    if (disabledIds.Contains(addonId))
+        return Results.NotFound(new { error = "Mod devre dışı." });
 
     var scan = scanner.Scan(serverName, serverId, port);
     if (!scan.TryGetPhysicalPath(addonId, relPath, out var fullPath))
@@ -156,7 +151,7 @@ app.Lifetime.ApplicationStarted.Register(() =>
     Console.WriteLine($"Sunucu adı : {serverName}");
     Console.WriteLine($"Sunucu kimliği: {serverId}");
     Console.WriteLine($"Eklenti klasörü: {addonsDir}");
-    Console.WriteLine($"Sunucu modları: {(ModsDisabled() ? "devre dışı" : "etkin")}");
+    Console.WriteLine($"Devre dışı mod: {DisabledMods().Count}");
     Console.WriteLine($"Dinleniyor : http://0.0.0.0:{port}/");
     Console.WriteLine(token.Length > 0 ? "Kimlik doğrulama: AÇIK (X-Sync-Token)" : "Kimlik doğrulama: kapalı");
     Console.WriteLine("Durdurmak için Ctrl+C.");
