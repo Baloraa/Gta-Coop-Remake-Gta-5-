@@ -1,4 +1,5 @@
 using System.Windows.Forms;
+using GTACoop.Sync;
 
 namespace GTACoop.Remake;
 
@@ -82,16 +83,16 @@ internal static class Ui
     }
 
     public static void Info(Form owner, string text, string title = "GTACoop Remake") =>
-        MessageBox.Show(owner, text, title, MessageBoxButtons.OK, MessageBoxIcon.Information);
+        MessageBox.Show(owner, SyncText.Translate(text), title, MessageBoxButtons.OK, MessageBoxIcon.Information);
 
     public static void Warn(Form owner, string text, string title = "GTACoop Remake") =>
-        MessageBox.Show(owner, text, title, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        MessageBox.Show(owner, SyncText.Translate(text), title, MessageBoxButtons.OK, MessageBoxIcon.Warning);
 
     public static void Error(Form owner, string text, string title = "GTACoop Remake") =>
-        MessageBox.Show(owner, text, title, MessageBoxButtons.OK, MessageBoxIcon.Error);
+        MessageBox.Show(owner, SyncText.Translate(text), title, MessageBoxButtons.OK, MessageBoxIcon.Error);
 
     public static bool Confirm(Form owner, string text, string title = "GTACoop Remake") =>
-        MessageBox.Show(owner, text, title, MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes;
+        MessageBox.Show(owner, SyncText.Translate(text), title, MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes;
 }
 
 internal static class ControlExtensions

@@ -48,6 +48,13 @@ KURULUM
      adresi ve portları girin (oyun portu 4499 UDP, sync 4599 TCP).
    - "Bağlan ve Oyna"ya basın. Sunucu modları otomatik iner,
      oyun açılır. Ayrıntılar: KODLA-KATIL.txt
+   - Sunucu sahibi oyuna tamamen girdikten sonra bağlanın;
+     GTACoOp oturumu host oyuna girince aktifleşir.
+
+   NOT: mods\update\update.rpf dosyanız 3,9 GB'a yakınsa veya
+   yapısı bozuksa DLC paketleri güvenlik için atlanır. Launcher
+   dosyanızı değiştirmez; script/ASI modları kurulmaya devam eder.
+   Onarım için Launcher > Yedekler bölümünü kullanabilirsiniz.
 
 5) Oyunda:
    - F9  : GTA Coop menüsü

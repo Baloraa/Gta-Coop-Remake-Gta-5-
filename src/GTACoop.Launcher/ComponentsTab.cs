@@ -654,6 +654,7 @@ public sealed class ComponentsTab : UserControl
             try { BeginInvoke(() => AppendDetail(line)); } catch { }
             return;
         }
+        line = SyncText.Translate(line);
         _details.AppendText($"[{DateTime.Now:HH:mm:ss}] {line}{Environment.NewLine}");
         _details.SelectionStart = _details.TextLength;
         _details.ScrollToCaret();

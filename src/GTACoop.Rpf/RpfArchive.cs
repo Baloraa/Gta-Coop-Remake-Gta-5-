@@ -334,7 +334,12 @@ public sealed class RpfArchive : IDisposable
     /// (512 bayt hizalı) ekler ve TOC girdisini günceller.
     /// </summary>
     /// <param name="compress">null: özgün formatı koru; true: sıkıştır; false: ham yaz.</param>
-    public void ReplaceFile(RpfFileEntry entry, byte[] content, bool verify = true, bool? compress = null)
+    /// <param name="requireInPlace">
+    /// true ise yeni içerik mevcut dosya alanına sığmazsa arşiv büyütülmez; hata verilir.
+    /// 4 GB'a yakın update.rpf dosyalarında güvenli düzenleme için kullanılır.
+    /// </param>
+    public void ReplaceFile(RpfFileEntry entry, byte[] content, bool verify = true, bool? compress = null,
+        bool requireInPlace = false)
     {
         if (entry.File is not RpfArchive owner || !ReferenceEquals(owner, this))
             throw new InvalidOperationException("Girdi bu arşive ait değil.");
@@ -430,6 +435,11 @@ public sealed class RpfArchive : IDisposable
         }
         else
         {
+            if (requireInPlace)
+                throw new InvalidOperationException(
+                    $"RPF7: '{entry.Path}' yeni içerik mevcut alana sığmıyor; " +
+                    "arşiv büyütülmedi (yerinde yazma gerekli).");
+
             long newPos = (_fs.Length + 511) / 512 * 512;
             long sector = newPos / 512;
             if (sector > 0x7FFFFF)
@@ -468,6 +478,106 @@ public sealed class RpfArchive : IDisposable
                 throw new RpfVerificationException(
                     $"Doğrulama başarısız: '{entry.Path}' içeriği yazdıktan sonra eşleşmiyor.");
         }
+    }
+
+    /// <summary>
+    /// İçerik arşivi büyütmeden mevcut dosya alanına sığar mı? Yalnızca okuma
+    /// yapar; hiçbir bayt yazmaz. Büyük update.rpf dosyalarında dlclist.xml'i
+    /// yerinde değiştirmenin güvenli olup olmadığını önceden anlamak için kullanılır.
+    /// </summary>
+    public bool CanReplaceInPlace(RpfFileEntry entry, byte[] content, out string reason,
+        bool? compress = null)
+    {
+        reason = "";
+        if (entry.File is not RpfArchive owner || !ReferenceEquals(owner, this))
+        {
+            reason = "Girdi bu arşive ait değil.";
+            return false;
+        }
+        if (entry is not RpfBinaryFileEntry bin0)
+        {
+            reason = "Yalnızca binary (RSC olmayan) dosyalar değiştirilebilir.";
+            return false;
+        }
+        if (bin0.IsEncrypted)
+        {
+            reason = "Şifreli dosya yerinde değiştirilemez.";
+            return false;
+        }
+
+        if (bin0.Compression == RpfCompression.Unknown &&
+            bin0.FileUncompressedSize > 0 && bin0.FileUncompressedSize != bin0.FileSize)
+        {
+            try { ReadFile(bin0); }
+            catch (Exception ex)
+            {
+                reason = ex.Message;
+                return false;
+            }
+        }
+
+        bool shouldCompress = compress ??
+            (bin0.Compression is RpfCompression.Raw or RpfCompression.Zlib);
+        var mode = bin0.Compression is RpfCompression.Raw or RpfCompression.Zlib
+            ? bin0.Compression
+            : RpfCompression.Raw;
+
+        byte[] stored = content;
+        if (shouldCompress)
+        {
+            var compressedBytes = RpfCrypto.Compress(content, mode);
+            if (compressedBytes.Length < content.Length) stored = compressedBytes;
+        }
+
+        if (stored.Length > 0xFFFFFF)
+        {
+            reason = "RPF7: tek girdi için depolanan veri 16 MB sınırını aşıyor.";
+            return false;
+        }
+
+        uint oldSize = bin0.FileSize == 0 ? bin0.FileUncompressedSize : bin0.FileSize;
+        long oldPos = (long)bin0.FileOffset * 512;
+        long headerEnd = 16 + (long)EntryCount * EntrySize + NamesLength;
+        if (oldPos < headerEnd || oldPos + oldSize > _fs.Length)
+        {
+            reason = $"RPF7: '{entry.Path}' veri konumu arşiv sınırlarının dışında.";
+            return false;
+        }
+
+        // İçerik zaten aynıysa yazma gerekmez.
+        try
+        {
+            if (ReadFile(bin0).AsSpan().SequenceEqual(content))
+                return true;
+        }
+        catch { /* normal alan kontrolüne devam */ }
+
+        long freeEnd = _fs.Length;
+        bool collision = false;
+        foreach (var other in AllFiles())
+        {
+            if (other.Index == bin0.Index) continue;
+            long op = (long)other.FileOffset * 512;
+            long olen = other is RpfBinaryFileEntry ob
+                ? (ob.FileSize == 0 ? ob.FileUncompressedSize : ob.FileSize)
+                : other.FileSize;
+            if (olen == 0 || op + olen <= oldPos) continue;
+
+            if (op < oldPos + stored.Length)
+            {
+                collision = true;
+                break;
+            }
+            if (op < freeEnd) freeEnd = op;
+        }
+
+        if (collision || stored.Length > freeEnd - oldPos)
+        {
+            reason = "mevcut alan yetersiz (yerinde yazma için boşluk yok).";
+            return false;
+        }
+
+        return true;
     }
 
     private void WriteZeros(long count)

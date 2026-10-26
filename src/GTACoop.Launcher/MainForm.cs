@@ -185,6 +185,7 @@ public sealed class MainForm : Form
 
         var wasEnglish = Loc.English;
         Loc.English = newLang == "en";
+        SyncText.English = Loc.English;
         var answer = MessageBox.Show(this,
             T("Dil değiştirildi. Uygulamak için launcher yeniden başlatılsın mı?"),
             T("Dil Değişikliği"), MessageBoxButtons.YesNo, MessageBoxIcon.Question);
@@ -197,6 +198,7 @@ public sealed class MainForm : Form
         else
         {
             Loc.English = wasEnglish; // seçim kaydedildi; sonraki açılışta geçerli olur
+            SyncText.English = Loc.English;
         }
     }
 

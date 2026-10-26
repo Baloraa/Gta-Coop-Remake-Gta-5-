@@ -1,6 +1,6 @@
 # GTACoop Remake — Türkçe Mod + Sunucu Yöneticisi
 
-2.2.2 sürümü — kendi sunucu yönetimi, otomatik mod indirme, **oturum modu**,
+2.2.3 sürümü — kendi sunucu yönetimi, otomatik mod indirme, **oturum modu**,
 **kısa kod** (ör. `Gel.com`) ile internetten sunucu bulma, **otomatik relay** ve
 **Bileşenler** sekmesinden ScriptHookV / ScriptHookVDotNet / OpenIV.asi / RageOpenV kurulumu:
 port yönlendirme veya Radmin VPN olmadan da arkadaşlarınız bağlanabilir. Sunucu modları
@@ -23,6 +23,10 @@ yalnızca oyun açıkken kurulu kalır, oyundan çıkınca otomatik kaldırılı
 - **Tekrar indirme yok**: indirilen dosyalar bilgisayarınızda saklanır (önbellek); ikinci
   girişte yeniden indirilmez. DLC paketleri oyun klasörüne kopyalanmaz, bağlantı (junction)
   ile eklenir — GB'larca veri çoğaltılmaz.
+- **Büyük/bozuk update.rpf güvenliği**: `mods/update/update.rpf` 3,9 GB'a yakınsa veya
+  yapısı bozuksa DLC paketleri **kurulmaz/atlanır**; dosyanız değiştirilmez, otomatik yedekle
+  ezilmez. Diğer script/ASI modları kurulmaya devam eder. Onarım için **Yedekler** bölümünü
+  kullanabilirsiniz.
 - **Gerekirse elle yenileme**: bir sunucunun indirdiği dosyaları bozuk/eksik bulursanız
   **Sunucular** sekmesinde sunucuyu seçip **Yeniden İndir...** deyin; yalnızca o sunucunun
   önbelleği silinip baştan indirilir. Bu sunucunun modları oyuna kuruluyken yenileme
@@ -117,7 +121,7 @@ Kurallar:
 - Bu betik uygulamayı `%LOCALAPPDATA%\Programs\GTACoop Remake` klasörüne kopyalar ve
   **masaüstü** + **Başlat menüsü** kısayollarını buraya bağlar. Hiçbir şey silinmez
   (eski `dist` klasörü olduğu yerde kalır).
-- Uygulama simgesi ve sürüm bilgisi (2.2.2) exe dosyasına işlenmiştir.
+- Uygulama simgesi ve sürüm bilgisi (2.2.3) exe dosyasına işlenmiştir.
 
 ---
 

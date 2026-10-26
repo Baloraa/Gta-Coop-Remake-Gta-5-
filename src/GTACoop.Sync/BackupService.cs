@@ -26,28 +26,62 @@ public static class BackupService
         {
             if (!File.Exists(path))
             {
-                reason = "dosya yok";
+                reason = SyncText.T("dosya yok");
                 return false;
             }
 
             var fi = new FileInfo(path);
             if (fi.Length < 0x100)
             {
-                reason = "dosya çok küçük / geçersiz";
+                reason = SyncText.T("dosya çok küçük / geçersiz");
                 return false;
             }
 
             if (fi.Length > MaxEditableUpdateRpfBytes)
             {
-                reason = $"arşiv çok büyük ({fi.Length / 1_000_000_000.0:0.00} GB; " +
-                         "RPF7 güvenli sınırı 3,9 GB) — OpenIV yeni dosya ekleyemez";
+                reason = SyncText.T(
+                    "arşiv çok büyük ({0} GB; RPF7 güvenli sınırı 3,9 GB) — OpenIV yeni dosya ekleyemez",
+                    (fi.Length / 1_000_000_000.0).ToString("0.00",
+                        System.Globalization.CultureInfo.InvariantCulture));
+                return false;
+            }
+
+            return IsUpdateRpfStructurallyHealthy(path, out reason);
+        }
+        catch (Exception ex)
+        {
+            reason = ex.Message;
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Boyut sınırını yok sayarak RPF7 başlığını, TOC yapısını ve dlclist
+    /// okunabilirliğini kontrol eder. 4 GB'a yakın ama yapısal olarak sağlıklı
+    /// arşivlerde yalnızca yerinde (arşivi büyütmeyen) düzenlemeye izin vermek için.
+    /// </summary>
+    public static bool IsUpdateRpfStructurallyHealthy(string path, out string reason)
+    {
+        reason = "";
+        try
+        {
+            if (!File.Exists(path))
+            {
+                reason = SyncText.T("dosya yok");
+                return false;
+            }
+
+            var fi = new FileInfo(path);
+            if (fi.Length < 0x100)
+            {
+                reason = SyncText.T("dosya çok küçük / geçersiz");
                 return false;
             }
 
             using var archive = RpfArchive.Open(path);
             if (archive.Find(Dlclist.RelativePath) is not RpfBinaryFileEntry dlclist)
             {
-                reason = "common/data/dlclist.xml bulunamadı";
+                reason = SyncText.T("common/data/dlclist.xml bulunamadı");
                 return false;
             }
 
@@ -56,7 +90,7 @@ public static class BackupService
             var check = archive.VerifyStructure(sampleReads: false);
             if (!check.IsHealthy)
             {
-                reason = "RPF7 yapısı sağlıksız";
+                reason = SyncText.T("RPF7 yapısı sağlıksız");
                 return false;
             }
 
@@ -77,7 +111,8 @@ public static class BackupService
             if (IsUpdateRpfHealthy(backup, out var why))
                 return backup;
 
-            log?.Invoke($"Sağlıksız yedek atlandı: {Path.GetFileName(backup)} ({why})");
+            log?.Invoke(SyncText.T("Sağlıksız yedek atlandı: {0} ({1})",
+                Path.GetFileName(backup), why));
         }
 
         return null;
@@ -93,7 +128,7 @@ public static class BackupService
         var src = Path.Combine(gameFolder, "mods", "update", "update.rpf");
         if (!File.Exists(src))
         {
-            log?.Invoke("UYARI: mods/update/update.rpf bulunamadı; dlclist düzenlemesi yapılamaz.");
+            log?.Invoke(SyncText.T("UYARI: mods/update/update.rpf bulunamadı; dlclist düzenlemesi yapılamaz."));
             return null;
         }
 
@@ -110,32 +145,59 @@ public static class BackupService
             // dosya sağlıklıysa yedeği sağlıklı içerikle yenile.
             if (currentHealthy && !IsUpdateRpfHealthy(target, out var backupWhy))
             {
-                log?.Invoke($"Mevcut günlük yedek sağlıksız ({backupWhy}); sağlıklı içerikle yenileniyor...");
+                log?.Invoke(SyncText.T("Mevcut günlük yedek sağlıksız ({0}); sağlıklı içerikle yenileniyor...",
+                    backupWhy));
                 var tmp = target + ".tmp";
                 File.Copy(src, tmp, overwrite: true);
                 File.Move(tmp, target, overwrite: true);
-                log?.Invoke("Yedek yenilendi.");
+                log?.Invoke(SyncText.T("Yedek yenilendi."));
             }
             else
             {
-                log?.Invoke($"Yedek zaten var: {target}");
+                log?.Invoke(SyncText.T("Yedek zaten var: {0}", target));
             }
         }
         else if (!currentHealthy)
         {
-            log?.Invoke($"UYARI: update.rpf sağlıksız ({currentWhy}); yedek alınmadı, " +
-                        "eski sağlıklı yedek(ler) korunuyor.");
+            log?.Invoke(SyncText.T("UYARI: update.rpf sağlıksız ({0}); yedek alınmadı, " +
+                                   "eski sağlıklı yedek(ler) korunuyor.", currentWhy));
         }
         else
         {
-            log?.Invoke($"update.rpf yedekleniyor -> {Path.GetFileName(target)} ...");
+            log?.Invoke(SyncText.T("update.rpf yedekleniyor -> {0} ...", Path.GetFileName(target)));
             var tmp = target + ".tmp";
             File.Copy(src, tmp, overwrite: true);
             File.Move(tmp, target, overwrite: true);
-            log?.Invoke("Yedek alındı.");
+            log?.Invoke(SyncText.T("Yedek alındı."));
         }
 
         Rotate(dir, keep: 3, log);
+        return target;
+    }
+
+    /// <summary>
+    /// Yerinde dlclist düzenlemesinden önce yalnızca XML içeriğini saklar.
+    /// 4 GB'a yakın update.rpf'nin tamamını kopyalamadan geri dönüş imkânı verir.
+    /// </summary>
+    public static string BackupDlclist(string gameFolder, byte[] content, Action<string>? log = null)
+    {
+        var dir = Path.Combine(BackupDir(gameFolder), "dlclist");
+        Directory.CreateDirectory(dir);
+        var target = Path.Combine(dir, $"dlclist-{DateTime.Now:yyyyMMdd-HHmmssfff}.xml");
+        File.WriteAllBytes(target, content);
+        log?.Invoke(SyncText.T("dlclist yedeği alındı: {0}", Path.GetFileName(target)));
+
+        try
+        {
+            foreach (var old in Directory.GetFiles(dir, "dlclist-*.xml")
+                         .OrderByDescending(f => Path.GetFileName(f), StringComparer.OrdinalIgnoreCase)
+                         .Skip(5))
+            {
+                try { File.Delete(old); } catch { }
+            }
+        }
+        catch { /* rotasyon kritik değil */ }
+
         return target;
     }
 
@@ -151,7 +213,7 @@ public static class BackupService
             foreach (var old in backups.Skip(keep))
             {
                 File.Delete(old);
-                log?.Invoke($"Eski yedek silindi: {Path.GetFileName(old)}");
+                log?.Invoke(SyncText.T("Eski yedek silindi: {0}", Path.GetFileName(old)));
             }
         }
         catch { /* rotasyon kritik değil */ }
@@ -171,13 +233,15 @@ public static class BackupService
     {
         var target = Path.Combine(gameFolder, "mods", "update", "update.rpf");
         if (!File.Exists(backupPath))
-            throw new SyncException($"Yedek bulunamadı: {backupPath}");
+            throw new SyncException(SyncText.T("Yedek bulunamadı: {0}", backupPath));
 
         if (!IsUpdateRpfHealthy(backupPath, out var why))
-            throw new SyncException(
-                $"Yedek düzenlemeye uygun değil: {Path.GetFileName(backupPath)} ({why})");
+            throw new SyncException(SyncText.T(
+                "Yedek düzenlemeye uygun değil: {0} ({1})",
+                Path.GetFileName(backupPath), why));
 
-        log?.Invoke($"Geri yükleniyor: {Path.GetFileName(backupPath)} -> mods/update/update.rpf");
+        log?.Invoke(SyncText.T("Geri yükleniyor: {0} -> mods/update/update.rpf",
+            Path.GetFileName(backupPath)));
 
         // Mevcut dosyayı da bir kenara al (son çare)
         if (File.Exists(target))
@@ -194,10 +258,10 @@ public static class BackupService
         File.Copy(backupPath, target, overwrite: true);
 
         if (!IsUpdateRpfHealthy(target, out var after))
-            throw new SyncException(
-                $"Geri yükleme sonrası update.rpf sağlıksız ({after}). " +
-                "Önceki dosya 'update.rpf.before-restore' olarak korunuyor.");
+            throw new SyncException(SyncText.T(
+                "Geri yükleme sonrası update.rpf sağlıksız ({0}). " +
+                "Önceki dosya 'update.rpf.before-restore' olarak korunuyor.", after));
 
-        log?.Invoke("Geri yükleme tamamlandı.");
+        log?.Invoke(SyncText.T("Geri yükleme tamamlandı."));
     }
 }

@@ -33,6 +33,12 @@ public sealed class AddonApplier
 
         /// <summary>Kullanıcının bilgisayarında zaten olduğu için kurulmayacak eklentiler.</summary>
         public List<SkippedAddon> LocalSkipped { get; } = new();
+
+        /// <summary>
+        /// Güvenli biçimde kurulamayan eklentiler (ör. update.rpf çok büyük/bozuk
+        /// olduğu için DLC paketi). Bu eklentiler indirilmez; mevcut dosyalara dokunulmaz.
+        /// </summary>
+        public List<SkippedAddon> Blocked { get; } = new();
     }
 
     /// <summary>Atlama nedeni: hedefte zaten var olan dosya/klasör.</summary>
@@ -69,6 +75,22 @@ public sealed class AddonApplier
             }
         }
 
+        // DLC paketleri update.rpf içindeki dlclist'i düzenlemeyi gerektirir.
+        // Dosya çok büyük/bozuksa veya dlclist yerinde güncellenemiyorsa paketi
+        // indirmeye bile başlamayız; böylece kullanıcının mevcut update.rpf'si
+        // ve modları korunur, diğer eklentiler kurulmaya devam eder.
+        var dlcToInstall = plan.ToInstall
+            .Where(a => a.Type == AddonType.DlcPack)
+            .ToList();
+        if (dlcToInstall.Count > 0 && !CanInstallDlcPacks(dlcToInstall, out var dlcReason))
+        {
+            foreach (var addon in dlcToInstall)
+            {
+                plan.ToInstall.Remove(addon);
+                plan.Blocked.Add(new SkippedAddon { Addon = addon, Reason = dlcReason });
+            }
+        }
+
         foreach (var inst in state.Addons)
         {
             if (!manifest.Addons.Any(a => a.Id == inst.Id))
@@ -77,6 +99,85 @@ public sealed class AddonApplier
 
         return plan;
     }
+
+    /// <summary>
+    /// DLC paketlerinin dlclist'e güvenle eklenip eklenemeyeceğini önceden kontrol eder.
+    /// - update.rpf yoksa veya yapısal olarak bozuksa: hayır (dosyaya dokunulmaz).
+    /// - 4 GB'a yakın ama yapısal olarak sağlıklıysa: yalnızca yeni dlclist mevcut
+    ///   alana sığıyorsa evet (arşiv büyütülmez).
+    /// - Küçük ve sağlıklıysa: normal ekleme yapılabilir.
+    /// Hiçbir durumda mevcut update.rpf otomatik olarak yedekle değiştirilmez.
+    /// </summary>
+    public bool CanInstallDlcPacks(IEnumerable<AddonInfo> addons, out string reason)
+    {
+        reason = "";
+        var list = addons.Where(a => a.Type == AddonType.DlcPack).ToList();
+        if (list.Count == 0) return true;
+
+        if (!File.Exists(UpdateRpfPath))
+        {
+            reason = SyncText.T(
+                "mods/update/update.rpf bulunamadı. DLC paketleri için OpenIV ile mods klasörü oluşturulmalı.");
+            return false;
+        }
+
+        bool healthy = BackupService.IsUpdateRpfHealthy(UpdateRpfPath, out _);
+        if (!healthy &&
+            !BackupService.IsUpdateRpfStructurallyHealthy(UpdateRpfPath, out var structuralWhy))
+        {
+            reason = SyncText.T(
+                "update.rpf düzenlemeye uygun değil: {0}. OpenIV ile mods klasörünü onarın " +
+                "veya Launcher > Yedekler bölümünden geri dönün.",
+                SyncText.Translate(structuralWhy));
+            return false;
+        }
+
+        try
+        {
+            using var archive = RpfArchive.Open(UpdateRpfPath);
+            var file = archive.Find(Dlclist.RelativePath)
+                ?? throw new SyncException(SyncText.T("update.rpf içinde dlclist.xml bulunamadı."));
+
+            var (xml, enc) = Dlclist.Decode(archive.ReadFile(file));
+            var existing = Dlclist.GetPackNames(xml);
+            var missing = list
+                .Select(DlclistEntryFor)
+                .Where(e => !existing.Contains(e, StringComparer.OrdinalIgnoreCase))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            // Girdiler zaten varsa update.rpf'ye yazma gerekmez; DLC dosyaları
+            // güncellenebilir, mevcut (sağlıksız/büyük) arşive dokunulmaz.
+            if (missing.Count == 0) return true;
+
+            // Küçük ve sağlıklı arşivlerde normal (gerekirse sona ekleyen) yazma yolu.
+            if (healthy) return true;
+
+            // Yalnızca büyük ama yapısal olarak sağlıklı arşiv: yerinde yazma şart.
+            var updated = Dlclist.AddPackNames(xml, missing);
+            ValidateXml(updated);
+            var writeEnc = Dlclist.Normalize(updated, enc);
+            var bytes = Dlclist.Encode(updated, writeEnc);
+            if (!archive.CanReplaceInPlace(file, bytes, out var why))
+            {
+                reason = SyncText.T(
+                    "update.rpf çok büyük ve dlclist.xml yerinde güncellenemiyor: {0}",
+                    SyncText.Translate(why));
+                return false;
+            }
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            reason = SyncText.T("update.rpf okunamadı: {0}", SyncText.Translate(ex.Message));
+            return false;
+        }
+    }
+
+    private static string DlclistEntryFor(AddonInfo addon) =>
+        MountFolderName(addon.Id) +
+        (string.IsNullOrEmpty(addon.RelativePackPath) ? "" : "/" + addon.RelativePackPath);
 
     /// <summary>
     /// Aynı mod kullanıcının bilgisayarında zaten var mı? Varsa eklenti hiç indirilmez/kurulmaz,
@@ -159,7 +260,15 @@ public sealed class AddonApplier
                     "mods", "update", "x64", "dlcpacks", inst.MountFolder);
                 if (!Directory.Exists(dir)) return false;
                 // dlc.rpf hâlâ var mı?
-                return Directory.EnumerateFiles(dir, "dlc.rpf", SearchOption.AllDirectories).Any();
+                if (!Directory.EnumerateFiles(dir, "dlc.rpf", SearchOption.AllDirectories).Any())
+                    return false;
+
+                // Klasör duruyor ama dlclist girdisi (ör. update.rpf geri yüklendiği
+                // için) kaybolmuş olabilir. Girdi yoksa paket oyunda yüklenmez;
+                // yeniden kurulum planlanır. Okunamıyorsa (null) mevcut kabul edilir.
+                if (string.IsNullOrEmpty(inst.DlclistEntry)) return true;
+                if (!File.Exists(UpdateRpfPath)) return false;
+                return DlclistEntryExists(inst.DlclistEntry) != false;
             }
             default:
                 return inst.InstalledPaths.Any(p =>
@@ -183,15 +292,28 @@ public sealed class AddonApplier
         state.ServerName = manifest.ServerName;
 
         var plan = BuildPlan(manifest, state);
-        _log($"Plan: {plan.ToInstall.Count} kurulacak, {plan.UpToDate.Count} güncel, " +
-             $"{plan.ToRemove.Count} kaldırılacak, {plan.LocalSkipped.Count} sizde var (atlanacak).");
+        _log(SyncText.T(
+            "Plan: {0} kurulacak, {1} güncel, {2} kaldırılacak, {3} sizde var (atlanacak), {4} engellendi.",
+            plan.ToInstall.Count, plan.UpToDate.Count, plan.ToRemove.Count,
+            plan.LocalSkipped.Count, plan.Blocked.Count));
 
         // Kullanıcının bilgisayarında zaten olan modlar: indirilmez, kurulmaz, dokunulmaz.
         foreach (var skip in plan.LocalSkipped)
         {
-            _log($"Atlandı (bilgisayarınızda zaten var): {skip.Addon.DisplayName} -> {skip.Reason}");
+            _log(SyncText.T("Atlandı (bilgisayarınızda zaten var): {0} -> {1}",
+                skip.Addon.DisplayName, skip.Reason));
             progress?.Report(new SyncProgress(
-                $"Atlandı: {skip.Addon.DisplayName} (zaten bilgisayarınızda var)", 0));
+                SyncText.T("Atlandı: {0} (zaten bilgisayarınızda var)", skip.Addon.DisplayName), 0));
+        }
+
+        // Güvenli biçimde kurulamayan eklentiler (ör. update.rpf çok büyük/bozuk).
+        // İndirme yapılmaz, mevcut dosyalara dokunulmaz; diğer eklentiler devam eder.
+        foreach (var blocked in plan.Blocked)
+        {
+            _log(SyncText.T("Atlandı (DLC kurulamıyor): {0} -> {1}",
+                blocked.Addon.DisplayName, blocked.Reason));
+            progress?.Report(new SyncProgress(
+                SyncText.T("Atlandı: {0} (DLC kurulamıyor)", blocked.Addon.DisplayName), 0));
         }
 
         // 1) Sunucudan kaldırılanları temizle
@@ -212,26 +334,61 @@ public sealed class AddonApplier
         foreach (var addon in plan.ToInstall)
         {
             ct.ThrowIfCancellationRequested();
-            var addonCacheDir = Path.Combine(serverCacheDir, Safe(addon.Id));
             var version = ServerScanner.ComputeVersion(addon);
+            // DLC güncellemelerinde eski sürümün önbelleğini EZMEYELİM: hedef
+            // klasör eski önbelleğe junction olabilir. Sürüm başına ayrı önbellek
+            // kullanınca indirme/kurulum başarısız olsa bile eski DLC sağlam kalır.
+            var addonCacheDir = addon.Type == AddonType.DlcPack
+                ? Path.Combine(serverCacheDir, Safe(addon.Id) + "__" + Safe(version))
+                : Path.Combine(serverCacheDir, Safe(addon.Id));
 
-            // Güncelleme senaryosu: eskisini kaldır
+            // Güncelleme senaryosu. DLC paketlerinde eski klasörü önceden SİLMEYİZ:
+            // InstallDlcPack yeni sürümü geçici klasöre hazırlar, başarısız olursa
+            // eski sürümü geri getirir. Böylece indirme/kurulum hatası modu bozmaz.
             var old = state.Addons.FirstOrDefault(a => a.Id == addon.Id);
             if (old != null)
             {
-                _log($"Güncelleniyor: {addon.Id} ({old.Version} -> {version})");
-                Uninstall(old);
-                state.Addons.Remove(old);
+                _log(SyncText.T("Güncelleniyor: {0} ({1} -> {2})", addon.Id, old.Version, version));
+                if (addon.Type != AddonType.DlcPack)
+                {
+                    Uninstall(old);
+                    state.Addons.Remove(old);
+                }
             }
 
-            doneBytes = await DownloadAddonAsync(
-                client, addon, addonCacheDir, progress, doneBytes, totalBytes, ct);
+            try
+            {
+                doneBytes = await DownloadAddonAsync(
+                    client, addon, addonCacheDir, progress, doneBytes, totalBytes, ct);
 
-            progress?.Report(new SyncProgress($"Kuruluyor: {addon.DisplayName}", Fraction(doneBytes, totalBytes)));
-            var installed = Install(addon, addonCacheDir, version);
-            state.Addons.Add(installed);
-            SyncStateStore.Save(dataFolder, state); // çökme güvenliği: artımlı kayıt
-            _log($"Kuruldu: {addon.DisplayName} ({addon.Type})");
+                progress?.Report(new SyncProgress(
+                    SyncText.T("Kuruluyor: {0}", addon.DisplayName),
+                    Fraction(doneBytes, totalBytes)));
+                var installed = Install(addon, addonCacheDir, version);
+
+                if (old != null && addon.Type == AddonType.DlcPack)
+                {
+                    state.Addons.Remove(old);
+                    // Yeni sürüm başarıyla kuruldu; eski sürümün önbelleği artık
+                    // kullanılmıyorsa temizle. Yedek hâlâ duruyorsa dokunma.
+                    CleanupOldDlcCache(old, addonCacheDir);
+                }
+
+                state.Addons.Add(installed);
+                SyncStateStore.Save(dataFolder, state); // çökme güvenliği: artımlı kayıt
+                _log(SyncText.T("Kuruldu: {0} ({1})", addon.DisplayName, addon.Type));
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException &&
+                                       addon.Type == AddonType.DlcPack)
+            {
+                // DLC hatası tüm senkronizasyonu durdurmasın; diğer modlar kurulur.
+                // InstallDlcPack hata durumunda eski sürümü geri getirmeye çalışır.
+                _log(SyncText.T("UYARI: DLC paketi kurulamadı: {0} ({1})",
+                    addon.DisplayName, ex.Message));
+                progress?.Report(new SyncProgress(
+                    SyncText.T("Atlandı: {0} (DLC kurulamadı)", addon.DisplayName),
+                    Fraction(doneBytes, totalBytes)));
+            }
         }
 
         state.LastSyncUtc = DateTime.UtcNow;
@@ -316,38 +473,174 @@ public sealed class AddonApplier
         var dlcpacksRoot = Path.Combine(_gameFolder, "mods", "update", "x64", "dlcpacks");
         Directory.CreateDirectory(dlcpacksRoot);
         var target = Path.Combine(dlcpacksRoot, mountFolder);
+        var staging = target + ".gtacoop-new";
+        var backup = target + ".gtacoop-old";
 
-        if (Directory.Exists(target)) DeleteDirectoryWithRetry(target, _log);
+        if (Directory.Exists(staging)) DeleteDirectoryWithRetry(staging, _log);
+        // Yedek varsa ve hedef de varsa hedef yarım kalmış olabilir; bilinen
+        // eski sürümü geri getir. Yedek tek sağlam kopyaysa asla silme.
+        if (Directory.Exists(backup) && Directory.Exists(target))
+        {
+            RestoreDlcBackup(backup, target);
+            if (Directory.Exists(backup))
+                throw new SyncException(SyncText.T(
+                    "DLC paketi güncellenemedi: eski yedek geri getirilemedi ({0}).",
+                    mountFolder));
+        }
 
-        // Oyun klasörüne GB'larca dosya kopyalamamak için NTFS bağlantısı (junction) denenir.
-        // Başarısız olursa (ör. desteklenmeyen disk biçimi) normal kopyalamaya düşülür.
         string linkTarget = "";
-        if (TryCreateJunction(target, cacheDir))
+        try
         {
-            linkTarget = cacheDir;
-            _log($"{addon.DisplayName}: oyuna bağlandı (bağlantı ile; kopyalama yapılmadı).");
+            // Önce yeni sürümü geçici klasöre hazırla; eski sürüm hâlâ yerinde kalsın.
+            // Oyun klasörüne GB'larca dosya kopyalamamak için NTFS bağlantısı (junction)
+            // denenir. Başarısız olursa normal kopyalamaya düşülür.
+            if (TryCreateJunction(staging, cacheDir))
+            {
+                linkTarget = cacheDir;
+                _log(SyncText.T("{0}: oyuna bağlandı (bağlantı ile; kopyalama yapılmadı).",
+                    addon.DisplayName));
+            }
+            else
+            {
+                CopyListedFiles(addon, cacheDir, staging);
+                _log(SyncText.T("{0}: oyuna kopyalandı (bağlantı kurulamadı).", addon.DisplayName));
+            }
+
+            // Eski DLC klasörünü silme; başarısızlıkta geri getirmek için yanına taşı.
+            if (Directory.Exists(target))
+            {
+                try
+                {
+                    Directory.Move(target, backup);
+                }
+                catch (Exception ex)
+                {
+                    throw new SyncException(SyncText.T(
+                        "DLC paketi güncellenemedi: eski klasör taşınamadı ({0}).", mountFolder), ex);
+                }
+            }
+
+            try
+            {
+                Directory.Move(staging, target);
+            }
+            catch (Exception ex)
+            {
+                RestoreDlcBackup(backup, target);
+                throw new SyncException(SyncText.T(
+                    "DLC paketi güncellenemedi: yeni klasör yerleştirilemedi ({0}).", mountFolder), ex);
+            }
+
+            var entry = DlclistEntryFor(addon);
+            try
+            {
+                AddDlclistEntry(entry);
+            }
+            catch
+            {
+                // dlclist yazılamadıysa yeni klasörü kaldır, eski sürümü geri getir.
+                if (Directory.Exists(target)) DeleteDirectoryWithRetry(target, _log);
+                RestoreDlcBackup(backup, target);
+                throw;
+            }
+
+            // Başarılı: eski sürüm yedeğini temizle. Silinemezse klasör kalabilir;
+            // dlclist'te karşılığı olmadığı için oyun tarafından yüklenmez.
+            if (Directory.Exists(backup))
+            {
+                try { DeleteDirectoryWithRetry(backup, _log); }
+                catch (Exception ex)
+                {
+                    _log(SyncText.T("UYARI: eski DLC yedeği silinemedi: {0}", ex.Message));
+                }
+            }
+
+            return new InstalledAddon
+            {
+                Id = addon.Id,
+                Type = addon.Type,
+                Version = version,
+                MountFolder = mountFolder,
+                DlclistEntry = entry,
+                LinkTarget = linkTarget,
+                InstalledPaths = { Path.GetRelativePath(_gameFolder, target).Replace('\\', '/') }
+            };
         }
-        else
+        catch
         {
-            CopyListedFiles(addon, cacheDir, target);
-            _log($"{addon.DisplayName}: oyuna kopyalandı (bağlantı kurulamadı).");
+            if (Directory.Exists(staging)) DeleteDirectoryWithRetry(staging, _log);
+            throw;
         }
+    }
 
-        var entry = mountFolder +
-            (string.IsNullOrEmpty(addon.RelativePackPath) ? "" : "/" + addon.RelativePackPath);
-
-        AddDlclistEntry(entry);
-
-        return new InstalledAddon
+    /// <summary>
+    /// Başarılı DLC güncellemesinden sonra eski sürümün önbelleğini siler.
+    /// Yalnızca sunucu önbellek kökü altındaki, yeni önbelleğin üstü olmayan
+    /// ve artık .gtacoop-old yedeği tarafından kullanılmayan klasörler silinir.
+    /// </summary>
+    private void CleanupOldDlcCache(InstalledAddon old, string newCacheDir)
+    {
+        try
         {
-            Id = addon.Id,
-            Type = addon.Type,
-            Version = version,
-            MountFolder = mountFolder,
-            DlclistEntry = entry,
-            LinkTarget = linkTarget,
-            InstalledPaths = { Path.GetRelativePath(_gameFolder, target).Replace('\\', '/') }
-        };
+            if (string.IsNullOrWhiteSpace(old.LinkTarget) ||
+                string.IsNullOrWhiteSpace(old.MountFolder))
+                return;
+
+            var oldCache = Path.GetFullPath(old.LinkTarget);
+            var newCache = Path.GetFullPath(newCacheDir);
+            if (string.Equals(oldCache, newCache, StringComparison.OrdinalIgnoreCase))
+                return;
+
+            var cacheRoot = Path.GetDirectoryName(newCache);
+            if (string.IsNullOrWhiteSpace(cacheRoot)) return;
+            var rootPrefix = cacheRoot.TrimEnd('\\', '/') + Path.DirectorySeparatorChar;
+            if (!oldCache.StartsWith(rootPrefix, StringComparison.OrdinalIgnoreCase))
+                return;
+
+            // Yalnızca bu eklentiye ait önbellek klasörünü temizle.
+            // Ad tam eşleşmeli (eski biçim) veya "<id>__<sürüm>" olmalı;
+            // böylece "testdlc_other" gibi başka bir eklentinin önbelleği silinmez.
+            var oldName = Path.GetFileName(oldCache);
+            var cacheKey = Safe(old.Id);
+            if (!string.Equals(oldName, cacheKey, StringComparison.OrdinalIgnoreCase) &&
+                !oldName.StartsWith(cacheKey + "__", StringComparison.OrdinalIgnoreCase))
+                return;
+
+            // Eski önbellek yeni önbelleğin üst klasörüyse silme.
+            var oldPrefix = oldCache.TrimEnd('\\', '/') + Path.DirectorySeparatorChar;
+            if (newCache.StartsWith(oldPrefix, StringComparison.OrdinalIgnoreCase))
+                return;
+
+            // .gtacoop-old hâlâ eski önbelleğe işaret ediyorsa koru.
+            var backup = Path.Combine(_gameFolder, "mods", "update", "x64",
+                "dlcpacks", old.MountFolder + ".gtacoop-old");
+            if (Directory.Exists(backup)) return;
+
+            if (!Directory.Exists(oldCache)) return;
+            DeleteDirectoryWithRetry(oldCache, _log);
+            if (!Directory.Exists(oldCache))
+                _log(SyncText.T("Eski DLC önbelleği temizlendi: {0}", old.MountFolder));
+        }
+        catch (Exception ex)
+        {
+            _log(SyncText.T("UYARI: eski DLC önbelleği temizlenemedi: {0}", ex.Message));
+        }
+    }
+
+    /// <summary>DLC güncellemesi başarısızsa eski klasörü hedefe geri taşır.</summary>
+    private void RestoreDlcBackup(string backup, string target)
+    {
+        if (!Directory.Exists(backup)) return;
+        try
+        {
+            if (Directory.Exists(target)) DeleteDirectoryWithRetry(target, _log);
+            Directory.Move(backup, target);
+            _log(SyncText.T("DLC: önceki sürüm geri getirildi."));
+        }
+        catch (Exception ex)
+        {
+            _log(SyncText.T("UYARI: önceki DLC sürümü geri getirilemedi: {0}", ex.Message));
+        }
     }
 
     /// <summary>NTFS junction oluşturur (mklink /J). Başarılıysa true döner.</summary>
@@ -476,8 +769,17 @@ public sealed class AddonApplier
         {
             case AddonType.DlcPack:
             {
-                if (!string.IsNullOrEmpty(inst.DlclistEntry))
-                    TryRemoveDlclistEntry(inst.DlclistEntry);
+                // dlclist girdisi kaldırılamadıysa klasörü SİLME/TAŞIMA: aksi hâlde
+                // oyun var olmayan bir DLC paketini yüklemeye çalışıp hata verebilir.
+                bool dlclistOk = string.IsNullOrEmpty(inst.DlclistEntry) ||
+                                 TryRemoveDlclistEntry(inst.DlclistEntry);
+                if (!dlclistOk)
+                {
+                    _log(SyncText.T(
+                        "UYARI: dlclist girdisi kaldırılamadı; DLC klasörü korundu: {0}",
+                        inst.MountFolder));
+                    break;
+                }
 
                 var relDir = Path.Combine("mods", "update", "x64", "dlcpacks", inst.MountFolder);
                 var dir = Path.Combine(_gameFolder, relDir);
@@ -700,102 +1002,193 @@ public sealed class AddonApplier
     private string UpdateRpfPath => Path.Combine(_gameFolder, "mods", "update", "update.rpf");
 
     /// <summary>
-    /// update.rpf düzenlemeye uygun mu? Değilse (4 GB RPF7 sınırına yakın veya bozuk)
-    /// en yeni sağlıklı yedekten otomatik geri yükler. Böylece GTACoop şişmiş/bozuk bir
-    /// arşivi asla düzenlemez ve OpenIV'nin yeni dosya ekleme yeteneği korunur.
+    /// update.rpf düzenlemeye uygun mu? Otomatik geri yükleme YAPMAZ: kullanıcının
+    /// mevcut modlarını eski bir yedekle ezmek riskli olabilir. Büyük ama yapısal
+    /// olarak sağlıklı arşivlerde yalnızca yerinde yazmaya izin verir; bozuk arşivde
+    /// net bir hata verir ve dosyaya hiç dokunmaz. Onarım kullanıcıya bırakılır
+    /// (Launcher > Yedekler).
     /// </summary>
     private void EnsureUpdateRpfUsable()
     {
         if (!File.Exists(UpdateRpfPath))
-            throw new SyncException(
-                "mods/update/update.rpf bulunamadı. DLC paketleri için OpenIV ile mods klasörü oluşturulmalı.");
+            throw new SyncException(SyncText.T(
+                "mods/update/update.rpf bulunamadı. DLC paketleri için OpenIV ile mods klasörü oluşturulmalı."));
 
         if (BackupService.IsUpdateRpfHealthy(UpdateRpfPath, out var reason))
             return;
 
-        _log($"UYARI: update.rpf düzenlemeye uygun değil: {reason}");
+        // 4 GB'a yakın olsa bile yapısal olarak sağlıklıysa yalnızca yerinde
+        // yazma denenecek. ReplaceFile(requireInPlace: true) sığmazsa hata verir.
+        if (BackupService.IsUpdateRpfStructurallyHealthy(UpdateRpfPath, out _) &&
+            new FileInfo(UpdateRpfPath).Length > BackupService.MaxEditableUpdateRpfBytes)
+        {
+            _log(SyncText.T("UYARI: update.rpf büyük; yalnızca yerinde dlclist düzenlemesi denenecek."));
+            return;
+        }
 
-        var backup = BackupService.FindNewestHealthyBackup(_gameFolder, _log);
-        if (backup == null)
-            throw new SyncException(
-                "update.rpf sağlıksız/çok büyük ve sağlıklı yedek bulunamadı. " +
-                "OpenIV ile mods klasörünü onarın veya Launcher > Yedekler bölümünden geri dönün.");
-
-        _log($"Otomatik onarım: {Path.GetFileName(backup)} geri yükleniyor...");
-        BackupService.RestoreUpdateRpf(_gameFolder, backup, _log);
-
-        if (!BackupService.IsUpdateRpfHealthy(UpdateRpfPath, out var after))
-            throw new SyncException("update.rpf otomatik onarımı başarısız: " + after);
-
-        _log("update.rpf onarıldı; işleme devam ediliyor.");
+        _log(SyncText.T("UYARI: update.rpf düzenlemeye uygun değil: {0}",
+            SyncText.Translate(reason)));
+        throw new SyncException(SyncText.T(
+            "update.rpf sağlıksız/çok büyük; otomatik geri yükleme yapılmadı. " +
+            "OpenIV ile mods klasörünü onarın veya Launcher > Yedekler bölümünden geri dönün."));
     }
 
     public void AddDlclistEntry(string entry)
     {
         if (IsGameRunning())
-            throw new SyncException("GTA V açıkken dlclist düzenlenemez. Lütfen oyunu kapatın.");
+            throw new SyncException(SyncText.T("GTA V açıkken dlclist düzenlenemez. Lütfen oyunu kapatın."));
         if (!File.Exists(UpdateRpfPath))
-            throw new SyncException(
-                "mods/update/update.rpf bulunamadı. DLC paketleri için OpenIV ile mods klasörü oluşturulmalı.");
+            throw new SyncException(SyncText.T(
+                "mods/update/update.rpf bulunamadı. DLC paketleri için OpenIV ile mods klasörü oluşturulmalı."));
+
+        // Girdi zaten varsa update.rpf'ye yazma gerekmez. Bu sayede büyük/bozuk
+        // arşivlerde bile yalnızca DLC dosyaları güncellenebilir; arşive dokunulmaz.
+        // Okunamıyorsa (null) normal akışa devam edilir; EnsureUpdateRpfUsable
+        // net bir hata verir.
+        if (DlclistEntryExists(entry) == true)
+        {
+            _log(SyncText.T("dlclist: '{0}' zaten kayıtlı, değişiklik yok.", entry));
+            return;
+        }
 
         EnsureUpdateRpfUsable();
         BackupService.EnsureUpdateRpfBackup(_gameFolder, _log);
+        bool large = new FileInfo(UpdateRpfPath).Length > BackupService.MaxEditableUpdateRpfBytes;
 
         lock (_rpfLock)
         {
             using var archive = RpfArchive.Open(UpdateRpfPath);
             var file = archive.Find(Dlclist.RelativePath)
-                ?? throw new SyncException("update.rpf içinde dlclist.xml bulunamadı.");
+                ?? throw new SyncException(SyncText.T("update.rpf içinde dlclist.xml bulunamadı."));
 
-            var (xml, enc) = Dlclist.Decode(archive.ReadFile(file));
+            var oldBytes = archive.ReadFile(file);
+            var (xml, enc) = Dlclist.Decode(oldBytes);
             var existing = Dlclist.GetPackNames(xml);
             if (existing.Contains(entry, StringComparer.OrdinalIgnoreCase))
             {
-                _log($"dlclist: '{entry}' zaten kayıtlı, değişiklik yok.");
+                _log(SyncText.T("dlclist: '{0}' zaten kayıtlı, değişiklik yok.", entry));
                 return;
             }
 
+            if (large)
+                BackupService.BackupDlclist(_gameFolder, oldBytes, _log);
+
             var updated = Dlclist.AddPackNames(xml, new[] { entry });
             ValidateXml(updated);
-            ReplaceDlclist(archive, file, updated, enc);
-            _log($"dlclist: eklendi -> {entry}");
+            try
+            {
+                ReplaceDlclist(archive, file, updated, enc, requireInPlace: large);
+            }
+            catch (Exception ex) when (large)
+            {
+                TryRollbackDlclist(archive, file, xml, enc);
+                throw new SyncException(SyncText.T(
+                    "update.rpf çok büyük ve dlclist.xml yerinde güncellenemedi; " +
+                    "mevcut dosya korundu."), ex);
+            }
+
+            _log(SyncText.T("dlclist: eklendi -> {0}", entry));
         }
     }
 
     public void RemoveDlclistEntry(string entry)
     {
         if (IsGameRunning())
-            throw new SyncException("GTA V açıkken dlclist düzenlenemez. Lütfen oyunu kapatın.");
+            throw new SyncException(SyncText.T("GTA V açıkken dlclist düzenlenemez. Lütfen oyunu kapatın."));
         if (!File.Exists(UpdateRpfPath))
-            throw new SyncException(
-                "mods/update/update.rpf bulunamadı. dlclist girdisi çıkarılamıyor.");
+            throw new SyncException(SyncText.T(
+                "mods/update/update.rpf bulunamadı. dlclist girdisi çıkarılamıyor."));
 
+        var exists = DlclistEntryExists(entry);
+        if (exists == false)
+        {
+            _log(SyncText.T("dlclist: '{0}' kayıtlı değil, değişiklik yok.", entry));
+            return;
+        }
+
+        // exists == null: arşiv okunamadı. EnsureUpdateRpfUsable net hata verir;
+        // böylece çağıran DLC klasörünü yanlışlıkla silmez.
         EnsureUpdateRpfUsable();
         BackupService.EnsureUpdateRpfBackup(_gameFolder, _log);
+        bool large = new FileInfo(UpdateRpfPath).Length > BackupService.MaxEditableUpdateRpfBytes;
 
         lock (_rpfLock)
         {
             using var archive = RpfArchive.Open(UpdateRpfPath);
             var file = archive.Find(Dlclist.RelativePath)
-                ?? throw new SyncException("update.rpf içinde dlclist.xml bulunamadı.");
+                ?? throw new SyncException(SyncText.T("update.rpf içinde dlclist.xml bulunamadı."));
 
-            var (xml, enc) = Dlclist.Decode(archive.ReadFile(file));
+            var oldBytes = archive.ReadFile(file);
+            var (xml, enc) = Dlclist.Decode(oldBytes);
             var updated = Dlclist.RemovePackNames(xml, new[] { entry });
             ValidateXml(updated);
-            ReplaceDlclist(archive, file, updated, enc);
-            _log($"dlclist: çıkarıldı -> {entry}");
+
+            if (large)
+                BackupService.BackupDlclist(_gameFolder, oldBytes, _log);
+
+            try
+            {
+                ReplaceDlclist(archive, file, updated, enc, requireInPlace: large);
+            }
+            catch (Exception ex) when (large)
+            {
+                TryRollbackDlclist(archive, file, xml, enc);
+                throw new SyncException(SyncText.T(
+                    "update.rpf çok büyük ve dlclist.xml yerinde güncellenemedi; " +
+                    "mevcut dosya korundu."), ex);
+            }
+
+            _log(SyncText.T("dlclist: çıkarıldı -> {0}", entry));
         }
     }
 
-    private void TryRemoveDlclistEntry(string entry)
+    /// <summary>
+    /// dlclist'te girdi var mı? true/false; arşiv okunamıyorsa null döner.
+    /// Çağıran null durumunda EnsureUpdateRpfUsable ile net hata üretmelidir.
+    /// </summary>
+    private bool? DlclistEntryExists(string entry)
+    {
+        try
+        {
+            using var archive = RpfArchive.Open(UpdateRpfPath);
+            var file = archive.Find(Dlclist.RelativePath);
+            if (file == null) return false;
+            var (xml, _) = Dlclist.Decode(archive.ReadFile(file));
+            return Dlclist.GetPackNames(xml).Contains(entry, StringComparer.OrdinalIgnoreCase);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>Yerinde yazma başarısız olursa eski dlclist içeriğini geri yazmayı dener.</summary>
+    private void TryRollbackDlclist(RpfArchive archive, RpfFileEntry file, string oldXml,
+        Dlclist.DlclistEncoding enc)
+    {
+        try
+        {
+            ReplaceDlclist(archive, file, oldXml, enc, requireInPlace: true);
+            _log(SyncText.T("dlclist: önceki içerik geri yazıldı."));
+        }
+        catch (Exception ex)
+        {
+            _log(SyncText.T("UYARI: dlclist geri alınamadı: {0}", ex.Message));
+        }
+    }
+
+    private bool TryRemoveDlclistEntry(string entry)
     {
         try
         {
             RemoveDlclistEntry(entry);
+            return true;
         }
         catch (Exception ex)
         {
-            _log($"UYARI: dlclist girdisi çıkarılamadı ({entry}): {ex.Message}");
+            _log(SyncText.T("UYARI: dlclist girdisi çıkarılamadı ({0}): {1}",
+                entry, ex.Message));
+            return false;
         }
     }
 
@@ -816,63 +1209,109 @@ public sealed class AddonApplier
     /// Beyan "utf-16" iken dosya UTF-8 kalmışsa UTF-16'ya normalleştirir; OpenIV'in
     /// XML düzenleyicisi bu uyumsuzlukta dosyayı düzenleyemeyebiliyor.
     /// </summary>
-    private void ReplaceDlclist(RpfArchive archive, RpfFileEntry file, string updated, Dlclist.DlclistEncoding enc)
+    private void ReplaceDlclist(RpfArchive archive, RpfFileEntry file, string updated,
+        Dlclist.DlclistEncoding enc, bool requireInPlace = false)
     {
         var writeEnc = Dlclist.Normalize(updated, enc);
         if (writeEnc != enc)
-            _log("dlclist: kodlama beyana uygun UTF-16'ya düzeltildi (OpenIV uyumu).");
-        archive.ReplaceFile(file, Dlclist.Encode(updated, writeEnc));
+            _log(SyncText.T("dlclist: kodlama beyana uygun UTF-16'ya düzeltildi (OpenIV uyumu)."));
+        archive.ReplaceFile(file, Dlclist.Encode(updated, writeEnc),
+            requireInPlace: requireInPlace);
     }
 
     /// <summary>dlclist'te gcs_ ile başlayan sahipsiz girdileri ve klasörleri temizler.</summary>
     public void PruneOrphanMounts()
     {
         var dlcpacksRoot = Path.Combine(_gameFolder, "mods", "update", "x64", "dlcpacks");
+        bool dlclistCleanupOk = true;
 
-        // 1) gcs_ klasörlerini sil
-        if (Directory.Exists(dlcpacksRoot))
-        {
-            foreach (var dir in Directory.GetDirectories(dlcpacksRoot, "gcs_*"))
-            {
-                _log($"Temizleniyor: {Path.GetFileName(dir)}");
-                DeleteDirectoryWithRetry(dir, _log);
-            }
-        }
-
-        // 2) dlclist'ten gcs_ girdilerini çıkar
+        // ÖNCE dlclist girdilerini temizle. Bu başarısız olursa gcs_ klasörlerini
+        // ASLA silmeyiz: aksi hâlde oyun var olmayan DLC paketlerini yüklemeye
+        // çalışıp hata verebilir. update.rpf yoksa klasörler zaten yüklenemez.
         try
         {
-            if (IsGameRunning()) throw new SyncException("GTA V açık; atlandı.");
-            EnsureUpdateRpfUsable();
+            if (IsGameRunning())
+                throw new SyncException(SyncText.T("GTA V açık; atlandı."));
 
-            lock (_rpfLock)
+            if (File.Exists(UpdateRpfPath))
             {
-                using var archive = RpfArchive.Open(UpdateRpfPath);
-                var file = archive.Find(Dlclist.RelativePath);
-                if (file == null) return;
+                EnsureUpdateRpfUsable();
 
-                var (xml, enc) = Dlclist.Decode(archive.ReadFile(file));
-                var orphans = Dlclist.GetPackNames(xml)
-                    .Where(n => n.StartsWith("gcs_", StringComparison.OrdinalIgnoreCase) ||
-                                n.Contains("/gcs_", StringComparison.OrdinalIgnoreCase))
-                    .ToList();
-
-                if (orphans.Count == 0)
+                lock (_rpfLock)
                 {
-                    _log("dlclist: temizlenecek gcs_ girdisi yok.");
-                    return;
-                }
+                    using var archive = RpfArchive.Open(UpdateRpfPath);
+                    var file = archive.Find(Dlclist.RelativePath);
+                    if (file == null)
+                        throw new SyncException(SyncText.T("update.rpf içinde dlclist.xml bulunamadı."));
 
-                BackupService.EnsureUpdateRpfBackup(_gameFolder, _log);
-                var updated = Dlclist.RemovePackNames(xml, orphans);
-                ValidateXml(updated);
-                ReplaceDlclist(archive, file, updated, enc);
-                _log($"dlclist: {orphans.Count} gcs_ girdisi temizlendi.");
+                    var (xml, enc) = Dlclist.Decode(archive.ReadFile(file));
+                    var orphans = Dlclist.GetPackNames(xml)
+                        .Where(n => n.StartsWith("gcs_", StringComparison.OrdinalIgnoreCase) ||
+                                    n.Contains("/gcs_", StringComparison.OrdinalIgnoreCase))
+                        .ToList();
+
+                    if (orphans.Count == 0)
+                    {
+                        _log(SyncText.T("dlclist: temizlenecek gcs_ girdisi yok."));
+                    }
+                    else
+                    {
+                        BackupService.EnsureUpdateRpfBackup(_gameFolder, _log);
+                        var oldBytes = archive.ReadFile(file);
+                        bool large = new FileInfo(UpdateRpfPath).Length >
+                                     BackupService.MaxEditableUpdateRpfBytes;
+                        if (large)
+                            BackupService.BackupDlclist(_gameFolder, oldBytes, _log);
+                        var updated = Dlclist.RemovePackNames(xml, orphans);
+                        ValidateXml(updated);
+                        try
+                        {
+                            ReplaceDlclist(archive, file, updated, enc, requireInPlace: large);
+                        }
+                        catch when (large)
+                        {
+                            TryRollbackDlclist(archive, file, xml, enc);
+                            throw;
+                        }
+                        _log(SyncText.T("dlclist: {0} gcs_ girdisi temizlendi.", orphans.Count));
+                    }
+                }
             }
         }
         catch (Exception ex)
         {
-            _log("dlclist temizliği atlandı: " + ex.Message);
+            dlclistCleanupOk = false;
+            _log(SyncText.T("dlclist temizliği atlandı: {0}", ex.Message));
+        }
+
+        if (!dlclistCleanupOk)
+        {
+            _log(SyncText.T(
+                "UYARI: dlclist temizlenemedi; gcs_ klasörleri korundu."));
+            return;
+        }
+
+        // dlclist temizliği başarılıysa artık gcs_ klasörlerini silebiliriz.
+        if (Directory.Exists(dlcpacksRoot))
+        {
+            foreach (var dir in Directory.GetDirectories(dlcpacksRoot, "gcs_*"))
+            {
+                var name = Path.GetFileName(dir);
+                // Başarısız bir DLC güncellemesinden kalan eski sürüm yedeği,
+                // hedef klasör yoksa silinmez; böylece kullanıcının paketi kaybolmaz.
+                if (name.EndsWith(".gtacoop-old", StringComparison.OrdinalIgnoreCase))
+                {
+                    var target = dir[..^".gtacoop-old".Length];
+                    if (!Directory.Exists(target))
+                    {
+                        _log(SyncText.T("UYARI: eski DLC yedeği korunuyor: {0}", name));
+                        continue;
+                    }
+                }
+
+                _log(SyncText.T("Temizleniyor: {0}", name));
+                DeleteDirectoryWithRetry(dir, _log);
+            }
         }
     }
 

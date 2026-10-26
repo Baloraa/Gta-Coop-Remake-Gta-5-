@@ -1,5 +1,5 @@
 ==========================================================
- GTACoop Remake - Friend Edition (English, v2.2.2)
+ GTACoop Remake - Friend Edition (English, v2.2.3)
 ==========================================================
 
 This is a friend-to-friend co-op tool for GTA V (Story Mode).
@@ -85,6 +85,12 @@ IMPORTANT NOTES
 - If you use a short code/automatic relay, keep GTACoop.Launcher
   open while playing; the relay carries game traffic through the
   launcher. You can close it after exiting the game.
+- The host must fully enter the game before friends can join;
+  the GTACoOp session becomes active once the host is in game.
+- If mods\update\update.rpf is near 3.9 GB or structurally damaged,
+  DLC packs are skipped for safety and your file is not modified.
+  Script/ASI mods still install. Use Launcher > Backups to repair
+  update.rpf if needed.
 - Hosting your own server additionally requires .NET 10.
 
 ------------------------------------------------------------------

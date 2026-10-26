@@ -69,7 +69,7 @@ public sealed class LogTab : UserControl
             _log.AppendText(T("... (günlük kısaltıldı) ...") + Environment.NewLine);
         }
 
-        _log.AppendText(line + Environment.NewLine);
+        _log.AppendText(SyncText.Translate(line) + Environment.NewLine);
         _log.SelectionStart = _log.TextLength;
         _log.ScrollToCaret();
     }

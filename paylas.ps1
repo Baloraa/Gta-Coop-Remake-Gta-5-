@@ -1,6 +1,7 @@
 ﻿# =============================================================================
 #  GTACoop Remake - Paylaşım Paketi Oluştur
-#  dist\GTACoopRemake + arkadaş okubeni (TR/EN) + lisans -> dist\GTACoop-Remake-Share.zip
+#  dist\GTACoopRemake + arkadaş okubeni (TR/EN) + lisans
+#  -> dist\GTACoop-Remake-Share-<sürüm>.zip (+ en son sürümün kopyası)
 #  Kullanım:  powershell -ExecutionPolicy Bypass -File paylas.ps1
 #  (Önce build.ps1 ile dist üretilmiş olmalı.)
 # =============================================================================
@@ -9,7 +10,15 @@ $ErrorActionPreference = 'Stop'
 
 $root  = Split-Path -Parent $MyInvocation.MyCommand.Path
 $dist  = Join-Path $root 'dist\GTACoopRemake'
-$zip   = Join-Path $root 'dist\GTACoop-Remake-Share.zip'
+$csproj = Join-Path $root 'src\GTACoop.Launcher\GTACoop.Launcher.csproj'
+$version = ([xml](Get-Content $csproj -Raw)).Project.PropertyGroup |
+    ForEach-Object { $_.Version } |
+    Where-Object { $_ } |
+    Select-Object -First 1
+if ([string]::IsNullOrWhiteSpace($version)) { $version = 'dev' }
+$version = ([string]$version).Trim()
+$zip   = Join-Path $root "dist\GTACoop-Remake-Share-$version.zip"
+$latestZip = Join-Path $root 'dist\GTACoop-Remake-Share.zip'
 $oldZip = Join-Path $root 'dist\GTACoop-Remake-Paylas.zip'
 $okubeni = Join-Path $root 'ARKADAS-OKUBENI.txt'
 $katil   = Join-Path $root 'KODLA-KATIL.txt'
@@ -57,13 +66,19 @@ if (Test-Path $zip) { Remove-Item $zip -Force }
 if (Test-Path $oldZip) { Remove-Item $oldZip -Force }  # eski Türkçe adlı paket
 Compress-Archive -Path (Join-Path $stage 'GTACoop-Remake') -DestinationPath $zip -CompressionLevel Optimal
 
+# Her sürüm kendi adıyla kalır; ayrıca "en son" kopyası güncellenir.
+Copy-Item $zip $latestZip -Force
+
 # --- Aşamayı temizle (sadece geçici klasör) ---
 Remove-Item $stage -Recurse -Force
 
 $mb = [math]::Round((Get-Item $zip).Length / 1MB, 1)
+$hash = (Get-FileHash $zip -Algorithm SHA256).Hash
 Write-Host ""
 Write-Host "TAMAM! Paylaşım paketi hazır:" -ForegroundColor Green
 Write-Host "  $zip  ($mb MB)"
+Write-Host "  $latestZip  (en son sürüm kopyası)"
+Write-Host "  SHA256: $hash"
 Write-Host ""
 Write-Host "Bu ZIP'i arkadaşlarınıza gönderebilirsiniz. İçinde:"
 Write-Host "  - Uygulama (GTACoop.Launcher.exe ve tüm dosyalar)"

@@ -39,6 +39,9 @@ public static class AppEnv
         Settings = SyncJson.Load<LauncherSettings>(SettingsPath) ?? new LauncherSettings();
         Settings.DataFolder = DataFolder;
 
+        // Günlük dosyası ilk satırdan itibaren seçili dilde olsun.
+        SyncText.English = string.Equals(Settings.Language, "en", StringComparison.OrdinalIgnoreCase);
+
         if (string.IsNullOrWhiteSpace(Settings.GameFolder) || !GameFolder.IsValid(Settings.GameFolder))
         {
             var detected = GameFolder.TryDetect();
@@ -142,6 +145,9 @@ public static class AppEnv
 
     public static void Log(string message)
     {
+        // Sync katmanı ve eski launcher mesajları Türkçe üretilebilir; İngilizce
+        // arayüzde günlük dosyası ve günlük sekmesi de tutarlı olsun.
+        message = SyncText.Translate(message);
         var line = $"[{DateTime.Now:HH:mm:ss}] {message}";
         try
         {

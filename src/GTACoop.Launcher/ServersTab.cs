@@ -361,8 +361,8 @@ public sealed class ServersTab : UserControl
 
                 ShowDetails(sel, mf, plan, state, viaRelay);
 
-                // Onay (indirilecek varsa)
-                if (plan.ToInstall.Count > 0)
+                // Onay (indirilecek veya güvenli kurulamayacak bir şey varsa)
+                if (plan.ToInstall.Count > 0 || plan.Blocked.Count > 0)
                 {
                     var mb = plan.ToInstall.Sum(a => a.TotalSize) / 1024.0 / 1024.0;
                     var note = AppEnv.Settings.RemoveModsOnExit
@@ -373,6 +373,14 @@ public sealed class ServersTab : UserControl
                             plan.LocalSkipped.Count,
                             string.Join(", ", plan.LocalSkipped.Take(5).Select(s => s.Addon.DisplayName)) +
                             (plan.LocalSkipped.Count > 5 ? "..." : ""));
+                    if (plan.Blocked.Count > 0)
+                    {
+                        note += T("DLC paketleri kurulamıyor (update.rpf güvenli değil) ({0}): {1}\r\n{2}\r\n\r\n",
+                            plan.Blocked.Count,
+                            string.Join(", ", plan.Blocked.Take(5).Select(s => s.Addon.DisplayName)) +
+                            (plan.Blocked.Count > 5 ? "..." : ""),
+                            plan.Blocked[0].Reason);
+                    }
                     bool go = true;
                     Invoke(() => go = Ui.Confirm(FindForm()!,
                         T("Sunucu: {0}\r\n\r\nKurulacak/güncellenecek: {1} eklenti ({2:F1} MB)\r\nKaldırılacak: {3}\r\n\r\n{4}Devam edilsin mi?",
@@ -790,16 +798,18 @@ public sealed class ServersTab : UserControl
         if (viaRelay)
             sb.AppendLine(T("Bağlantı: otomatik relay (oyun sırasında launcher açık kalmalı)."));
         sb.AppendLine(T("Kimlik : {0}", manifest.ServerId));
-        sb.AppendLine(T("Eklenti: {0}  |  kurulacak: {1}  |  güncel: {2}  |  kaldırılacak: {3}  |  sizde var: {4}",
+        sb.AppendLine(T("Eklenti: {0}  |  kurulacak: {1}  |  güncel: {2}  |  kaldırılacak: {3}  |  sizde var: {4}  |  engellendi: {5}",
             manifest.Addons.Count, plan.ToInstall.Count, plan.UpToDate.Count, plan.ToRemove.Count,
-            plan.LocalSkipped.Count));
+            plan.LocalSkipped.Count, plan.Blocked.Count));
         sb.AppendLine(new string('-', 70));
 
         foreach (var a in manifest.Addons)
         {
             string status;
+            var blocked = plan.Blocked.FirstOrDefault(s => s.Addon.Id == a.Id);
             if (a.Type == AddonType.ServerPlugin) status = T("sunucu tarafı");
             else if (plan.LocalSkipped.Any(s => s.Addon.Id == a.Id)) status = T("SİZDE VAR");
+            else if (blocked != null) status = T("ENGELLENDİ");
             else if (plan.ToInstall.Contains(a)) status = state.Addons.Any(x => x.Id == a.Id)
                 ? T("GÜNCELLENECEK")
                 : T("KURULACAK");
@@ -818,6 +828,8 @@ public sealed class ServersTab : UserControl
             sb.AppendLine($"[{status,-14}] {a.DisplayName} ({typeName}, {a.TotalSize / 1024.0 / 1024.0:F1} MB)");
             if (!string.IsNullOrEmpty(a.Description))
                 sb.AppendLine($"                 {a.Description}");
+            if (blocked != null)
+                sb.AppendLine($"                 {T("Neden")}: {blocked.Reason}");
         }
 
         if (plan.ToRemove.Count > 0)
@@ -853,7 +865,7 @@ public sealed class ServersTab : UserControl
     private void SetStatus(string text, Color color)
     {
         if (InvokeRequired) { BeginInvoke(() => SetStatus(text, color)); return; }
-        _status.Text = text;
+        _status.Text = SyncText.Translate(text);
         _status.ForeColor = color;
     }
 
