@@ -126,6 +126,8 @@ public static class ClientSettingsEditor
             new XElement("MasterServerAddress", "https://master.gtacoop.com"),
             new XElement("BackupMasterServerAddress", ""),
             new XElement("ActivationKey", "F9"),
+            new XElement("VoiceEnabled", "true"),
+            new XElement("VoiceKey", "N"),
             new XElement("HidePasswords", "false"),
             new XElement("AutoConnect", "true"),
             new XElement("AutoReconnect", "true"),

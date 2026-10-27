@@ -1,5 +1,5 @@
 ==========================================================
- GTACoop Remake - Arkadaş Sürümü (Türkçe, v2.2.6)
+ GTACoop Remake - Arkadaş Sürümü (Türkçe, v2.2.7)
 ==========================================================
 
 Bu bir GTA V (Hikaye Modu) arkadaş-arası co-op aracıdır.
@@ -62,6 +62,7 @@ KURULUM
    - F9  : GTA Coop menüsü
    - T   : sohbet
    - Z   : oyuncu listesi
+   - N   : sesli sohbet (bas-konuş; F9 > Ayarlar'dan değiştirilebilir)
    - İlk girişte sohbetten:  /register sıfre
      (sonraki girişlerde:    /login sıfre)
 
@@ -69,6 +70,12 @@ KURULUM
 ÖNEMLİ NOTLAR
 ------------------------------------------------------------------
 - Bu araç GTA Online'a dokunmaz; yalnızca Hikaye Modu'nda çalışır.
+- Sesli sohbette konuşurken adınızın solunda [MIC] görünür.
+  Sesli sohbet tuşunu F9 > Ayarlar > Voice Chat Key'den değiştirin.
+- Hikaye görevleri: F9 > Story Mission Co-op (Host-led). Host görevi
+  Pause > Game > Replay Mission'dan başlatır; arkadaşlar yardımcı olur.
+  Görev hedefleri/cutscene'ler host'a aittir, kayıt dosyası yazılmaz.
+  Aynı kayıt dosyasına sahip olmanız gerekmez.
 - KENDİ modlarınıza asla dokunulmaz. Sunucudaki bir mod sizde
   zaten varsa o mod atlanır: indirilmez, üzerine yazılmaz.
 - Sunucu modları yalnızca siz oynarken kuruludur; oyundan

@@ -16,3 +16,6 @@ desktop.ini
 # Geçici
 *.tmp
 *.bak
+
+# Yerel derleme referansı (GTA V'den kopyalanır; paylaşılmaz)
+vendor/Build/

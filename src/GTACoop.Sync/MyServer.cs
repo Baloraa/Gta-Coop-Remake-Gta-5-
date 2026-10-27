@@ -46,10 +46,14 @@ public sealed class MyServerSettings
 /// </summary>
 public sealed class MyServer : IDisposable
 {
+    public const string BundledBridgePlugin = "GTACoop.Remake.Plugin.dll";
+
     private readonly string _serverDir;
     private Process? _gameServer;
     private Process? _syncServer;
     private readonly Action<string> _log;
+
+    private string BridgeRemovedMarker => Path.Combine(_serverDir, ".gtacoop-remake-bridge-removed");
 
     public MyServer(string serverDir, Action<string>? log = null)
     {
@@ -85,6 +89,42 @@ public sealed class MyServer : IDisposable
         ServerScanner.EnsureLayout(AddonsDir);
         Directory.CreateDirectory(PluginsDir);
         Directory.CreateDirectory(ConfigDir);
+
+        EnsureBundledPlugins();
+    }
+
+    /// <summary>
+    /// Copies the GTACoop Remake bridge plugin into the server's Plugins folder.
+    /// Existing servers are upgraded in place. If the user explicitly removed
+    /// the bridge from Sunucum &gt; Sunucu Modları, the marker prevents it from
+    /// silently coming back.
+    /// </summary>
+    private void EnsureBundledPlugins()
+    {
+        try
+        {
+            if (File.Exists(BridgeRemovedMarker)) return;
+
+            var source = Path.Combine(Distribution.ServerTemplate, "Plugins", BundledBridgePlugin);
+            if (!File.Exists(source)) return;
+
+            var target = Path.Combine(PluginsDir, BundledBridgePlugin);
+            if (File.Exists(target))
+            {
+                var oldBytes = File.ReadAllBytes(target);
+                var newBytes = File.ReadAllBytes(source);
+                if (oldBytes.Length == newBytes.Length &&
+                    oldBytes.AsSpan().SequenceEqual(newBytes))
+                    return;
+            }
+
+            File.Copy(source, target, overwrite: true);
+            _log($"Sunucu köprü eklentisi kuruldu: {BundledBridgePlugin}");
+        }
+        catch (Exception ex)
+        {
+            _log($"Sunucu köprü eklentisi kurulamadı: {ex.Message}");
+        }
     }
 
     /// <summary>Sunucu kimliğini okur/oluşturur (Addons\.gtacoop-server.json).</summary>

@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Small bridge plugin for gtaserver.core.
+    It relays GTACoop Remake voice-state and host-led story mission events between clients.
+    The server already supports the PluginMessage packet type and plugin API.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <AssemblyName>GTACoop.Remake.Plugin</AssemblyName>
+    <RootNamespace>GTACoop.Remake.Plugin</RootNamespace>
+    <Version>1.0.0</Version>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0.0</FileVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="gtaserver.core">
+      <HintPath>..\..\vendor\Distribution\Server\gtaserver.core.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Lidgren.Network.MultiTarget">
+      <HintPath>..\..\vendor\Distribution\Server\Lidgren.Network.MultiTarget.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+</Project>

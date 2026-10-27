@@ -1,0 +1,62 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    GTACoOp client fork used by GTACoop Remake.
+    Upstream: https://github.com/oldnapalm/GTACoop (GPL-3.0).
+    Build target: .NET Framework 4.8 / ScriptHookVDotNet 3.
+    The resulting GTACoOp.dll is copied to vendor/Distribution/Scripts by build.ps1.
+  -->
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <AssemblyName>GTACoOp</AssemblyName>
+    <RootNamespace>GTACoOp</RootNamespace>
+    <LangVersion>latest</LangVersion>
+    <PlatformTarget>x64</PlatformTarget>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <AppendTargetFrameworkToOutputPath>true</AppendTargetFrameworkToOutputPath>
+    <DefineConstants>TRACE;VOICE</DefineConstants>
+    <NoWarn>$(NoWarn);CS0618;CS0619;CS0169;CS0649;CS0414</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="ScriptHookVDotNet3">
+      <HintPath>..\..\vendor\Build\ScriptHookVDotNet3.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="LemonUI.SHVDN3">
+      <HintPath>..\..\vendor\Distribution\Scripts\LemonUI.SHVDN3.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Lidgren.Network.MultiTarget">
+      <HintPath>..\..\vendor\Distribution\Scripts\Lidgren.Network.MultiTarget.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="MaxMind.Db">
+      <HintPath>..\..\vendor\Distribution\Scripts\MaxMind.Db.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="MaxMind.GeoIP2">
+      <HintPath>..\..\vendor\Distribution\Scripts\MaxMind.GeoIP2.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="NAudio">
+      <HintPath>..\..\vendor\Distribution\Scripts\NAudio.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Newtonsoft.Json">
+      <HintPath>..\..\vendor\Distribution\Scripts\Newtonsoft.Json.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="protobuf-net">
+      <HintPath>..\..\vendor\Distribution\Scripts\protobuf-net.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Xml" />
+    <Reference Include="System.Net.Http" />
+  </ItemGroup>
+
+</Project>

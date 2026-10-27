@@ -1,5 +1,5 @@
 ==========================================================
- GTACoop Remake - Sunucuya Katılma (v2.2.6)
+ GTACoop Remake - Sunucuya Katılma (v2.2.7)
 ==========================================================
 
 Sunucuya katılmanın iki yolu var:
@@ -93,7 +93,7 @@ ARKADAŞ (katılan)
       /register şifren
    Sonraki girişlerde:
       /login şifren
-   Oyuncu listesi: Z tuşu. GTA Coop menüsü: F9.
+   Oyuncu listesi: Z tuşu. GTA Coop menüsü: F9. Sesli sohbet: N (F9 > Ayarlar'dan değiştirilebilir).
 
 Kod olmadan da oynanabilir: "Sunucu Ekle..." ile IP ve portları
 elle girme yöntemi aynen duruyor (port yönlendirme/Radmin gerekir).

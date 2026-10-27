@@ -1,5 +1,5 @@
 ==========================================================
- GTACoop Remake - Friend Edition (English, v2.2.6)
+ GTACoop Remake - Friend Edition (English, v2.2.7)
 ==========================================================
 
 This is a friend-to-friend co-op tool for GTA V (Story Mode).
@@ -60,6 +60,7 @@ INSTALLATION
    - F9  : GTA Coop menu
    - T   : chat
    - Z   : player list
+   - N   : voice chat (push-to-talk; change it in F9 > Settings)
    - On first join, type in chat:   /register password
      (later sessions:               /login password)
 
@@ -67,6 +68,12 @@ INSTALLATION
 IMPORTANT NOTES
 ------------------------------------------------------------------
 - This tool does not touch GTA Online; it works in Story Mode only.
+- While talking, [MIC] appears to the left of your name. Change the
+  push-to-talk key in F9 > Settings > Voice Chat Key.
+- Story missions: F9 > Story Mission Co-op (Host-led). The host starts
+  the real mission from Pause > Game > Replay Mission; friends help in
+  the same world. Objectives/cutscenes are host-only, no save data is
+  written, and identical save files are not required.
 - YOUR OWN mods are never touched. If a server mod already exists
   on your PC, it is skipped: not downloaded, not overwritten.
 - Server mods are installed only while you play; they are removed

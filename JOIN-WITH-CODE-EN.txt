@@ -1,5 +1,5 @@
 ==========================================================
- GTACoop Remake - Joining a Server (v2.2.6)
+ GTACoop Remake - Joining a Server (v2.2.7)
 ==========================================================
 
 There are two ways to join:
@@ -104,7 +104,7 @@ FRIEND (JOINING)
       /register password
    Later sessions:
       /login password
-   Player list: Z. GTA Coop menu: F9.
+   Player list: Z. GTA Coop menu: F9. Voice chat: N (change it in F9 > Settings).
 
 You can still play without a code: "Add Server..." and manual
 IP/port entry work as before (direct connectivity or Radmin VPN

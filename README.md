@@ -1,11 +1,13 @@
 # GTACoop Remake — Türkçe Mod + Sunucu Yöneticisi
 
-2.2.6 sürümü — kendi sunucu yönetimi, otomatik mod indirme, **oturum modu**,
+2.2.7 sürümü - kendi sunucu yönetimi, otomatik mod indirme, **oturum modu**,
 **kısa kod** (ör. `Gel.com`) ile internetten sunucu bulma, **otomatik relay** ve
 **Bileşenler** sekmesinden ScriptHookV / ScriptHookVDotNet / OpenIV.asi / RageOpenV kurulumu:
 port yönlendirme veya Radmin VPN olmadan da arkadaşlarınız bağlanabilir. Sunucu modları
 yalnızca oyun açıkken kurulu kalır, oyundan çıkınca otomatik kaldırılır.
 Oyun başlatma dosyası seçilebilir; varsayılan **PlayGTAV.exe**'dir (GTA5.exe de seçilebilir).
+**Sesli sohbet** (bas-konuş, `[MIC]` göstergesi) ve **host-led hikaye görevi koordinasyonu**
+bu sürümde eklendi; ayrıntılar aşağıda.
 
 ---
 
@@ -55,6 +57,42 @@ Oyun başlatma dosyası seçilebilir; varsayılan **PlayGTAV.exe**'dir (GTA5.exe
   (seçip tek tek devre dışı bırakma/kaldırma), **kısa kod** (ör. `Gel.com`) ile sunucuyu
   internetten bulunur yapma.
 - **Günlük / Araçlar**: günlük, yedekten geri yükleme, kalıntı temizleme.
+
+---
+
+## Sesli sohbet ve hikaye görevleri (2.2.7)
+
+### Sesli sohbet
+
+- Oyun içinde **F9 > Ayarlar > Voice Chat (Push-to-Talk)** ile sesli sohbeti açıp
+  kapatabilirsiniz. Varsayılan olarak açıktır.
+- **Voice Chat Key** satırına basıp istediğiniz tuşu atayabilirsiniz (varsayılan **N**).
+  Tuş atarken menü kapanır; **Esc** ile iptal edilir.
+- Konuşurken oyuncunun adının solunda `[MIC]` görünür ve adı yeşil olur. Oyuncu
+  listesinde de `[MIC]` işareti gösterilir.
+- Ses, sunucudaki **GTACoop.Remake.Plugin.dll** köprü eklentisi üzerinden taşınır.
+  Eklenti yoksa ses akışı çalışmaya devam eder, ancak `[MIC]` durumu gösterilmez.
+- Mikrofon yoksa veya Windows izin vermiyorsa sesli sohbet sessiz kalır; oyunu
+  etkilemez.
+
+### Hikaye görevleri (host-led)
+
+GTA V'ın kendi hikaye görevleri tek oyunculu scriptlerdir. Aynı görevi her
+istemcide ayrı ayrı başlatmak görev hedeflerini, cutscene'leri ve kayıt durumunu
+birbirinden koparır; bu yüzden görev yalnızca **host** tarafında çalıştırılır.
+
+- **F9 > Story Mission Co-op (Host-led)** menüsünden bir görev seçin. Arkadaşlarınıza
+  davet bildirimi gider.
+- Host, gerçek görevi **Pause > Game > Replay Mission** üzerinden başlatır. Bu ekranda
+  yalnızca daha önce tamamladığınız görevler görünür.
+- Arkadaşlar aynı dünyada kalır ve senkronize edilen araç/piyade aksiyonunda host'a
+  yardım eder. Görev hedefleri ve cutscene'ler host'a aittir; arkadaşlar kendi
+  kayıtlarını oynamaz.
+- Görev başlangıcı/bitişi istemcilere bildirilir. **Hiçbir kayıt dosyası yazılmaz**
+  ve aynı kayıt dosyasına sahip olmanız gerekmez.
+- Bu mod gerçek bir görev senkronizasyon motoru değildir; GTA V'ın hikaye
+  scriptlerini çok oyunculu hale getirmez. Arkadaşların görev hedeflerini ayrı ayrı
+  tamamlaması beklenmemelidir.
 
 ---
 
@@ -123,7 +161,7 @@ Kurallar:
 - Bu betik uygulamayı `%LOCALAPPDATA%\Programs\GTACoop Remake` klasörüne kopyalar ve
   **masaüstü** + **Başlat menüsü** kısayollarını buraya bağlar. Hiçbir şey silinmez
   (eski `dist` klasörü olduğu yerde kalır).
-- Uygulama simgesi ve sürüm bilgisi (2.2.6) exe dosyasına işlenmiştir.
+- Uygulama simgesi ve sürüm bilgisi (2.2.7) exe dosyasına işlenmiştir.
 
 ---
 

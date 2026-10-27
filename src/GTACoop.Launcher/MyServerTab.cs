@@ -424,6 +424,13 @@ public sealed class MyServerTab : UserControl
                     File.Move(entry.SourcePath, target, overwrite: true);
             }
 
+            if (selected.Any(e => e.IsRootPlugin &&
+                string.Equals(e.SourceName, MyServer.BundledBridgePlugin, StringComparison.OrdinalIgnoreCase)))
+            {
+                File.WriteAllText(Path.Combine(AppEnv.ServerDir, ".gtacoop-remake-bridge-removed"),
+                    DateTime.UtcNow.ToString("O"));
+            }
+
             var s = MyServerSettings.Load(AppEnv.DataFolder);
             s.DisabledMods.RemoveAll(k => removedKeys.Contains(k));
             s.Save(AppEnv.DataFolder);
@@ -1268,6 +1275,13 @@ public sealed class MyServerTab : UserControl
             Directory.CreateDirectory(pluginsDir);
             foreach (var file in dlg.FileNames)
                 File.Copy(file, Path.Combine(pluginsDir, Path.GetFileName(file)), overwrite: true);
+
+            if (dlg.FileNames.Any(f =>
+                string.Equals(Path.GetFileName(f), MyServer.BundledBridgePlugin, StringComparison.OrdinalIgnoreCase)))
+            {
+                var marker = Path.Combine(AppEnv.ServerDir, ".gtacoop-remake-bridge-removed");
+                if (File.Exists(marker)) File.Delete(marker);
+            }
 
             Ui.Info(FindForm()!, T("Eklenti(ler) Plugins klasörüne eklendi.\r\nSunucuyu yeniden başlatınca yüklenecek (ayarlar otomatik güncellenir)."));
             RefreshModsList();
