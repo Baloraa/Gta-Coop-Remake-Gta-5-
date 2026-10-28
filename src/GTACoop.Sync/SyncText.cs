@@ -216,6 +216,38 @@ public static class SyncText
         ["dlclist: temizlenecek gcs_ girdisi yok."] = "dlclist: no gcs_ entries to clean.",
         ["dlclist: kodlama beyana uygun UTF-16'ya düzeltildi (OpenIV uyumu)."] =
             "dlclist: encoding normalized to UTF-16 (OpenIV compatibility).",
+        ["Sync   : otomatik relay ({0})"] = "Sync   : automatic relay ({0})",
+        ["Sync   : doğrudan ({0}:{1})"] = "Sync   : direct ({0}:{1})",
+        ["Oyun   : otomatik relay (oyun sırasında launcher açık kalmalı)."] =
+            "Game   : automatic relay (launcher must stay open while playing).",
+        ["Oyun   : doğrudan ({0}:{1})"] = "Game   : direct ({0}:{1})",
+        ["Sunucuya ne otomatik relay ne de doğrudan bağlantı kurulamadı. " +
+         "Sunucu ve launcher açık mı? İnternet bağlantınızı kontrol edip yeniden deneyin."] =
+            "Could not connect to the server via automatic relay or directly. " +
+            "Is the server and launcher running? Check your internet connection and try again.",
+        ["Sunucunun güncel relay bilgisi alınıyor..."] =
+            "Fetching the server's current relay information...",
+        ["Otomatik relay bağlantısı kuruluyor..."] =
+            "Establishing the automatic relay connection...",
+        ["Otomatik relay kurulamadı; doğrudan adres deneniyor..."] =
+            "Automatic relay failed; trying the direct address...",
+        ["Otomatik relay bağlantısı kurulamadı. Sunucu ve launcher açık mı? " +
+         "İnternet bağlantınızı kontrol edip yeniden deneyin."] =
+            "Could not establish the automatic relay connection. Is the server and launcher running? " +
+            "Check your internet connection and try again.",
+        ["Otomatik relay bağlantısı kurulamadı; bu sunucuya doğrudan da ulaşılamıyor. " +
+         "Sunucu ve launcher açık mı? Güncel kodu kullanın."] =
+            "Could not establish the automatic relay connection, and the server is not reachable directly either. " +
+            "Is the server and launcher running? Use the current code.",
+        ["Bu sunucuya doğrudan ulaşılamaz: adres özel bir ağda ve otomatik relay bilgisi yok. " +
+         "Sunucu sahibinden güncel kısa kodu isteyin."] =
+            "This server cannot be reached directly: the address is on a private network and no automatic relay information is available. " +
+            "Ask the server owner for the current short code.",
+        ["Bu sunucuya doğrudan ulaşılamaz: adres özel bir ağda (ör. hotspot/ICS) ve otomatik relay bilgisi yok.\r\n" +
+         "Sunucu sahibinden güncel kısa kodu veya uzun GTC1 kodunu isteyip 'Kod ile Katıl...' ile yeniden ekleyin."] =
+            "This server cannot be reached directly: the address is on a private network (e.g. hotspot/ICS) and no automatic relay information is available.\r\n" +
+            "Ask the server owner for the current short code or long GTC1 code and add it again with 'Join with Code...'.",
+        ["Modsuz bağlantı hazırlanıyor..."] = "Preparing a mod-free connection...",
     };
 
     // Dinamik iletilerde geçen Türkçe kalıplar. Uzun olanlar önce denenir.
@@ -244,6 +276,28 @@ public static class SyncText
         ("Otomatik relay bağlantısı kurulamadı: ", "Could not establish the automatic relay: "),
         ("Otomatik relay başlatılamadı: ", "Could not start the automatic relay: "),
         ("Otomatik relay başlatılıyor (port yönlendirme/Radmin gerekmez)...", "Starting automatic relay (no port forwarding/Radmin needed)..."),
+        ("Relay sunucusu: ", "Relay server: "),
+        ("Sunucu çevrimiçi: ", "Server online: "),
+        ("Sunucu çevrimdışı: ", "Server offline: "),
+        ("Sunucu durumu kontrol edilemedi: ", "Could not check server status: "),
+        ("UPnP denemesi başlatıldı (oyun UDP ", "UPnP mapping attempt started (game UDP "),
+        ("yönlendirici UPnP'yi desteklemiyor veya kapalı", "the router does not support UPnP or it is disabled"),
+        ("uygun yerel ağ adresi bulunamadı", "no suitable local network address was found"),
+        ("bu Windows sürümünde UPnP desteği yok", "UPnP is not supported on this Windows version"),
+        ("UPnP başlatılamadı", "UPnP could not be started"),
+        ("UPnP hatası: ", "UPnP error: "),
+        ("UPnP portları yönlendirilemedi; relay kullanılacak.", "UPnP ports could not be mapped; relay will be used."),
+        ("yönlendirici 15 saniye içinde yanıt vermedi; arka planda denenecek.", "the router did not respond within 15 seconds; it will keep trying in the background."),
+        ("zaten yönlendirilmiş (", "already mapped ("),
+        ("); yeniden eklenmedi.", "); not added again."),
+        ("başka bir hedefe yönlendirilmiş (", "mapped to another target ("),
+        ("); dokunulmadı.", "); left untouched."),
+        ("eklenemedi (mevcut eşleme korunuyor): ", "could not be added (existing mapping preserved): "),
+        (" eşlemesi kaldırıldı.", " mapping removed."),
+        (" eşlemesi kaldırılamadı: ", " mapping could not be removed: "),
+        ("eşlemeler kaldırılamadı: ", "mappings could not be removed: "),
+        ("UPnP eşlemeleri arka planda kaldırılıyor.", "UPnP mappings are being removed in the background."),
+        ("UPnP kapatılırken hata: ", "Error while closing UPnP: "),
         ("Otomatik relay kullanılamıyor; yalnızca doğrudan adresler yayınlanacak.", "Automatic relay is unavailable; only direct addresses will be published."),
         ("Otomatik relay kapatılması arka planda sürüyor.", "Automatic relay is still shutting down in the background."),
         ("Otomatik relay kapatılırken hata: ", "Error while closing the automatic relay: "),
@@ -445,6 +499,52 @@ public static class SyncText
         ("veri konumu arşiv sınırlarının dışında.", "data location is outside the archive bounds."),
         ("veri konumu arşiv sınırlarının dışında; yazma iptal edildi.",
             "data location is outside the archive bounds; write cancelled."),
+        ("Kısmi indirme geçersiz; baştan indirilecek: ", "Partial download is invalid; restarting: "),
+        ("Sunucu HTTP Range desteklemiyor; tek bağlantıyla indirilecek: ",
+            "Server does not support HTTP Range; downloading with a single connection: "),
+        ("Range desteği sınanamadı; tek bağlantı kullanılacak: ",
+            "Could not test Range support; using a single connection: "),
+        ("Parçalı indirme doğrulanamadı (", "Segmented download failed verification ("),
+        ("Parçalı indirme: ", "Segmented download: "),
+        ("Parça aralığı geçersiz; parça baştan indirilecek: ",
+            "Segment range is invalid; restarting segment: "),
+        ("Parça yanlış konumdan geldi (", "Segment arrived at the wrong offset ("),
+        ("Parça erken kapandı (", "Segment ended early ("),
+        ("Parça indirmesi kesildi (", "Segment download interrupted ("),
+        ("Dosya parçası indirilemedi: ", "Could not download file segment: "),
+        ("Sync   : otomatik relay (", "Sync   : automatic relay ("),
+        ("Sync   : doğrudan (", "Sync   : direct ("),
+        ("Oyun   : otomatik relay (oyun sırasında launcher açık kalmalı).",
+            "Game   : automatic relay (launcher must stay open while playing)."),
+        ("Oyun   : doğrudan (", "Game   : direct ("),
+        ("Sunucuya ne otomatik relay ne de doğrudan bağlantı kurulamadı. ",
+            "Could not connect to the server via automatic relay or directly. "),
+        ("Yerel/aynı ağ sunucusu: relay atlanıyor, doğrudan bağlantı", "Local/same-network server: skipping relay, direct connection"),
+        ("Yerel/aynı ağ sunucusu: relay atlanıyor", "Local/same-network server: skipping relay"),
+        ("Ön indirme: yerel/aynı ağ sunucusu, relay atlanıyor", "Prefetch: local/same-network server, skipping relay"),
+        ("Modsuz bağlantı: yerel/aynı ağ sunucusu, relay atlanıyor", "Game-only: local/same-network server, skipping relay"),
+        ("Modsuz bağlantı relay üzerinden: ", "Game-only connection via relay: "),
+        ("Modsuz bağlantı: relay kurulamadı; doğrudan adres denenecek: ", "Game-only: relay failed; trying direct address: "),
+        ("Sync doğrudan: ", "Sync direct: "),
+        ("Doğrudan sync erişilebilir: ", "Direct sync reachable: "),
+        ("Doğrudan sync yok (", "No direct sync ("),
+        ("Ön indirme sync doğrudan: ", "Prefetch sync direct: "),
+        ("Ön indirme relay bağlantısı: ", "Prefetch relay connection: "),
+        ("Ön indirme: relay kurulamadı; doğrudan adres kullanılacak: ", "Prefetch: relay failed; using direct address: "),
+        ("Dosya doğrulanamadı (SHA-256 uyuşmuyor): ", "File verification failed (SHA-256 mismatch): "),
+        ("İndirme bozuk geldi; sunucudaki dosyayı ve bağlantınızı kontrol edip yeniden deneyin.",
+            "The download was corrupted; check the file on the server and your connection, then try again."),
+        ("İndirme erken kapandı (", "Download ended early ("),
+        ("kaldığı yerden sürüyor: ", "resuming: "),
+        ("İndirilen dosya doğrulanamadı; baştan indirilecek: ", "Downloaded file failed verification; restarting: "),
+        (" sn ilerlemedi (", "s without progress ("),
+        ("kaldığı yerden yeniden denenecek (", "resuming from where it left off ("),
+        ("İndirme kesildi (", "Download interrupted ("),
+        ("yeniden denenecek (", "will retry ("),
+        ("Dosya indirilemedi: ", "Could not download file: "),
+        ("Bağlantı koptu; tekrar bağlandığınızda kaldığı yerden devam eder.",
+            "The connection dropped; it will resume where it left off when you reconnect."),
+        ("İndirme ", "Download "),
     }
     .OrderByDescending(x => x.Tr.Length)
     .ToArray();

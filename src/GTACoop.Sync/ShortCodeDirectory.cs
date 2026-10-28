@@ -65,7 +65,12 @@ public static class ShortCodeDirectory
         long TimestampUnix,
         string RelayHost = "",
         int RelaySyncPort = 0,
-        int RelayGamePort = 0);
+        int RelayGamePort = 0)
+    {
+        /// <summary>Teklif, kullanılabilir otomatik relay uç noktaları içeriyor mu?</summary>
+        public bool HasRelay =>
+            !string.IsNullOrWhiteSpace(RelayHost) && RelaySyncPort > 0 && RelayGamePort > 0;
+    }
 
     /// <summary>
     /// Kullanıcının yazdığı kısa kodu doğrular ve karşılaştırma için küçük harfe çevirir.

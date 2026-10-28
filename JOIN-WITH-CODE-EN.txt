@@ -1,5 +1,5 @@
 ==========================================================
- GTACoop Remake - Joining a Server (v2.2.7)
+ GTACoop Remake - Joining a Server (v2.3.5)
 ==========================================================
 
 There are two ways to join:
@@ -11,8 +11,12 @@ There are two ways to join:
 
   2) LONG CODE (GTC1...)
      The code carries the connection details itself; no internet
-     lookup or account is required. The long code does not carry
-     relay details (direct connectivity is required).
+     lookup is required. If it was created while the server was
+     running, it also carries the automatic relay details. If a
+     short code is configured in "My Server", the long code carries
+     it too; the launcher then refreshes the current relay ports
+     when your friend connects, so the same long code keeps working
+     after a server restart.
 
 Both are pasted into "Join with Code..." on the "Servers" tab.
 
@@ -32,7 +36,11 @@ SERVER OWNER - SHORT CODE (recommended)
 
 3) Click "Start Server". Under the short code field you should
    see "Short code online: Gel.com" and "Automatic relay:
-   bore.pub ...". The relay is usually ready in 1-2 seconds.
+   <server> ...". The relay is usually ready in 1-2 seconds.
+   If "Relay server" is empty, bore.pub is used; you can enter
+   your own bore-compatible server as "host:port". If the router
+   supports UPnP, the game (UDP) and sync (TCP) ports are also
+   mapped automatically; otherwise the relay keeps working.
    The launcher publishes the code encrypted via ntfy.sh and
    refreshes it every 60 seconds; it goes offline when the
    server stops.
@@ -40,15 +48,16 @@ SERVER OWNER - SHORT CODE (recommended)
 4) Send ONLY the short code to your friend (WhatsApp/Discord).
 
 5) When your friend enters the code, the launcher first tries the
-   direct addresses (LAN/Radmin/port forwarding) and falls back
-   to the automatic relay. The server and your friend's launcher
-   MUST stay open while playing.
+   automatic relay; if the relay cannot be established, it falls
+   back to same-network/Radmin/port-forwarding addresses. The
+   server and your friend's launcher MUST stay open while playing.
 
 Note: the short code also carries the server password and sync
 token (encrypted); only give it to people you trust. Relay traffic
 goes through bore.pub on a random public port. The relay can be a
-little slower than a direct connection. If port forwarding/Radmin
-is available, the launcher already prefers it.
+little slower than a direct connection. If you are on the same
+Wi-Fi/hotspot or Radmin VPN, choose "Direct" mode in the join
+window.
 
 ------------------------------------------------------------------
 SERVER OWNER - LONG CODE (GTC1...)
@@ -70,12 +79,16 @@ SERVER OWNER - LONG CODE (GTC1...)
 5) Click "Start Server". When your friend joins with the code,
    server mods download automatically.
 
-Note: the long code carries the connection details itself. It
-needs no internet account and can be created while the server
-is stopped. It may contain the password/token; only give it to
-people you trust. The long code has no relay information; if the
-server is behind CGNAT or port forwarding is a problem, use a
-short code instead.
+Note: the long code carries the connection details itself and
+can be created while the server is stopped. If you create it
+while the server is running, the relay endpoints are included
+too. If a short code is configured, it is embedded in the long
+code and the relay information is refreshed through it when your
+friend connects, so the same long code still works after a server
+restart. Without a short code, the relay information in the long
+code is valid for one session; create a new long code after
+restarting the server. It may contain the password/token; only
+give it to people you trust.
 
 ------------------------------------------------------------------
 FRIEND (JOINING)
@@ -86,11 +99,13 @@ FRIEND (JOINING)
    the window fills it in automatically; otherwise paste it.
 
 3) If you enter a short code (Gel.com), the launcher fetches the
-   server details from the internet and connects through the
-   automatic relay if direct addresses do not work. The server
-   and your launcher must be running. If you enter a long code
-   (GTC1...), the details are read from the code itself; that
-   path needs direct connectivity/port forwarding.
+   server details from the internet and tries the automatic relay
+   first. The server and your launcher must be running. If you
+   enter a long code (GTC1...), the details are read from the code
+   itself; if the code contains a short code, the relay information
+   is refreshed when connecting. Without a short code, relay ports
+   from an earlier server session may be stale after a restart;
+   ask the server owner for a new code.
 
 4) When the details appear, click "Add and Connect". The server
    is added to the list, mods download, and the game starts.
@@ -144,14 +159,20 @@ FAQ
   published only after the server starts. You can also try the
   long GTC1 code.
 - Short code found but no connection: make sure both you and the
-  server owner use v2.2.3 or newer. The server should show
-  "Automatic relay: bore.pub ...". Wait a few seconds and click
+  server owner use v2.3.5 or newer. The server should show
+  "Automatic relay: <server> ...". Wait a few seconds and click
   "Search Again".
-- Relay not working: bore.pub may be unreachable. Use Radmin VPN
+- Relay not working: bore.pub (or the custom relay chosen by the
+  server owner) may be unreachable. Use Radmin VPN
   (free) or forward 4499 UDP + 4599 TCP for a direct connection,
-  or try the long GTC1 code.
+  or try a current long GTC1 code created while the server was
+  running.
 - Long code does not work: make sure you copied all of it.
-  Line breaks are fine; the launcher strips whitespace.
+  Line breaks are fine; the launcher strips whitespace. If the
+  server was restarted and the code has no short code, its relay
+  ports may be stale; ask for a new long code created while the
+  server is running. Long codes with a short code refresh the
+  relay information automatically.
 - Same network: a local IP is enough. For internet play, the
   short code plus automatic relay is the easiest path.
 - You can create a long code while the server is stopped; your

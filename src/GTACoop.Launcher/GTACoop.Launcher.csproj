@@ -11,9 +11,9 @@
     <NoWarn>$(NoWarn);CA1416</NoWarn>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
     <ApplicationIcon>Assets\app.ico</ApplicationIcon>
-    <Version>2.2.7</Version>
-    <AssemblyVersion>2.2.7.0</AssemblyVersion>
-    <FileVersion>2.2.7.0</FileVersion>
+    <Version>2.3.5</Version>
+    <AssemblyVersion>2.3.5.0</AssemblyVersion>
+    <FileVersion>2.3.5.0</FileVersion>
     <AssemblyTitle>GTACoop Remake</AssemblyTitle>
     <Product>GTACoop Remake</Product>
     <Description>GTA V mod ve sunucu yöneticisi (GTACoOp) - Türkçe/İngilizce</Description>
@@ -26,10 +26,20 @@
     <ProjectReference Include="..\GTACoop.SyncServer\GTACoop.SyncServer.csproj" ReferenceOutputAssembly="false" />
   </ItemGroup>
 
+  <!-- Sunucu Tarayıcı: GTACoOp ile aynı Lidgren discovery protokolü -->
+  <ItemGroup>
+    <Reference Include="Lidgren.Network.MultiTarget">
+      <HintPath>..\..\vendor\Distribution\Scripts\Lidgren.Network.MultiTarget.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+  </ItemGroup>
+
   <!-- Avatar (Hakkında sekmesi) uygulamanın içine gömülür -->
   <ItemGroup>
     <None Remove="Assets\avatar.png" />
     <EmbeddedResource Include="Assets\avatar.png" />
+    <None Remove="Assets\tester.png" />
+    <EmbeddedResource Include="Assets\tester.png" />
   </ItemGroup>
 
   <!-- Dağıtım dosyalarını (GTACoOp sunucu/istemci + SyncServer) çıktı klasörüne kopyala -->

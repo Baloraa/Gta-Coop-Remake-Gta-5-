@@ -22,6 +22,17 @@ public static class JoinCode
         public int s { get; set; } = 4599;
         public string? p { get; set; }
         public string? t { get; set; }
+
+        // Otomatik relay uç noktaları. Eski istemciler bu alanları yok sayar;
+        // alanlar boşsa kod eskisi gibi yalnızca doğrudan adres taşır.
+        public string? rh { get; set; }
+        public int rs { get; set; }
+        public int rg { get; set; }
+
+        // Kısa kod (varsa). Relay portları sunucu her başlatıldığında
+        // değişebildiği için uzun kod bağlanırken güncel uç noktalar bu
+        // koddan yenilenir. Eski istemciler bu alanı yok sayar.
+        public string? sc { get; set; }
     }
 
     /// <summary>Sunucu kaydından katılım kodu üretir.</summary>
@@ -34,7 +45,11 @@ public static class JoinCode
             g = entry.GamePort,
             s = entry.SyncPort,
             p = string.IsNullOrEmpty(entry.Password) ? null : entry.Password,
-            t = string.IsNullOrEmpty(entry.SyncToken) ? null : entry.SyncToken
+            t = string.IsNullOrEmpty(entry.SyncToken) ? null : entry.SyncToken,
+            rh = entry.UsesRelay ? entry.RelayHost.Trim() : null,
+            rs = entry.UsesRelay ? entry.RelaySyncPort : 0,
+            rg = entry.UsesRelay ? entry.RelayGamePort : 0,
+            sc = string.IsNullOrWhiteSpace(entry.ShortCode) ? null : entry.ShortCode.Trim()
         };
 
         var json = JsonSerializer.SerializeToUtf8Bytes(payload);
@@ -98,8 +113,22 @@ public static class JoinCode
             var gamePort = payload.g is >= 1 and <= 65535 ? payload.g : 4499;
             var syncPort = payload.s is >= 1 and <= 65535 ? payload.s : 4599;
 
+            var relayHost = (payload.rh ?? "").Trim();
+            var relaySync = payload.rs is >= 1 and <= 65535 ? payload.rs : 0;
+            var relayGame = payload.rg is >= 1 and <= 65535 ? payload.rg : 0;
+            if (relayHost.Length == 0 || relaySync == 0 || relayGame == 0)
+            {
+                relayHost = "";
+                relaySync = 0;
+                relayGame = 0;
+            }
+
             var name = (payload.n ?? "").Trim();
             if (name.Length == 0) name = host;
+
+            var shortCode = ShortCodeDirectory.TryNormalize(payload.sc, out var normalizedShort, out _)
+                ? normalizedShort
+                : "";
 
             entry = new ServerEntry
             {
@@ -109,7 +138,11 @@ public static class JoinCode
                 SyncPort = syncPort,
                 Password = payload.p ?? "",
                 SyncToken = payload.t ?? "",
-                AutoConnect = true
+                AutoConnect = true,
+                ShortCode = shortCode,
+                RelayHost = relayHost,
+                RelaySyncPort = relaySync,
+                RelayGamePort = relayGame
             };
             return true;
         }

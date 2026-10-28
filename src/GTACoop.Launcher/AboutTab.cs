@@ -59,7 +59,7 @@ public sealed class AboutTab : UserControl
         var header = new TableLayoutPanel
         {
             Dock = DockStyle.Top,
-            Height = 200,
+            Height = 300,
             ColumnCount = 2,
             RowCount = 1,
             Padding = new Padding(0, 0, 0, 8)
@@ -102,6 +102,53 @@ public sealed class AboutTab : UserControl
             AutoSize = true,
             Margin = new Padding(4, 0, 2, 4)
         });
+
+        // ---- İlk test eden: fotoğraf + Discord bilgileri
+        var testerRow = new FlowLayoutPanel
+        {
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            FlowDirection = FlowDirection.LeftToRight,
+            WrapContents = false,
+            Margin = new Padding(2, 2, 2, 6)
+        };
+
+        var testerPhoto = new PictureBox
+        {
+            Size = new Size(64, 64),
+            SizeMode = PictureBoxSizeMode.Zoom,
+            Image = LoadTesterPhoto(),
+            BorderStyle = BorderStyle.FixedSingle,
+            Margin = new Padding(2, 0, 10, 0)
+        };
+        _tips.SetToolTip(testerPhoto, T("zaza specialist — ilk test eden"));
+
+        var testerInfo = new FlowLayoutPanel
+        {
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            FlowDirection = FlowDirection.TopDown,
+            WrapContents = false,
+            Margin = new Padding(0)
+        };
+        testerInfo.Controls.Add(new Label
+        {
+            Text = T("İlk test eden: zaza specialist"),
+            Font = new Font("Segoe UI", 10f, FontStyle.Bold),
+            AutoSize = true,
+            Margin = new Padding(0, 2, 0, 3)
+        });
+        testerInfo.Controls.Add(new Label
+        {
+            Text = T("Arkadaşlık kodu: za_za"),
+            AutoSize = true,
+            Margin = new Padding(0, 1, 0, 1)
+        });
+
+        testerRow.Controls.Add(testerPhoto);
+        testerRow.Controls.Add(testerInfo);
+        who.Controls.Add(testerRow);
+
         who.Controls.Add(new Label
         {
             Text = T("Sürüm: {0}", AppVersion()),
@@ -154,13 +201,18 @@ public sealed class AboutTab : UserControl
     }
 
     /// <summary>Avatar, derlemeye gömülü kaynaktan yüklenir (Assets\avatar.png).</summary>
-    private static Image? LoadAvatar()
+    private static Image? LoadAvatar() => LoadEmbeddedImage("avatar.png");
+
+    /// <summary>İlk test edenin fotoğrafı (Assets\tester.png).</summary>
+    private static Image? LoadTesterPhoto() => LoadEmbeddedImage("tester.png");
+
+    private static Image? LoadEmbeddedImage(string fileName)
     {
         try
         {
             var asm = typeof(AboutTab).Assembly;
             var name = Array.Find(asm.GetManifestResourceNames(),
-                n => n.EndsWith("avatar.png", StringComparison.OrdinalIgnoreCase));
+                n => n.EndsWith(fileName, StringComparison.OrdinalIgnoreCase));
             if (name == null) return null;
 
             using var stream = asm.GetManifestResourceStream(name);
@@ -169,7 +221,10 @@ public sealed class AboutTab : UserControl
             using var ms = new MemoryStream();
             stream.CopyTo(ms);
             ms.Position = 0;
-            return Image.FromStream(ms);
+
+            // GDI+ görüntüyü akış kapanınca kullanamayabilir; kopyasını al.
+            using var temp = Image.FromStream(ms);
+            return new Bitmap(temp);
         }
         catch
         {

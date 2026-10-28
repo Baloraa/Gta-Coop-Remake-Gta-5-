@@ -1,4 +1,5 @@
-﻿using System.Windows.Forms;
+﻿using System.Text;
+using System.Windows.Forms;
 using GTACoop.Sync;
 
 namespace GTACoop.Remake;
@@ -30,6 +31,7 @@ public sealed class LogTab : UserControl
         row1.Controls.Add(Ui.Btn(T("Seçili Yedeği Geri Yükle"), (_, _) => RestoreSelected()));
 
         var row2 = Ui.Flow();
+        row2.Controls.Add(Ui.Btn(T("Tanılama Kopyala"), (_, _) => CopyDiagnostics()));
         row2.Controls.Add(Ui.Btn(T("gcs_ Kalıntılarını Temizle"), (_, _) => PruneOrphans()));
         row2.Controls.Add(Ui.Btn(T("AutoConnect Kapat"), (_, _) => DisableAutoConnect()));
         row2.Controls.Add(Ui.Btn(T("Günlük Dosyasını Aç"), (_, _) => OpenLogFile()));
@@ -203,6 +205,73 @@ public sealed class LogTab : UserControl
         catch (Exception ex)
         {
             AppEnv.LogError("Günlük açılamadı: " + ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// Sorun bildirirken paylaşılabilecek sürüm, sistem, sunucu ve son günlük
+    /// satırlarını panoya kopyalar. Parola/token gibi gizli alanlar eklenmez.
+    /// </summary>
+    private void CopyDiagnostics()
+    {
+        try
+        {
+            var server = MyServerSettings.Load(AppEnv.DataFolder);
+            var sb = new StringBuilder();
+            sb.AppendLine("GTACoop Remake - " + T("Tanılama"));
+            sb.AppendLine(T("Sürüm: {0}", Application.ProductVersion));
+            sb.AppendLine(T("İşletim sistemi: {0}", System.Runtime.InteropServices.RuntimeInformation.OSDescription +
+                (Environment.Is64BitOperatingSystem ? " (64-bit)" : " (32-bit)")));
+            sb.AppendLine(T(".NET: {0}", Environment.Version));
+            sb.AppendLine(T("Dil: {0}", Loc.English ? "English" : "Türkçe"));
+            sb.AppendLine(T("GTA klasörü: {0}",
+                string.IsNullOrWhiteSpace(AppEnv.Settings.GameFolder) ? T("(seçilmemiş)") : AppEnv.Settings.GameFolder));
+            sb.AppendLine(T("Sunucu: {0} | oyun: {1} UDP | sync: {2} TCP",
+                server.ServerName, server.GamePort, server.SyncPort));
+            sb.AppendLine(T("Relay sunucusu: {0}",
+                string.IsNullOrWhiteSpace(server.RelayServer) ? "bore.pub" : server.RelayServer));
+            sb.AppendLine(T(string.IsNullOrWhiteSpace(server.ShortCode) ? "Kısa kod: kapalı" : "Kısa kod: açık"));
+
+            var ips = LocalAddresses.Detect().Select(a => a.Ip).ToList();
+            sb.AppendLine(T("Yerel adresler: {0}",
+                ips.Count == 0 ? T("(yok)") : string.Join(", ", ips)));
+
+            sb.AppendLine();
+            sb.AppendLine(T("--- son 80 günlük satırı ---"));
+
+            // Önce gerçek günlük dosyasını oku: Log sekmesi hiç açılmadıysa
+            // arayüz kutusu boş olabilir. Dosya okunamazsa arayüzdeki
+            // satırlara dön.
+            var logLines = Array.Empty<string>();
+            try
+            {
+                if (File.Exists(AppEnv.LogFile))
+                    logLines = File.ReadLines(AppEnv.LogFile).TakeLast(80).ToArray();
+            }
+            catch
+            {
+                // Günlük dosyası kilitliyse arayüz kopyası kullanılır.
+            }
+
+            if (logLines.Length == 0)
+            {
+                var uiLines = _log.Lines;
+                logLines = uiLines.Skip(Math.Max(0, uiLines.Length - 80)).ToArray();
+            }
+
+            foreach (var line in logLines)
+                sb.AppendLine(line);
+
+            var text = sb.ToString();
+            try { Clipboard.SetDataObject(text, true); }
+            catch { Clipboard.SetText(text); }
+
+            Ui.Info(FindForm()!, T("Tanılama bilgisi panoya kopyalandı. Bir sorun bildirirken bu metni yapıştırabilirsiniz."));
+        }
+        catch (Exception ex)
+        {
+            AppEnv.LogError("Tanılama kopyalanamadı: " + ex.Message);
+            Ui.Error(FindForm()!, T("Tanılama kopyalanamadı:\r\n") + ex.Message);
         }
     }
 }

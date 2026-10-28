@@ -15,6 +15,7 @@ public sealed class JoinCodeDialog : Form
     private readonly Button _addBtn;
     private readonly Button _connectBtn;
     private readonly Button _retryBtn;
+    private readonly ComboBox _mode = new();
     private readonly System.Windows.Forms.Timer _lookupTimer = new();
     private ServerEntry? _parsed;
     private CancellationTokenSource? _lookupCts;
@@ -87,6 +88,27 @@ public sealed class JoinCodeDialog : Form
         buttons.Controls.Add(Ui.Btn(T("Panodan Yapıştır"), (_, _) => PasteCode()));
         _retryBtn = Ui.Btn(T("Yeniden Ara"), (_, _) => RetryLookup());
         buttons.Controls.Add(_retryBtn);
+
+        var modeLabel = new Label
+        {
+            Text = T("Bağlantı:"),
+            AutoSize = true,
+            Margin = new Padding(12, 9, 4, 4)
+        };
+        _mode.Name = "JoinModeBox";
+        _mode.DropDownStyle = ComboBoxStyle.DropDownList;
+        _mode.Width = 285;
+        _mode.Margin = new Padding(0, 5, 4, 4);
+        _mode.Items.Add(T("Otomatik (relay öncelikli)"));
+        _mode.Items.Add(T("Doğrudan (aynı ağ / Radmin VPN)"));
+        _mode.SelectedIndex = 0;
+        _mode.SelectedIndexChanged += (_, _) =>
+        {
+            if (_pendingCode != null) RetryLookup();
+        };
+        buttons.Controls.Add(modeLabel);
+        buttons.Controls.Add(_mode);
+
         _addBtn = Ui.Btn(T("Ekle"), (_, _) => Accept(connect: false));
         _addBtn.Enabled = false;
         _connectBtn = Ui.Btn(T("Ekle ve Bağlan"), (_, _) => Accept(connect: true));
@@ -104,7 +126,8 @@ public sealed class JoinCodeDialog : Form
             Text = T("İpucu: Kısa kod (ör. Gel.com) sunucuyu internet üzerinden bulur; sunucu açık olmalı. " +
                      "Uzun GTC1 kodu bağlantı bilgilerini kendi taşır ve internet gerektirmez. " +
                      "Kod şifre/token içerebilir; yalnızca güvendiğiniz kişilerle paylaşın.") +
-                   "\r\n" + T("Otomatik relay sayesinde port yönlendirme/Radmin gerekmez; oyun sırasında launcher açık kalmalı."),
+                   "\r\n" + T("Otomatik relay sayesinde port yönlendirme/Radmin gerekmez; oyun sırasında launcher açık kalmalı.") +
+                   "\r\n" + T("Varsayılan 'Otomatik' mod relay'i önce dener. Aynı Wi-Fi/hotspot veya Radmin VPN üzerindeyseniz 'Doğrudan' modunu seçebilirsiniz."),
             Margin = new Padding(2, 2, 2, 0)
         };
 
@@ -195,9 +218,20 @@ public sealed class JoinCodeDialog : Form
         if (JoinCode.TryParse(text, out var entry, out var longError) && entry != null)
         {
             _parsed = entry;
-            SetSummary(T("Sunucu: {0}\r\nAdres: {1}\r\nOyun portu: {2}  |  Sync portu: {3}\r\nŞifre: {4}",
+            var summary = T("Sunucu: {0}\r\nAdres: {1}\r\nOyun portu: {2}  |  Sync portu: {3}\r\nŞifre: {4}",
                 entry.Name, entry.Host, entry.GamePort, entry.SyncPort,
-                string.IsNullOrEmpty(entry.Password) ? T("yok") : T("var")), Ui.OkColor);
+                string.IsNullOrEmpty(entry.Password) ? T("yok") : T("var"));
+            if (entry.UsesRelay)
+                summary += "\r\n" + T("Otomatik relay: {0} (sync {1}, oyun {2}) — relay öncelikli kullanılacak.",
+                    entry.RelayHost, entry.RelaySyncPort, entry.RelayGamePort);
+            else
+                summary += "\r\n" + T("Bu kodda otomatik relay bilgisi yok; yalnızca doğrudan bağlantı denenir.");
+            if (!string.IsNullOrWhiteSpace(entry.ShortCode))
+                summary += "\r\n" + T("Kısa kod: {0} — bağlanırken güncel relay bilgisi bu koddan alınır.",
+                    entry.ShortCode);
+            else if (entry.UsesRelay)
+                summary += "\r\n" + T("Bu uzun kod tek oturumluk relay bilgisi taşır; sunucu yeniden başlatıldıysa yeni kod isteyin.");
+            SetSummary(summary, Ui.OkColor);
             _addBtn.Enabled = _connectBtn.Enabled = true;
             return;
         }
@@ -230,7 +264,7 @@ public sealed class JoinCodeDialog : Form
     private async Task LookupShortCodeAsync(string code)
     {
         _lookupCts?.Cancel();
-        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(90));
         _lookupCts = cts;
 
         var display = _code.Text.Trim();
@@ -239,8 +273,39 @@ public sealed class JoinCodeDialog : Form
 
         try
         {
-            var offer = await ShortCodeDirectory.LookupAsync(code, cts.Token);
-            if (cts.IsCancellationRequested || IsDisposed || !IsCurrentShortCode(code)) return;
+            var auto = _mode.SelectedIndex == 0;
+            ShortCodeDirectory.ShortCodeOffer? offer = null;
+
+            // Sunucu relay'i kısa kod yayınından birkaç saniye sonra hazır
+            // olabilir. Otomatik modda relay görünene kadar kodu birkaç kez
+            // yeniden sorgula; aynı ağdaki doğrudan bağlantı varsa bekleme.
+            const int maxLookups = 5;
+            for (int attempt = 0; attempt < maxLookups; attempt++)
+            {
+                offer = await ShortCodeDirectory.LookupAsync(code, cts.Token);
+                if (cts.IsCancellationRequested || IsDisposed || !IsCurrentShortCode(code)) return;
+
+                if (offer == null)
+                {
+                    if (attempt < maxLookups - 1)
+                    {
+                        SetSummary(T("Kısa kod henüz yayında değil; yeniden deneniyor... ({0}/{1})",
+                            attempt + 2, maxLookups), Color.DimGray);
+                        await Task.Delay(1500, cts.Token);
+                        continue;
+                    }
+                    break;
+                }
+
+                if (!auto || offer.HasRelay) break;
+
+                if (attempt < maxLookups - 1)
+                {
+                    SetSummary(T("Sunucu bulundu; otomatik relay'in hazır olması bekleniyor... ({0}/{1})",
+                        attempt + 2, maxLookups), Color.DimGray);
+                    await Task.Delay(2000, cts.Token);
+                }
+            }
 
             if (offer == null)
             {
@@ -249,25 +314,35 @@ public sealed class JoinCodeDialog : Form
                 return;
             }
 
-            SetSummary(T("Sunucu bulundu, doğrudan adresler ve otomatik relay deneniyor..."), Color.DimGray);
+            SetSummary(auto
+                ? T("Sunucu bulundu; otomatik relay öncelikli deneniyor...")
+                : T("Sunucu bulundu; doğrudan adresler deneniyor..."), Color.DimGray);
+
             var resolved = await ResolveOfferAsync(offer, cts.Token);
             if (cts.IsCancellationRequested || IsDisposed || !IsCurrentShortCode(code)) return;
 
             if (resolved == null)
             {
-                SetSummary(T("Sunucuya ulaşılamadı. Sunucu açık mı, kod doğru mu? Doğrudan adres ve otomatik relay denendi.\r\nSunucu sahibiyle ikiniz de güncel sürümü kullanın; uzun GTC1 kodunu da deneyebilirsiniz."),
+                var noRelay = auto && !offer.HasRelay;
+                SetSummary(noRelay
+                        ? T("Sunucuya ulaşılamadı: kısa kodda otomatik relay bilgisi yok ve doğrudan adresler aynı ağda değil.\r\n" +
+                            "Sunucu sahibinden sunucuyu yeniden başlatmasını veya güncel sürümü kullanmasını isteyin. " +
+                            "Aynı Wi-Fi/hotspot'taysanız 'Doğrudan' modunu deneyin.")
+                        : T("Sunucuya ulaşılamadı. Otomatik relay ve doğrudan adresler denendi.\r\n" +
+                            "Sunucu açık mı? İkiniz de güncel sürümü kullanıyor musunuz? 'Yeniden Ara' ile tekrar deneyin."),
                     Ui.WarnColor);
                 return;
             }
 
+            resolved.ShortCode = code;
             _parsed = resolved;
+
             if (resolved.UsesRelay)
             {
-                var direct = offer.Hosts is { Count: > 0 }
-                    ? $"{resolved.Host}:{resolved.SyncPort}"
-                    : T("yok");
-                SetSummary(T("Kısa kod bulundu ✓\r\nSunucu: {0}\r\nDoğrudan adres: {1}\r\nOtomatik relay: {2}\r\nOyun portu: {3}  |  Sync portu: {4}\r\nŞifre: {5}",
-                    resolved.Name, direct, resolved.RelayHost,
+                var direct = offer.Hosts.FirstOrDefault(LocalAddresses.IsDirectReachable);
+                SetSummary(T("Kısa kod bulundu ✓\r\nSunucu: {0}\r\nOtomatik relay: {1} (sync {2}, oyun {3})\r\nYedek doğrudan adres: {4}\r\nOyun portu: {5}  |  Sync portu: {6}\r\nŞifre: {7}",
+                    resolved.Name, resolved.RelayHost, resolved.RelaySyncPort, resolved.RelayGamePort,
+                    string.IsNullOrWhiteSpace(direct) ? T("yok") : direct,
                     resolved.GamePort, resolved.SyncPort,
                     string.IsNullOrEmpty(resolved.Password) ? T("yok") : T("var")), Ui.OkColor);
             }
@@ -300,80 +375,105 @@ public sealed class JoinCodeDialog : Form
     private async Task<ServerEntry?> ResolveOfferAsync(
         ShortCodeDirectory.ShortCodeOffer offer, CancellationToken ct)
     {
-        // Doğrudan adresler (LAN/Radmin/port yönlendirme) ve otomatik relay paralel
-        // denenir. Doğrudan bağlantı genellikle daha hızlıdır; relay ise CGNAT
-        // arkasındaki sunucular için port yönlendirme gerektirmeden çalışır.
-        using var groupCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        var directTasks = offer.Hosts
-            .Select(host => TryHostAsync(host, offer, groupCts.Token))
-            .ToList();
-        var relayTask = TryRelayAsync(offer, groupCts.Token);
-        var relayPending = true;
+        // Otomatik mod: relay varsa her zaman önce relay denenir. Böylece
+        // 192.168.137.x gibi yalnızca sunucunun kendi hotspot'unda geçerli
+        // adresler, uzaktaki arkadaş tarafından yanlışlıkla seçilmez.
+        var preferDirect = _mode.SelectedIndex == 1;
 
-        while (directTasks.Count > 0)
+        if (!preferDirect && offer.HasRelay)
         {
-            var candidates = new List<Task<ServerEntry?>>(directTasks);
-            if (relayPending) candidates.Add(relayTask);
-            var done = await Task.WhenAny(candidates);
-            if (relayPending && done == relayTask)
-            {
-                relayPending = false;
-                var relayEntry = await relayTask;
-                if (relayEntry != null)
-                {
-                    groupCts.Cancel();
-                    return relayEntry;
-                }
-                continue;
-            }
-
-            directTasks.Remove(done);
-            var entry = await done;
-            if (entry == null) continue;
-
-            groupCts.Cancel();
-            return entry;
+            var relayEntry = await TryRelayAsync(offer, ct);
+            if (relayEntry != null) return relayEntry;
+            if (ct.IsCancellationRequested) return null;
+            SetSummary(T("Otomatik relay yanıt vermedi; uygun doğrudan adresler deneniyor..."),
+                Ui.WarnColor);
         }
 
-        var fallback = relayPending ? await relayTask : null;
-        if (fallback != null) groupCts.Cancel();
-        return fallback;
+        var hosts = preferDirect
+            ? offer.Hosts.ToList()
+            : offer.Hosts.Where(LocalAddresses.IsDirectReachable).ToList();
+
+        if (hosts.Count == 0)
+            return null;
+
+        var direct = await TryHostsAsync(hosts, offer, ct);
+        if (direct != null) return direct;
+
+        // Relay geçici bir aksaklık yaşadıysa son bir kez daha dene.
+        if (!preferDirect && offer.HasRelay && !ct.IsCancellationRequested)
+            return await TryRelayAsync(offer, ct);
+
+        return null;
+    }
+
+    private static async Task<ServerEntry?> TryHostsAsync(
+        IReadOnlyList<string> hosts, ShortCodeDirectory.ShortCodeOffer offer, CancellationToken ct)
+    {
+        var pending = hosts
+            .Select(host => TryHostAsync(host, offer, ct))
+            .ToList();
+
+        while (pending.Count > 0)
+        {
+            var done = await Task.WhenAny(pending);
+            pending.Remove(done);
+            var entry = await done;
+            if (entry != null) return entry;
+        }
+
+        return null;
     }
 
     private static async Task<ServerEntry?> TryRelayAsync(
         ShortCodeDirectory.ShortCodeOffer offer, CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(offer.RelayHost) ||
-            offer.RelaySyncPort <= 0 || offer.RelayGamePort <= 0)
-            return null;
+        if (!offer.HasRelay) return null;
 
-        try
+        for (int attempt = 0; attempt < 2; attempt++)
         {
-            using var linkCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-            linkCts.CancelAfter(TimeSpan.FromSeconds(10));
+            if (ct.IsCancellationRequested) return null;
 
-            using var client = new SyncClient(offer.RelayHost, offer.RelaySyncPort, offer.SyncToken);
-            var mf = await client.GetManifestAsync(linkCts.Token);
-
-            return new ServerEntry
+            try
             {
-                Name = string.IsNullOrWhiteSpace(mf.ServerName) ? offer.Name : mf.ServerName,
-                Host = offer.Hosts.FirstOrDefault() ?? offer.RelayHost,
-                GamePort = offer.GamePort,
-                SyncPort = offer.SyncPort,
-                Password = offer.Password,
-                SyncToken = offer.SyncToken,
-                AutoConnect = true,
-                RelayHost = offer.RelayHost,
-                RelaySyncPort = offer.RelaySyncPort,
-                RelayGamePort = offer.RelayGamePort
-            };
+                using var linkCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                linkCts.CancelAfter(TimeSpan.FromSeconds(15));
+
+                using var client = new SyncClient(offer.RelayHost, offer.RelaySyncPort, offer.SyncToken);
+                var mf = await client.GetManifestAsync(linkCts.Token);
+
+                var host = offer.Hosts.FirstOrDefault(LocalAddresses.IsDirectReachable)
+                           ?? offer.Hosts.FirstOrDefault()
+                           ?? offer.RelayHost;
+
+                return new ServerEntry
+                {
+                    Name = string.IsNullOrWhiteSpace(mf.ServerName) ? offer.Name : mf.ServerName,
+                    Host = host,
+                    GamePort = offer.GamePort,
+                    SyncPort = offer.SyncPort,
+                    Password = offer.Password,
+                    SyncToken = offer.SyncToken,
+                    AutoConnect = true,
+                    RelayHost = offer.RelayHost,
+                    RelaySyncPort = offer.RelaySyncPort,
+                    RelayGamePort = offer.RelayGamePort
+                };
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                return null;
+            }
+            catch
+            {
+                if (attempt == 0)
+                {
+                    try { await Task.Delay(1000, ct); }
+                    catch (OperationCanceledException) { return null; }
+                }
+            }
         }
-        catch
-        {
-            // Relay yoksa/erişilemezse doğrudan adresler denenmeye devam eder.
-            return null;
-        }
+
+        return null;
     }
 
     private static async Task<ServerEntry?> TryHostAsync(string host,
@@ -382,7 +482,7 @@ public sealed class JoinCodeDialog : Form
         try
         {
             using var linkCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-            linkCts.CancelAfter(TimeSpan.FromSeconds(6));
+            linkCts.CancelAfter(TimeSpan.FromSeconds(7));
 
             using var client = new SyncClient(host, offer.SyncPort, offer.SyncToken);
             var mf = await client.GetManifestAsync(linkCts.Token);

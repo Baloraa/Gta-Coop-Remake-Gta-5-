@@ -3,18 +3,32 @@ using System.Xml.Linq;
 namespace GTACoop.Sync;
 
 /// <summary>
-/// mods/GTACoop/ClientSettings.xml (GTACoOp istemci ayarları) düzenleyicisi.
+/// GTACoOp istemci ayarları düzenleyicisi.
+/// GTACoOp, ayarları scriptin yanındaki scripts/ClientSettings.xml dosyasından
+/// okur; eski sürümlerde mods/GTACoop altındaki kopya kullanılmıyordu.
 /// Dosya yoksa varsayılan içerikle oluşturur; mevcut alanlar korunur.
 /// </summary>
 public static class ClientSettingsEditor
 {
-    public static string SettingsPath(string gameFolder) =>
-        Path.Combine(gameFolder, "mods", "GTACoop", "ClientSettings.xml");
+    public static string SettingsPath(string gameFolder)
+    {
+        var scripts = Path.Combine(gameFolder, "scripts", "ClientSettings.xml");
+        var scriptsDir = Path.Combine(gameFolder, "scripts");
+        var legacy = Path.Combine(gameFolder, "mods", "GTACoop", "ClientSettings.xml");
 
-    /// <summary>AutoConnect için sunucu bilgilerini yazar.</summary>
+        // Normal kurulumda oyun scripts/ClientSettings.xml dosyasını okur.
+        // scripts klasörü yoksa eski mods/GTACoop konumuna geri düş.
+        return Directory.Exists(scriptsDir) || !File.Exists(legacy) ? scripts : legacy;
+    }
+
+    /// <summary>
+    /// AutoConnect için sunucu bilgilerini yazar.
+    /// lowDesync true ise trafik/ped yoğunluğunu azaltan isteğe bağlı profili uygular.
+    /// </summary>
     public static void Apply(
         string gameFolder, string username, string host, int port,
-        string password, bool autoConnect, Action<string>? log = null)
+        string password, bool autoConnect, bool lowDesync = false,
+        Action<string>? log = null)
     {
         var path = SettingsPath(gameFolder);
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
@@ -52,11 +66,78 @@ public static class ClientSettingsEditor
         Set(root, "AutoConnect", autoConnect ? "true" : "false");
         Set(root, "SyncWorld", "true");
 
+        if (lowDesync)
+        {
+            // İsteğe bağlı profil: yoğunluk ve NPC trafiğini azaltarak
+            // senkronizasyon yükünü düşürür.
+            ApplyLowDesyncProfile(root, true);
+            log?.Invoke("Düşük gecikme profili uygulandı (trafik/ped kapalı, 4 NPC).");
+        }
+        else if (IsLowDesyncProfile(root))
+        {
+            // Kullanıcı profili kapattıysa (veya oyun açıkken kapattıysa) eski
+            // profil değerleri takılı kalmasın; yalnızca profil değerleri
+            // görülüyorsa varsayılana dön, özel ayarlara dokunma.
+            ApplyLowDesyncProfile(root, false);
+            log?.Invoke("Düşük gecikme profili kapatıldı; istemci ayarları varsayılana döndü.");
+        }
+
         var tmp = path + ".tmp";
         doc.Save(tmp);
         File.Move(tmp, path, overwrite: true);
         log?.Invoke($"İstemci ayarları yazıldı: {host}:{port} (AutoConnect={autoConnect}).");
     }
+
+    /// <summary>
+    /// Düşük gecikme profilini mevcut ClientSettings.xml dosyasına hemen uygular.
+    /// Profil kapatılınca GTACoOp varsayılanlarına (trafik/ped açık, 10 NPC) döner.
+    /// </summary>
+    public static void SetLowDesyncProfile(string gameFolder, bool enabled, Action<string>? log = null)
+    {
+        var path = SettingsPath(gameFolder);
+        if (!File.Exists(path)) return;
+
+        try
+        {
+            var bak = path + ".bak";
+            if (!File.Exists(bak))
+            {
+                File.Copy(path, bak);
+                log?.Invoke($"ClientSettings.xml yedeklendi: {Path.GetFileName(bak)}");
+            }
+
+            var doc = XDocument.Load(path);
+            if (doc.Root == null) return;
+
+            ApplyLowDesyncProfile(doc.Root, enabled);
+
+            var tmp = path + ".tmp";
+            doc.Save(tmp);
+            File.Move(tmp, path, overwrite: true);
+            log?.Invoke(enabled
+                ? "Düşük gecikme profili istemci ayarlarına uygulandı (trafik/ped kapalı, 4 NPC)."
+                : "Düşük gecikme profili kapatıldı; istemci ayarları varsayılana döndü.");
+        }
+        catch (Exception ex)
+        {
+            log?.Invoke("Düşük gecikme profili yazılamadı: " + ex.Message);
+        }
+    }
+
+    private static void ApplyLowDesyncProfile(XElement root, bool enabled)
+    {
+        Set(root, "DisableTraffic", enabled ? "true" : "false");
+        Set(root, "DisablePeds", enabled ? "true" : "false");
+        Set(root, "MaxStreamedNpcs", enabled ? "4" : "10");
+    }
+
+    private static bool IsLowDesyncProfile(XElement root) =>
+        Get(root, "DisableTraffic") == "true" &&
+        Get(root, "DisablePeds") == "true" &&
+        Get(root, "MaxStreamedNpcs") == "4";
+
+    private static string Get(XElement root, string name) =>
+        root.Elements().FirstOrDefault(e => e.Name.LocalName == name)?.Value ?? "";
 
     /// <summary>Yalnızca oyuncu adını (Username) günceller; diğer alanlara dokunmaz.</summary>
     public static void SetUsername(string gameFolder, string username, Action<string>? log = null)

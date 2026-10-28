@@ -1,5 +1,5 @@
 ==========================================================
- GTACoop Remake - Arkadaş Sürümü (Türkçe, v2.2.7)
+ GTACoop Remake - Arkadaş Sürümü (Türkçe, v2.3.5)
 ==========================================================
 
 Bu bir GTA V (Hikaye Modu) arkadaş-arası co-op aracıdır.
@@ -41,15 +41,27 @@ KURULUM
 4) "Sunucular" sekmesi:
    - EN KOLAY: Sunucu sahibinin gönderdiği KISA KOD'u (ör. Gel.com)
      "Kod ile Katıl..." düğmesine yazın; "Ekle ve Bağlan" deyin.
-     Launcher sunucu bilgilerini internetten alır; gerekirse
-     otomatik relay ile bağlanır. Port yönlendirme veya Radmin VPN
-     gerekmez. Sunucu açık ve internetiniz çalışır olmalıdır.
+     Launcher sunucu bilgilerini internetten alır ve önce otomatik
+     relay ile bağlanır; relay kurulamazsa ulaşılabilir doğrudan
+     adrese geçer. Port yönlendirme veya Radmin VPN gerekmez.
+     Sunucu açık ve internetiniz çalışır olmalıdır. Sunucu sahibi
+     "Sunucum > Relay sunucusu" ile özel bir relay seçebilir; bu
+     durumda bağlantı bore.pub'a zorla dönmez. Yönlendirici UPnP
+     destekliyorsa oyun/sync portları otomatik açılır; desteklemiyorsa
+     relay kullanılmaya devam eder.
    - Sunucu sahibi uzun GTC1 kodu gönderdiyse onu da aynı ekrana
-     yapıştırabilirsiniz; uzun kod bilgileri kendi taşır (relay yok).
+     yapıştırabilirsiniz; uzun kod bilgileri kendi taşır. Sunucu
+     açıkken oluşturulduysa relay bilgisini de taşır. Kodda kısa
+     kod varsa relay portları bağlanırken otomatik yenilenir. Kısa
+     kod yoksa ve sunucu yeniden başlatıldıysa yeni kod isteyin.
    - Alternatif: "Sunucu Ekle" deyin; sunucu sahibinin verdiği
      adresi ve portları girin (oyun portu 4499 UDP, sync 4599 TCP).
    - "Bağlan ve Oyna"ya basın. Sunucu modları otomatik iner,
      oyun açılır. Ayrıntılar: KODLA-KATIL.txt
+   - Alternatif: "Sunucu Tarayıcı" sekmesinden GTACoOp master
+     listesini, LAN'ı veya doğrudan IP:port'u tarayın. Sunucu adı,
+     oyuncu sayısı, mod, şifre, ping ve sürüm (güncel/eski) görünür.
+     Sync sunucusu yoksa oyun modsuz bağlanır.
    - Sunucu sahibi oyuna tamamen girdikten sonra bağlanın;
      GTACoOp oturumu host oyuna girince aktifleşir.
 
@@ -57,6 +69,13 @@ KURULUM
    yapısı bozuksa DLC paketleri güvenlik için atlanır. Launcher
    dosyanızı değiştirmez; script/ASI modları kurulmaya devam eder.
    Onarım için Launcher > Yedekler bölümünü kullanabilirsiniz.
+
+   İndirme çok yavaşsa veya bağlantı koparsa launcher otomatik
+   yeniden dener ve kaldığı yerden devam eder. Büyük dosyalar
+   (4 MB üstü 2, 12 MB üstü 4 paralel bağlantı) parçalı indirilir;
+   sunucu aynı ağdaysa relay atlanır. Sorun sürerse
+   %LOCALAPPDATA%\GTACoopRemake\logs\launcher-<tarih>.log dosyasını
+   sunucu sahibine gönderin.
 
 5) Oyunda:
    - F9  : GTA Coop menüsü
@@ -78,6 +97,8 @@ KURULUM
   Aynı kayıt dosyasına sahip olmanız gerekmez.
 - KENDİ modlarınıza asla dokunulmaz. Sunucudaki bir mod sizde
   zaten varsa o mod atlanır: indirilmez, üzerine yazılmaz.
+- Sunucu scriptleri doğrudan scripts\ klasörüne kurulur; yanlışlıkla
+  scripts\scripts\... gibi iç içe klasör oluşturulmaz.
 - Sunucu modları yalnızca siz oynarken kuruludur; oyundan
   çıkınca otomatik olarak kaldırılır.
 - Sunucu sahibi modları devre dışı bırakırsa bağlanınca mod
@@ -90,6 +111,8 @@ KURULUM
   sunucuyu seçip "Yeniden İndir..." deyin; o sunucunun dosyaları
   silinip baştan indirilir (oyuna kurulmaz). Modlar oyuna
   kuruluyken bu işlem çalışmaz; önce "Oturumu Bitir".
+- Büyük DLC indirirken ekranda inen/toplam boyut ve hız görünür.
+  Bağlantı koparsa indirme kaldığı yerden devam eder.
 - Oyun dosyalarınız değiştirilmez. "Bileşenler" sekmesinde
   yalnızca seçtiğiniz bileşen dosyaları güncellenir; değiştirilen
   dosyalar önce mods\GTACoop\backups\components altına yedeklenir.

@@ -1,4 +1,5 @@
-﻿using System.Text;
+﻿using System.Diagnostics;
+using System.Text;
 using GTACoop.Sync;
 
 // ---------------------------------------------------------------------------
@@ -81,6 +82,25 @@ builder.WebHost.ConfigureKestrel(k => k.ListenAnyIP(port));
 
 var app = builder.Build();
 
+// Dosya isteklerini (özellikle paralel Range parçalarını) sunucu tarafında
+// görünür kıl. Böylece "indirme takıldı" durumunda hangi parçanın istendiği,
+// hangi HTTP koduyla ve ne kadar sürede döndüğü logdan anlaşılır.
+app.Use(async (ctx, next) =>
+{
+    var isFile = ctx.Request.Path.StartsWithSegments("/api/v1/files");
+    var started = Stopwatch.GetTimestamp();
+    await next();
+    if (!isFile) return;
+
+    var elapsed = Stopwatch.GetElapsedTime(started).TotalMilliseconds;
+    var range = ctx.Request.Headers.Range.ToString();
+    Console.WriteLine(
+        $"[{DateTime.Now:HH:mm:ss}] HTTP {ctx.Response.StatusCode} " +
+        $"{elapsed:0} ms range={(range.Length == 0 ? "-" : range)} " +
+        $"len={ctx.Response.ContentLength?.ToString() ?? "?"} " +
+        $"<- {ctx.Connection.RemoteIpAddress} {ctx.Request.Path}");
+});
+
 bool Authorized(HttpContext ctx) =>
     string.IsNullOrEmpty(token) ||
     (ctx.Request.Headers.TryGetValue("X-Sync-Token", out var t) && t.ToString() == token);
@@ -99,7 +119,8 @@ app.MapGet("/api/v1/ping", () => Results.Json(new
     syncPort = port,
     disabledMods = DisabledMods().Count,
     app = "GTACoop.SyncServer",
-    version = "1.0"
+    version = "1.1",
+    range = true
 }, SyncJson.Options));
 
 app.MapGet("/api/v1/manifest", (HttpContext ctx) =>

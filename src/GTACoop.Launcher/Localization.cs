@@ -4,7 +4,7 @@ namespace GTACoop.Remake;
 /// Basit çoklu dil desteği. Anahtarlar Türkçe metinlerdir; İngilizce modda
 /// sözlükteki karşılıkları kullanılır. Eksik anahtar olursa Türkçesi gösterilir.
 /// </summary>
-public static class Loc
+public static partial class Loc
 {
     /// <summary>true ise arayüz İngilizce gösterilir.</summary>
     public static bool English { get; set; }
@@ -12,7 +12,8 @@ public static class Loc
     public static string T(string tr)
     {
         if (!English) return tr;
-        return En.TryGetValue(tr, out var en) ? en : tr;
+        if (En.TryGetValue(tr, out var en)) return en;
+        return RelayEn.TryGetValue(tr, out en) ? en : tr;
     }
 
     public static string T(string tr, params object?[] args)
@@ -93,6 +94,7 @@ public static class Loc
         ["Günlüğü Temizle"] = "Clear Log",
         ["Günlük / Araçlar"] = "Log / Tools",
         ["Günlük Dosyasını Aç"] = "Open Log File",
+        ["Düşük gecikme profili (trafik/ped azalt, 4 NPC)"] = "Low desync profile (reduce traffic/peds, 4 NPCs)",
         ["Hata: "] = "Error: ",
         ["Hazır"] = "Ready",
         ["Hazır: sunucu modları kurulu."] = "Ready: server mods installed.",
@@ -178,6 +180,74 @@ public static class Loc
         ["Senkronizasyon sunucusu: kapalı"] = "Sync server: stopped",
         ["Sil"] = "Delete",
         ["Sunucu"] = "Server",
+        ["Sunucu Tarayıcı"] = "Server Browser",
+        ["Sunucuları Tara"] = "Scan Servers",
+        ["LAN Tara"] = "Scan LAN",
+        ["LAN taranıyor..."] = "Scanning LAN...",
+        ["Sunucular taranıyor..."] = "Scanning servers...",
+        ["Liste adresi:"] = "List URL:",
+        ["Doğrudan:"] = "Direct:",
+        ["Bağlan"] = "Connect",
+        ["Oyuncular"] = "Players",
+        ["Sürüm"] = "Version",
+        ["Ping"] = "Ping",
+        ["Kaynak"] = "Source",
+        ["Sunucu Detayları"] = "Server Details",
+        ["Bir sunucu seçin."] = "Select a server.",
+        ["Hazır. Sunucuları taramak için 'Sunucuları Tara' düğmesine basın."] = "Ready. Press 'Scan Servers' to scan.",
+        ["GTA CooP sunucularını master listesinden, LAN'dan veya doğrudan adresten bulun. Sürüm, oyuncu sayısı, mod, şifre ve ping bilgileri discovery ile okunur."] = "Find GTA CooP servers from the master list, LAN, or a direct address. Version, player count, mode, password, and ping are read via discovery.",
+        ["Master listesi alınıyor..."] = "Fetching master list...",
+        ["Sunucular sorgulanıyor... {0}/{1}"] = "Querying servers... {0}/{1}",
+        ["Yanıtlar bekleniyor... ({0} sunucu sorgulandı)"] = "Waiting for replies... ({0} servers queried)",
+        ["Yanıt veren sunucu: {0}"] = "Server replied: {0}",
+        ["Master listesi"] = "Master list",
+        ["Keşif"] = "Discovery",
+        ["LAN"] = "LAN",
+        ["bilinmiyor"] = "unknown",
+        ["eski / sürüm yok"] = "old / no version",
+        ["eski"] = "old",
+        ["daha yeni"] = "newer",
+        ["Master listesi beklenenden büyük."] = "Master list is larger than expected.",
+        ["Master listesi boş."] = "Master list is empty.",
+        ["Master listesi tanınmayan bir JSON biçiminde."] = "Master list has an unknown JSON format.",
+        ["Master listesi bir dizi değil."] = "Master list is not an array.",
+        ["Master listesi okunamadı: {0}"] = "Could not read master list: {0}",
+        ["Doğrudan"] = "Direct",
+        ["Master: {0}"] = "Master: {0}",
+        ["Master listesine ulaşılamadı; LAN/doğrudan bağlantı kullanılabilir."] = "Could not reach the master list; LAN/direct connection is available.",
+        ["{0} sunucu yanıt verdi ({1} sorgu). {2}"] = "{0} servers replied ({1} queried). {2}",
+        ["{0} yerel sunucu yanıt verdi."] = "{0} local servers replied.",
+        ["Yanıt veren sunucu bulunamadı. LAN veya doğrudan bağlantı deneyin."] = "No server replied. Try LAN or a direct connection.",
+        ["Tarama iptal edildi."] = "Scan cancelled.",
+        ["Tarama hatası: "] = "Scan error: ",
+        ["Launcher zaten bir sunucuya bağlanıyor. Lütfen bekleyin."] = "The launcher is already connecting to a server. Please wait.",
+        ["Modsuz bağlantı hazırlanıyor..."] = "Preparing a mod-free connection...",
+        ["Oyun açılıyor... (modsuz bağlantı)"] = "Launching game... (mod-free connection)",
+        ["Hazır: modsuz bağlantı ayarlandı."] = "Ready: mod-free connection configured.",
+        ["Sunucu Tarayıcı: mod senkronizasyonu kontrol ediliyor..."] = "Server Browser: checking mod sync...",
+        ["Adresi IP:port biçiminde girin (ör. 127.0.0.1:4499)."] = "Enter the address as IP:port (e.g. 127.0.0.1:4499).",
+        ["Doğrudan sunucu yoklanıyor..."] = "Probing direct server...",
+        ["Sunucu discovery yanıtı vermedi. Yine de doğrudan bağlanılsın mı?\r\nSunucu açık ve port yönlendirmesi doğruysa bağlantı kurulabilir."] = "The server did not reply to discovery. Connect directly anyway?\r\nIf the server is running and port forwarding is correct, the connection may work.",
+        ["Doğrudan Sunucu {0}:{1}"] = "Direct Server {0}:{1}",
+        ["Sunucu 'Sunucular' listesine eklendi."] = "Server added to the 'Servers' list.",
+        ["Sunucu protokol sürümünü bildirmiyor. Eski bir GTACoOp sunucusu olabilir; güncel istemci sunucu tarafından reddedilebilir."] = "The server does not report its protocol version. It may be an older GTACoOp server; the current client may be rejected.",
+        ["Sunucu protokolü: {0} ({1}). Güncel istemci: {2}. Sunucu eski/yeni istemcileri kabul etmiyorsa bağlantı reddedilebilir."] = "Server protocol: {0} ({1}). Current client: {2}. The connection may be rejected if the server does not accept old/new clients.",
+        ["{0}\r\n\r\nYine de bağlanılsın mı?"] = "{0}\r\n\r\nConnect anyway?",
+        ["Sunucu   : {0}"] = "Server   : {0}",
+        ["Adres    : {0}"] = "Address  : {0}",
+        ["Oyuncular: {0}/{1}"] = "Players  : {0}/{1}",
+        ["Sürüm    : {0} ({1})"] = "Version  : {0} ({1})",
+        ["Mod      : {0}"] = "Mode     : {0}",
+        ["Şifre    : {0}"] = "Password : {0}",
+        ["Ping     : {0}"] = "Ping     : {0}",
+        ["Kaynak   : {0}"] = "Source   : {0}",
+        ["Not: Sunucu protokol sürümü bildirmiyor; eski bir GTACoOp sunucusu olabilir."] = "Note: The server does not report its protocol version; it may be an older GTACoOp server.",
+        ["Bağlanınca GTACoop Remake mod senkronizasyonu otomatik denenir; sync sunucusu yoksa oyun modsuz başlatılır."] = "On connect, GTACoop Remake mod sync is tried automatically; if no sync server exists, the game starts without mods.",
+        ["Sunuculara Ekle"] = "Add to Servers",
+        ["Modsuz Bağlan"] = "Connect Without Mods",
+        ["Sunucu Şifresi"] = "Server Password",
+        ["Sunucu:"] = "Server:",
+        ["Şifre:"] = "Password:",
         ["Sunucu : {0}  ({1}:{2})"] = "Server : {0}  ({1}:{2})",
         ["Sunucu adı boş olamaz."] = "Server name cannot be empty.",
         ["Sunucu adı:"] = "Server name:",
@@ -251,6 +321,9 @@ public static class Loc
         ["Bağlantı açılamadı: "] = "Could not open link: ",
         ["Bağlantılar"] = "Links",
         ["Geliştirici: Turkish Mods"] = "Developer: Turkish Mods",
+        ["İlk test eden: zaza specialist"] = "First tester: zaza specialist",
+        ["Arkadaşlık kodu: za_za"] = "Friend code: za_za",
+        ["zaza specialist — ilk test eden"] = "zaza specialist — first tester",
         ["GTA V hikâye modu için arkadaş-arası co-op aracı (GTACoOp tabanlı)."] = "A friend-to-friend co-op tool for GTA V story mode (based on GTACoOp).",
         ["GTACoop kaynak kodu (GitHub)"] = "GTACoop source code (GitHub)",
         ["GTACoop Remake, GTACoop (GTACoOp) açık kaynak projesini temel alan, GNU GPL v3 lisanslı ücretsiz bir araçtır; kaynak kodu GitHub'da açıktır.\r\nRockstar Games / Take-Two Interactive ile bağlantılı değildir; resmî bir ürün değildir. Orijinal GTA V gerektirir.\r\nÜcretsizdir: satılamaz, ticari amaçla dağıtılamaz."] = "GTACoop Remake is a free tool based on the open-source GTACoop (GTACoOp) project, licensed under GNU GPL v3; the source code is available on GitHub.\r\nNot affiliated with Rockstar Games / Take-Two Interactive; not an official product. Requires the original GTA V.\r\nIt is free: it may not be sold or distributed commercially.",

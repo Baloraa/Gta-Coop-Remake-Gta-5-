@@ -258,12 +258,17 @@ public sealed class RelayGameClient : IAsyncDisposable
 public sealed class TcpRelayProxy : IAsyncDisposable
 {
     private readonly TcpListener _listener;
-    private readonly string _remoteHost;
-    private readonly int _remotePort;
     private readonly CancellationTokenSource _cts = new();
+    private string _remoteHost;
+    private int _remotePort;
     private Task? _loop;
 
     public int LocalPort { get; }
+
+    /// <summary>Relay tüneli yeniden başladığında yeni uç noktayı döndürür.</summary>
+    public Func<CancellationToken, Task<(string Host, int Port)?>>? EndpointRefresh { get; set; }
+
+    public (string Host, int Port) RemoteEndpoint => (_remoteHost, _remotePort);
 
     public TcpRelayProxy(string remoteHost, int remotePort)
     {
@@ -273,6 +278,12 @@ public sealed class TcpRelayProxy : IAsyncDisposable
         _listener.Start();
         LocalPort = ((IPEndPoint)_listener.LocalEndpoint).Port;
         _loop = Task.Run(() => AcceptLoopAsync(_cts.Token));
+    }
+
+    public void UpdateEndpoint(string host, int port)
+    {
+        _remoteHost = host;
+        _remotePort = port;
     }
 
     private async Task AcceptLoopAsync(CancellationToken ct)
@@ -291,18 +302,53 @@ public sealed class TcpRelayProxy : IAsyncDisposable
     private async Task HandleAsync(TcpClient client, CancellationToken ct)
     {
         using var _ = client;
-        TcpClient remote;
-        try
+        TcpClient? remote = null;
+
+        for (var attempt = 0; attempt < 2 && remote == null; attempt++)
         {
-            remote = new TcpClient { NoDelay = true };
-            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
-            timeout.CancelAfter(TimeSpan.FromSeconds(10));
-            await remote.ConnectAsync(_remoteHost, _remotePort, timeout.Token).ConfigureAwait(false);
+            var host = _remoteHost;
+            var port = _remotePort;
+            try
+            {
+                remote = new TcpClient { NoDelay = true };
+                using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                timeout.CancelAfter(TimeSpan.FromSeconds(10));
+                await remote.ConnectAsync(host, port, timeout.Token).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                remote?.Dispose();
+                return;
+            }
+            catch when (attempt == 0 && EndpointRefresh != null)
+            {
+                // Relay tüneli yeniden başlamış olabilir; kısa koddan güncel
+                // portu al ve aynı isteği bir kez daha dene.
+                remote?.Dispose();
+                remote = null;
+                try
+                {
+                    var next = await EndpointRefresh(ct).ConfigureAwait(false);
+                    if (next == null) return;
+                    UpdateEndpoint(next.Value.Host, next.Value.Port);
+                }
+                catch (OperationCanceledException) when (ct.IsCancellationRequested)
+                {
+                    return;
+                }
+                catch
+                {
+                    return;
+                }
+            }
+            catch
+            {
+                remote?.Dispose();
+                return;
+            }
         }
-        catch
-        {
-            return;
-        }
+
+        if (remote == null) return;
 
         using var __ = remote;
         using var link = CancellationTokenSource.CreateLinkedTokenSource(ct);

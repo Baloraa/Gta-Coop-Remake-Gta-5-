@@ -28,6 +28,11 @@ namespace GTACoOp
         private const byte ActionStarted = 2;
         private const byte ActionEnded = 3;
         private const byte ActionCancelled = 4;
+        private const byte ActionState = 5;
+
+        // Aktif mission durumu periyodik olarak yayınlanır. Böylece sonradan
+        // katılan oyuncular da mission'ı öğrenir ve kaybolan paketler kendini onarır.
+        private const int HeartbeatInterval = 5000;
 
         private readonly NativeMenu _menu;
         private readonly ObjectPool _menuPool;
@@ -39,6 +44,10 @@ namespace GTACoOp
         private bool _remoteMission;
         private bool _lastLocalMissionFlag;
         private int _lastMissionCheck;
+        private int _lastHeartbeat;
+        private int _lastPlayerCount;
+        private int _lastRemoteState;
+        private bool _wasOnServer;
 
         private static readonly string[] Missions =
         {
@@ -128,6 +137,7 @@ namespace GTACoOp
             if (Function.Call<bool>(Hash.GET_MISSION_FLAG))
             {
                 _activeMission = mission;
+                _lastHeartbeat = Game.GameTime;
                 Send(ActionStarted, mission);
             }
         }
@@ -139,38 +149,93 @@ namespace GTACoOp
 
             _lastMissionCheck = Game.GameTime;
 
+            bool onServer = Main.IsOnServer();
             bool missionFlag = Function.Call<bool>(Hash.GET_MISSION_FLAG);
-            if (missionFlag == _lastLocalMissionFlag)
-                return;
 
-            _lastLocalMissionFlag = missionFlag;
-
-            if (!Main.IsOnServer())
-                return;
-
-            if (missionFlag)
+            // Sunucuda değilken yalnızca yerel durumu izle. Bağlanınca mission
+            // hâlâ sürüyorsa aşağıdaki "justConnected" yolu devreye girer.
+            if (!onServer)
             {
-                if (string.IsNullOrWhiteSpace(_selectedMission) && string.IsNullOrWhiteSpace(_activeMission))
-                    return;
+                _wasOnServer = false;
+                _lastLocalMissionFlag = missionFlag;
+                return;
+            }
 
-                string mission = string.IsNullOrWhiteSpace(_selectedMission) ? _activeMission : _selectedMission;
+            // Başka birinin mission'ına yardım ediyorsak kendi mission flag'imizi
+            // yayınlamayız; aksi hâlde iki taraf birbirinin durumunu ezer.
+            if (_remoteMission)
+            {
+                // Bitiş paketi kaybolursa HUD sonsuza kadar takılı kalmasın.
+                if (_lastRemoteState != 0 && Game.GameTime - _lastRemoteState > 30000)
+                {
+                    _activeMission = null;
+                    _hostName = null;
+                    _remoteMission = false;
+                    _lastRemoteState = 0;
+                    Notification.Show("Story mission state timed out; the host may have left the mission.");
+                }
+
+                _lastLocalMissionFlag = missionFlag;
+                return;
+            }
+
+            bool justConnected = !_wasOnServer;
+            _wasOnServer = true;
+
+            if (missionFlag && (justConnected || missionFlag != _lastLocalMissionFlag))
+            {
+                // Menüden mission seçilmediyse (ör. Pause > Replay Mission ile
+                // başlatıldıysa) genel bir ad kullan. Böylece host'un seçim
+                // yapmayı unutması davetlerin kaybolmasına yol açmaz.
+                string mission = !string.IsNullOrWhiteSpace(_selectedMission)
+                    ? _selectedMission
+                    : _activeMission;
                 if (string.IsNullOrWhiteSpace(mission))
-                    return;
+                    mission = "Host mission";
 
                 _activeMission = mission;
                 _remoteMission = false;
                 _hostName = Main.LocalDisplayName;
                 _statusItem.AltTitle = "In mission: " + mission;
+                _lastHeartbeat = Game.GameTime;
                 Send(ActionStarted, mission);
             }
-            else if (!string.IsNullOrWhiteSpace(_activeMission))
+            else if (!missionFlag && !justConnected && _lastLocalMissionFlag &&
+                     !string.IsNullOrWhiteSpace(_activeMission))
             {
                 string mission = _activeMission;
                 _activeMission = null;
                 _selectedMission = null;
                 _remoteMission = false;
                 _statusItem.AltTitle = "Mission ended: " + mission;
+                _lastHeartbeat = 0;
                 Send(ActionEnded, mission);
+            }
+
+            _lastLocalMissionFlag = missionFlag;
+
+            // Mission sürerken durum paketini periyodik olarak gönder. Yeni bir
+            // oyuncu katıldığında da hemen gönder ki geç katılanlar geride kalmasın.
+            if (missionFlag && !string.IsNullOrWhiteSpace(_activeMission))
+            {
+                int players = Main.PlayerCount;
+                bool playerListChanged = players != _lastPlayerCount;
+                _lastPlayerCount = players;
+
+                if (players > 1 && playerListChanged)
+                {
+                    _lastHeartbeat = Game.GameTime;
+                    Send(ActionState, _activeMission);
+                }
+                else if (Game.GameTime - _lastHeartbeat >= HeartbeatInterval)
+                {
+                    _lastHeartbeat = Game.GameTime;
+                    Send(ActionState, _activeMission);
+                }
+            }
+            else
+            {
+                _lastPlayerCount = Main.PlayerCount;
             }
         }
 
@@ -206,21 +271,53 @@ namespace GTACoOp
 
                     string host = string.IsNullOrWhiteSpace(senderName) ? "Host" : senderName;
 
+                    // Biz aktif olarak mission yönetiyorsak başka birinden gelen
+                    // davet/durum paketleri kendi durumumuzu ezmesin.
+                    bool localHosting = !_remoteMission && !string.IsNullOrWhiteSpace(_activeMission);
+                    if (localHosting &&
+                        (action == ActionInvite || action == ActionStarted || action == ActionState))
+                        return;
+
                     switch (action)
                     {
                         case ActionInvite:
                             _hostName = host;
+                            _activeMission = null;
                             _remoteMission = false;
                             Notification.Show("~b~" + host + "~w~ invites you to story mission: ~y~" + mission +
                                               "~w~. Stay near the host; do not start your own copy.");
                             break;
 
                         case ActionStarted:
-                            _hostName = host;
-                            _activeMission = mission;
-                            _remoteMission = true;
-                            Notification.Show("Host ~b~" + host + "~w~ started ~y~" + mission +
-                                              "~w~. Help them; cutscenes and objectives are host-only.");
+                            {
+                                bool alreadyActive = _remoteMission &&
+                                    string.Equals(_activeMission, mission, StringComparison.OrdinalIgnoreCase) &&
+                                    string.Equals(_hostName, host, StringComparison.OrdinalIgnoreCase);
+                                _hostName = host;
+                                _activeMission = mission;
+                                _remoteMission = true;
+                                _lastRemoteState = Game.GameTime;
+                                if (!alreadyActive)
+                                    Notification.Show("Host ~b~" + host + "~w~ started ~y~" + mission +
+                                                      "~w~. Help them; cutscenes and objectives are host-only.");
+                            }
+                            break;
+
+                        case ActionState:
+                            {
+                                // Periyodik durum paketi: aynı mission için sessizce
+                                // güncelle, yalnızca ilk öğrenildiğinde bildir.
+                                bool alreadyActive = _remoteMission &&
+                                    string.Equals(_activeMission, mission, StringComparison.OrdinalIgnoreCase) &&
+                                    string.Equals(_hostName, host, StringComparison.OrdinalIgnoreCase);
+                                _hostName = host;
+                                _activeMission = mission;
+                                _remoteMission = true;
+                                _lastRemoteState = Game.GameTime;
+                                if (!alreadyActive)
+                                    Notification.Show("Host ~b~" + host + "~w~ is running ~y~" + mission +
+                                                      "~w~. Join them; cutscenes and objectives are host-only.");
+                            }
                             break;
 
                         case ActionEnded:
@@ -228,8 +325,10 @@ namespace GTACoOp
                             {
                                 _activeMission = null;
                                 _remoteMission = false;
+                                _hostName = null;
+                                _lastRemoteState = 0;
+                                Notification.Show("Host ~b~" + host + "~w~ ended ~y~" + mission + "~w~.");
                             }
-                            Notification.Show("Host ~b~" + host + "~w~ ended ~y~" + mission + "~w~.");
                             break;
 
                         case ActionCancelled:
@@ -238,8 +337,9 @@ namespace GTACoOp
                                 _activeMission = null;
                                 _remoteMission = false;
                                 _hostName = null;
+                                _lastRemoteState = 0;
+                                Notification.Show("Story mission invite cancelled.");
                             }
-                            Notification.Show("Story mission invite cancelled.");
                             break;
                     }
                 }
@@ -261,6 +361,7 @@ namespace GTACoOp
             _activeMission = null;
             _hostName = null;
             _remoteMission = false;
+            _lastRemoteState = 0;
             Notification.Show("Story mission host disconnected.");
         }
 
@@ -270,6 +371,10 @@ namespace GTACoOp
             _hostName = null;
             _remoteMission = false;
             _lastLocalMissionFlag = false;
+            _lastHeartbeat = 0;
+            _lastPlayerCount = 0;
+            _lastRemoteState = 0;
+            _wasOnServer = false;
             _statusItem.AltTitle = string.IsNullOrWhiteSpace(_selectedMission)
                 ? "No mission selected"
                 : _selectedMission;
@@ -277,7 +382,15 @@ namespace GTACoOp
 
         private void CancelInvite()
         {
+            // Menüden iptal edilirse hem bekleyen daveti hem de varsa aktif
+            // host mission durumunu temizle; arkadaşlar HUD'da takılı kalmasın.
+            if (!_remoteMission && !string.IsNullOrWhiteSpace(_activeMission))
+                Send(ActionEnded, _activeMission);
+
             _selectedMission = null;
+            _activeMission = null;
+            _lastHeartbeat = 0;
+            _lastRemoteState = 0;
             _statusItem.AltTitle = "No mission selected";
             Send(ActionCancelled, "");
             Notification.Show("Story mission invite cancelled.");

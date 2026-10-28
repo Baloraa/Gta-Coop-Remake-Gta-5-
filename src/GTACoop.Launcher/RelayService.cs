@@ -33,11 +33,24 @@ public sealed class RelayHostService : IAsyncDisposable
     /// <summary>Değişen relay portlarını bildirir.</summary>
     public event Action? Changed;
 
+    /// <summary>Eski çağrılar için uyumluluk overload'u (varsayılan relay).</summary>
+    public static Task<RelayHostService?> StartAsync(
+        int gamePort, int syncPort, Action<string> log, CancellationToken ct)
+        => StartAsync(gamePort, syncPort, log, relayServer: null, ct: ct);
+
     public static async Task<RelayHostService?> StartAsync(
-        int gamePort, int syncPort, Action<string> log, CancellationToken ct = default)
+        int gamePort, int syncPort, Action<string> log,
+        string? relayServer = null, CancellationToken ct = default)
     {
-        var server = (Environment.GetEnvironmentVariable("GTACOOP_RELAY_SERVER") ?? "bore.pub").Trim();
+        // Öncelik: geliştirici ortam değişkeni > sunucu ayarı > bore.pub.
+        // Özel bir relay sunucusu seçildiyse başarısızlıkta bore.pub'a
+        // sessizce dönülmez; relay döngüsü aynı sunucuyu yeniden dener.
+        var env = Environment.GetEnvironmentVariable("GTACOOP_RELAY_SERVER");
+        var server = !string.IsNullOrWhiteSpace(env) ? env.Trim()
+            : !string.IsNullOrWhiteSpace(relayServer) ? relayServer.Trim()
+            : "bore.pub";
         if (server.Length == 0) server = "bore.pub";
+        log($"Relay sunucusu: {server}");
 
         RelayGameHost? gameHost = null;
         BoreTunnel? syncTunnel = null;
@@ -130,7 +143,9 @@ public sealed class RelaySession : IAsyncDisposable
         _gameClient = gameClient;
     }
 
-    public static async Task<RelaySession> StartAsync(ServerEntry entry, CancellationToken ct = default)
+    public static async Task<RelaySession> StartAsync(
+        ServerEntry entry, CancellationToken ct = default, bool requireSync = true,
+        Action<string>? log = null)
     {
         if (!entry.UsesRelay)
             throw new SyncException("Sunucuda relay bilgisi yok.");
@@ -139,8 +154,73 @@ public sealed class RelaySession : IAsyncDisposable
         RelayGameClient? game = null;
         try
         {
+            // Relay kontrol tüneli koptuğunda bore yeni bir genel port atar.
+            // Dosya indirmeleri eski porta bağlanmaya çalışırsa HTTP isteği
+            // sessizce asılı kalmasın diye kısa koddan güncel portu al.
+            var shortCode = entry.ShortCode?.Trim() ?? "";
+            if (shortCode.Length > 0)
+            {
+                sync.EndpointRefresh = async token =>
+                {
+                    try
+                    {
+                        using var lookupCts = CancellationTokenSource.CreateLinkedTokenSource(token);
+                        lookupCts.CancelAfter(TimeSpan.FromSeconds(8));
+                        var offer = await ShortCodeDirectory.LookupAsync(shortCode, lookupCts.Token)
+                            .ConfigureAwait(false);
+                        if (offer?.HasRelay != true) return null;
+
+                        var endpoint = (offer.RelayHost, offer.RelaySyncPort);
+                        if (endpoint.RelayHost != entry.RelayHost ||
+                            endpoint.RelaySyncPort != entry.RelaySyncPort)
+                        {
+                            entry.RelayHost = offer.RelayHost;
+                            entry.RelaySyncPort = offer.RelaySyncPort;
+                            entry.RelayGamePort = offer.RelayGamePort;
+                            log?.Invoke(
+                                $"Relay sync uç noktası yenilendi: {offer.RelayHost}:{offer.RelaySyncPort}");
+                        }
+                        return endpoint;
+                    }
+                    catch (OperationCanceledException) when (token.IsCancellationRequested)
+                    {
+                        return null;
+                    }
+                    catch (Exception ex)
+                    {
+                        log?.Invoke("Relay uç noktası yenilenemedi: " + ex.Message);
+                        return null;
+                    }
+                };
+            }
+
             game = await RelayGameClient.StartAsync(entry.RelayHost, entry.RelayGamePort, ct)
                 .ConfigureAwait(false);
+
+            // Relay TCP bağlantısı kurulsa bile karşı taraftaki sunucu hazır
+            // olmayabilir. Senkronizasyon gerekiyorsa gerçek bir HTTP isteğiyle
+            // doğrula; böylece ölü relay oturumu 60 dakikalık istemci zaman
+            // aşımına kadar asılı kalmaz.
+            if (requireSync)
+            {
+                using var verifyCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                verifyCts.CancelAfter(TimeSpan.FromSeconds(12));
+                try
+                {
+                    using var client = new SyncClient("127.0.0.1", sync.LocalPort, entry.SyncToken);
+                    await client.PingAsync(verifyCts.Token).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException) when (ct.IsCancellationRequested)
+                {
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    throw new SyncException(
+                        "Relay üzerinden senkronizasyon sunucusuna ulaşılamadı: " + ex.Message, ex);
+                }
+            }
+
             return new RelaySession(sync, game);
         }
         catch

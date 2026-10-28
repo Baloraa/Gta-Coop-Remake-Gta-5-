@@ -115,6 +115,19 @@ public sealed class LauncherSettings
     public bool RemoveModsOnExit { get; set; } = true;
 
     /// <summary>
+    /// Düşük gecikme profili: bağlantıda trafiği/ped'leri azaltır ve akışa
+    /// alınan NPC sayısını düşürür. Bu bir semptom azaltma profilidir;
+    /// çekirdek senkronizasyon protokolünü değiştirmez.
+    /// </summary>
+    public bool LowDesyncProfile { get; set; } = false;
+
+    /// <summary>
+    /// Sunucu Tarayıcı sekmesinin kullandığı GTACoOp master listesi.
+    /// Boşsa yerleşik varsayılan adres kullanılır.
+    /// </summary>
+    public string ServerBrowserMasterUrl { get; set; } = "https://master.gtacoop.com";
+
+    /// <summary>
     /// Kullanıcının seçtiği oyun başlatma dosyası. Boşsa otomatik seçim:
     /// PlayGTAV.exe -> GTA5_Enhanced.exe -> GTA5.exe.
     /// Oyun klasörü içindeyse göreli dosya adı olarak saklanır.
@@ -132,6 +145,12 @@ public sealed class ServerEntry
     public string Password { get; set; } = "";
     public string SyncToken { get; set; } = "";
     public bool AutoConnect { get; set; } = true;
+
+    /// <summary>
+    /// Sunucuyu eklerken kullanılan kısa kod (varsa). Relay bilgisi eskirse
+    /// bağlantı öncesinde bu kodla güncel relay uç noktaları yeniden alınır.
+    /// </summary>
+    public string ShortCode { get; set; } = "";
 
     // Otomatik relay (port yönlendirme/Radmin gerekmeden). Boşsa doğrudan bağlantı.
     public string RelayHost { get; set; } = "";

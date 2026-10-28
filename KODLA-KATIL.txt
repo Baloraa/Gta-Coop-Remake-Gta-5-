@@ -1,5 +1,5 @@
 ==========================================================
- GTACoop Remake - Sunucuya Katılma (v2.2.7)
+ GTACoop Remake - Sunucuya Katılma (v2.3.5)
 ==========================================================
 
 Sunucuya katılmanın iki yolu var:
@@ -9,8 +9,11 @@ Sunucuya katılmanın iki yolu var:
      relay açar; port yönlendirme veya Radmin VPN gerekmez.
 
   2) UZUN KOD (GTC1...)
-     Bağlantı bilgilerini kendi taşır; internet/hesap gerekmez.
-     Uzun kod relay bilgisi taşımaz (doğrudan bağlantı gerekir).
+     Bağlantı bilgilerini kendi taşır; kısa kod araması gerekmez.
+     Sunucu açıkken oluşturulduysa relay bilgisini de taşır.
+     "Sunucum" sekmesinde bir kısa kod ayarlıysa uzun kod onu da
+     taşır; arkadaşın bağlanırken güncel relay portları otomatik
+     yenilenir. Böylece sunucu yeniden başlatılsa bile çalışır.
 
 Her iki kod da "Sunucular" sekmesindeki "Kod ile Katıl..."
 ekranına yapıştırılır.
@@ -29,22 +32,28 @@ SUNUCU SAHİBİ - KISA KOD (önerilen)
    - "GTC1." ile başlayan kod kısa kod olarak kullanılamaz.
 
 3) "Sunucuyu Başlat" düğmesine bas. Kısa kod alanının altında
-   "Kısa kod yayında: Gel.com" ve "Otomatik relay: bore.pub ..."
+   "Kısa kod yayında: Gel.com" ve "Otomatik relay: <sunucu> ..."
    yazısını gör. Relay genellikle 1-2 saniyede hazır olur.
+   "Relay sunucusu" alanı boşsa bore.pub kullanılır; kendi bore
+   uyumlu sunucunuzu "host:port" olarak yazabilirsiniz. Yönlendirici
+   UPnP destekliyorsa oyun (UDP) ve sync (TCP) portları ayrıca
+   otomatik yönlendirilir; desteklemiyorsa relay devam eder.
    Launcher kodu ntfy.sh üzerinden şifreli yayınlar ve 60
    saniyede bir tazeler; sunucu durunca kod çevrimdışı olur.
 
 4) Arkadaşına SADECE kısa kodu gönder (WhatsApp, Discord...).
 
-5) Arkadaşın kodu girdiğinde launcher önce doğrudan adresleri
-   dener, ulaşamazsa otomatik relay'e geçer. Sunucu ve
-   arkadaşının launcher'ı oyun sırasında AÇIK KALMALIDIR.
+5) Arkadaşın kodu girdiğinde launcher önce otomatik relay'i
+   dener; relay kurulamazsa aynı ağ/Radmin/port yönlendirme
+   adreslerine geçer. Sunucu ve arkadaşının launcher'ı oyun
+   sırasında AÇIK KALMALIDIR.
 
 Not: Kısa kod, sunucu şifresini ve sync token'ını da şifreli
 olarak taşır; sadece güvendiğin kişilere ver. Relay trafiği
 bore.pub üzerinden geçer; sunucu adresi rastgele bir genel
 porttadır. Relay doğrudan bağlantıdan biraz daha yavaş olabilir.
-Port yönlendirme/Radmin varsa launcher zaten önce onu dener.
+Aynı Wi-Fi/hotspot veya Radmin VPN üzerindeyseniz katılım
+ekranında "Doğrudan" modunu seçebilirsiniz.
 
 ------------------------------------------------------------------
 SUNUCU SAHİBİ - UZUN KOD (GTC1...)
@@ -64,10 +73,14 @@ SUNUCU SAHİBİ - UZUN KOD (GTC1...)
 5) "Sunucuyu Başlat" ile sunucuyu aç. Arkadaşın kod ile bağlanınca
    sunucu modları otomatik inecek.
 
-Not: Uzun kod bağlantı bilgilerini kendi taşır; internet hesabı
-gerektirmez ve sunucu kapalıyken de oluşturulabilir. Şifre/token
-içerebilir; sadece güvendiğin kişilere ver. CGNAT/port yönlendirme
-sorunu varsa kısa kod kullan.
+Not: Uzun kod bağlantı bilgilerini kendi taşır; sunucu kapalıyken
+de oluşturulabilir. Sunucu açıkken oluşturursan relay uç noktaları
+da koda eklenir. Bir kısa kod ayarlıysa o da koda eklenir ve
+arkadaşın bağlanırken relay bilgisi bu koddan yenilenir; bu sayede
+sunucuyu yeniden başlatsan bile aynı uzun kod çalışır. Kısa kod
+yoksa uzun koddaki relay bilgisi tek oturumluktur; sunucuyu yeniden
+başlattıysan yeni bir uzun kod oluştur. Şifre/token içerebilir;
+sadece güvendiğin kişilere ver.
 
 ------------------------------------------------------------------
 ARKADAŞ (katılan)
@@ -78,9 +91,12 @@ ARKADAŞ (katılan)
    açıldığında otomatik dolar; değilse kodu yapıştır.
 
 3) Kısa kod (Gel.com) girersen launcher sunucuyu internetten bulur
-   ve otomatik relay ile bağlanır. Sunucunun ve senin launcher'ının
-   açık olması gerekir. Uzun kod (GTC1...) girersen bilgiler koddan
-   okunur; bu durumda doğrudan bağlantı/port yönlendirme gerekir.
+   ve önce otomatik relay ile bağlanır. Sunucunun ve senin
+   launcher'ının açık olması gerekir. Uzun kod (GTC1...) girersen
+   bilgiler koddan okunur; kodda kısa kod varsa relay bilgisi
+   bağlanırken güncellenir. Kısa kod yoksa ve sunucu yeniden
+   başlatıldıysa eski uzun koddaki relay portları geçersiz olabilir;
+   sunucu sahibinden yeni kod iste.
 
 4) Bilgiler görününce "Ekle ve Bağlan" de. Sunucu listeye eklenir,
    modlar iner ve oyun açılır.
@@ -133,14 +149,19 @@ SIK SORULANLAR
   internet bağlantın çalışıyor mu? Kısa kod ancak sunucu
   başlatılınca yayınlanır. Uzun GTC1 kodunu da deneyebilirsin.
 - Kısa kod bulundu ama bağlanmadı: sunucu sahibiyle ikiniz de
-  v2.2.3 (veya daha yeni) kullanın. Sunucu tarafında "Otomatik
-  relay: bore.pub ..." yazısı görünmeli. Birkaç saniye sonra
+  v2.3.5 (veya daha yeni) kullanın. Sunucu tarafında "Otomatik
+  relay: <sunucu> ..." yazısı görünmeli. Birkaç saniye sonra
   "Yeniden Ara" ile tekrar dene.
-- Relay çalışmıyor: bore.pub erişilemiyor olabilir. Doğrudan
+- Relay çalışmıyor: bore.pub (veya sunucunun seçtiği özel relay)
+  erişilemiyor olabilir. Doğrudan
   bağlantı için Radmin VPN (ücretsiz) kullan veya 4499 UDP +
-  4599 TCP portlarını yönlendir; uzun GTC1 kodunu dene.
+  4599 TCP portlarını yönlendir; sunucu açıkken oluşturulmuş
+  güncel uzun GTC1 kodunu dene.
 - Uzun kod çalışmadı: eksiksiz kopyalandığından emin ol; satır
-  sonları sorun değil, launcher boşlukları temizler.
+  sonları sorun değil, launcher boşlukları temizler. Sunucu yeniden
+  başlatıldıysa ve kodda kısa kod yoksa relay portları değişmiş
+  olabilir; sunucu açıkken oluşturulmuş yeni bir uzun kod iste.
+  Kısa kodlu uzun kodlar relay bilgisini otomatik yeniler.
 - Aynı ağdasınız yerel IP yeterli. İnternet üzerinden kısa kod
   + otomatik relay en kolay yoldur.
 - Sunucu kapalıyken uzun kod oluşturabilirsin; arkadaşın sen

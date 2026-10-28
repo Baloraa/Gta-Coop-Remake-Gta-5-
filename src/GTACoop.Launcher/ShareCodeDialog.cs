@@ -20,18 +20,21 @@ public sealed class ShareCodeDialog : Form
     private readonly bool _serverRunning;
     private readonly string _publishStatus;
     private readonly bool _publishOk;
-    private readonly RelayEndpoints? _relay;
+    private readonly Func<RelayEndpoints?>? _relayProvider;
+    private RelayEndpoints? _relay;
     private readonly string _relayStatus;
 
     public ShareCodeDialog(MyServerSettings settings, bool serverRunning = false,
         string? publishStatus = null, bool publishOk = false,
-        RelayEndpoints? relay = null, string? relayStatus = null)
+        RelayEndpoints? relay = null, string? relayStatus = null,
+        Func<RelayEndpoints?>? relayProvider = null)
     {
         _settings = settings;
         _serverRunning = serverRunning;
         _publishStatus = publishStatus ?? "";
         _publishOk = publishOk;
-        _relay = relay;
+        _relayProvider = relayProvider;
+        _relay = relay ?? relayProvider?.Invoke();
         _relayStatus = relayStatus ?? "";
 
         Text = T("Katılım Kodu Oluştur");
@@ -276,6 +279,10 @@ public sealed class ShareCodeDialog : Form
 
     private void RefreshCode()
     {
+        // Relay, pencere açıldıktan sonra hazır olmuş olabilir; kodu
+        // yenilerken güncel uç noktaları tekrar al.
+        _relay = _relayProvider?.Invoke() ?? _relay;
+
         var host = CurrentAddress();
         if (host.Length == 0)
         {
@@ -293,13 +300,41 @@ public sealed class ShareCodeDialog : Form
             SyncPort = _settings.SyncPort,
             Password = _settings.Password,
             SyncToken = _settings.SyncToken,
-            AutoConnect = true
+            AutoConnect = true,
+            ShortCode = ShortCodeDirectory.TryNormalize(
+                _settings.ShortCode, out var normalizedShort, out _)
+                ? normalizedShort
+                : ""
         };
+
+        if (_relay != null)
+        {
+            entry.RelayHost = _relay.Host;
+            entry.RelaySyncPort = _relay.SyncPort;
+            entry.RelayGamePort = _relay.GamePort;
+        }
 
         _code.Text = JoinCode.Create(entry);
         _status.ForeColor = Color.DimGray;
-        _status.Text = T("Adres: {0}  |  Oyun portu: {1}  |  Sync portu: {2}",
-            host, _settings.GamePort, _settings.SyncPort);
+        _status.Text = _relay != null
+            ? T("Adres: {0}  |  Oyun portu: {1}  |  Sync portu: {2}\r\nOtomatik relay koda eklendi: {3} (sync {4}, oyun {5}). Arkadaşınız relay öncelikli bağlanır.",
+                host, _settings.GamePort, _settings.SyncPort,
+                _relay.Host, _relay.SyncPort, _relay.GamePort)
+            : T("Adres: {0}  |  Oyun portu: {1}  |  Sync portu: {2}",
+                host, _settings.GamePort, _settings.SyncPort);
+
+        if (entry.ShortCode.Length > 0)
+        {
+            _status.Text += "\r\n" + T(
+                "Kısa kod da koda eklendi ({0}); sunucu yeniden başlarsa relay bilgisi bağlanırken otomatik yenilenir.",
+                entry.ShortCode);
+        }
+
+        if (_shortStatus.Text.Length > 0)
+        {
+            _shortStatus.Text = ShortStatusText();
+            _shortStatus.ForeColor = ShortStatusColor();
+        }
     }
 
     private void CopyCode()

@@ -198,9 +198,10 @@ try
             var gameDir = Path.GetFullPath(args[1]);
             var host = args[2];
             var port = int.Parse(args[3]);
-            var password = args.Length > 4 ? args[4] : "";
+            var password = args.Length > 4 && !args[4].StartsWith("--") ? args[4] : "";
+            var lowDesync = args.Contains("--low");
             ClientSettingsEditor.Apply(gameDir, "TestOyuncu", host, port, password, true,
-                s => Console.WriteLine("  " + s));
+                lowDesync: lowDesync, log: s => Console.WriteLine("  " + s));
             Console.WriteLine("--- ClientSettings.xml: ---");
             Console.WriteLine(File.ReadAllText(ClientSettingsEditor.SettingsPath(gameDir)));
             ClientSettingsEditor.DisableAutoConnect(gameDir, s => Console.WriteLine("  " + s));

@@ -13,12 +13,15 @@ public sealed class MainForm : Form
     private readonly GameTab _gameTab = new();
     private readonly ComponentsTab _componentsTab = new();
     private readonly ServersTab _serversTab = new();
+    private readonly ServerBrowserTab _serverBrowserTab;
     private readonly MyServerTab _serverTab = new();
     private readonly LogTab _logTab = new();
     private readonly AboutTab _aboutTab = new();
 
     public MainForm()
     {
+        _serverBrowserTab = new ServerBrowserTab(_serversTab);
+
         // Yüksek DPI ekranlarda (125%, 150%...) arayüzün düzgün ölçeklenmesi için:
         // pencere ve içerik, ekran ölçeğine göre orantılı büyür; tuşlar kesilmez.
         AutoScaleMode = AutoScaleMode.Dpi;
@@ -56,6 +59,8 @@ public sealed class MainForm : Form
             _serverTab.RefreshStatus();
             if (_tabs.SelectedTab?.Controls.Contains(_componentsTab) == true)
                 _componentsTab.OnShown();
+            if (_tabs.SelectedTab?.Controls.Contains(_serverBrowserTab) == true)
+                _serverBrowserTab.OnShown();
         };
     }
 
@@ -149,6 +154,7 @@ public sealed class MainForm : Form
         AddTab(T("Oyun"), _gameTab);
         AddTab(T("Bileşenler"), _componentsTab);
         AddTab(T("Sunucular"), _serversTab);
+        AddTab(T("Sunucu Tarayıcı"), _serverBrowserTab);
         AddTab(T("Sunucum"), _serverTab);
         AddTab(T("Günlük / Araçlar"), _logTab);
         AddTab(T("Hakkında"), _aboutTab);
@@ -234,6 +240,13 @@ public sealed class MainForm : Form
     {
         var page = _tabs.TabPages.Cast<TabPage>()
             .FirstOrDefault(p => p.Controls.Contains(_componentsTab));
+        if (page != null) _tabs.SelectedTab = page;
+    }
+
+    public void ShowServersTab()
+    {
+        var page = _tabs.TabPages.Cast<TabPage>()
+            .FirstOrDefault(p => p.Controls.Contains(_serversTab));
         if (page != null) _tabs.SelectedTab = page;
     }
 

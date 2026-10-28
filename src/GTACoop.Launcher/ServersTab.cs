@@ -1,4 +1,6 @@
-﻿using System.Windows.Forms;
+﻿using System.Diagnostics;
+using System.Net.Sockets;
+using System.Windows.Forms;
 using GTACoop.Sync;
 
 namespace GTACoop.Remake;
@@ -12,15 +14,21 @@ public sealed class ServersTab : UserControl
     private readonly Button _connectBtn;
     private readonly Button _cancelBtn;
     private readonly CheckBox _sessionMode = new();
+    private readonly CheckBox _lowDesync = new();
     private readonly Label _sessionInfo = new();
     private readonly Button _endSessionBtn;
     private readonly System.Windows.Forms.Timer _sessionTimer = new();
+    private readonly System.Windows.Forms.Timer _statusTimer = new();
+    private readonly Dictionary<string, ServerStatus> _statusCache = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, DateTime> _codeRefreshAt = new(StringComparer.OrdinalIgnoreCase);
+    private bool _statusChecking;
     private CancellationTokenSource? _cts;
     private CancellationTokenSource? _fallbackWatcherCts;
     private RelaySession? _activeRelay;
     private DateTime? _relayIdleSince;
     private bool _relayGameSeen;
     private bool _busy;
+    private bool _browserConnectBusy;
 
     public ServersTab()
     {
@@ -30,14 +38,15 @@ public sealed class ServersTab : UserControl
         {
             Dock = DockStyle.Top,
             AutoSize = false,
-            Height = 48,
+            Height = 72,
             Text = T("Sunucu listesine sunucu ekleyin (arkadaşınızın IP'si veya kendi sunucunuz), seçip 'Bağlan ve Oyna'ya basın.\r\nSunucunun tüm modları (araç/ped paketleri, scriptler, ASI eklentileri) otomatik indirilir ve yalnızca siz oynarken kurulu kalır; oyundan çıkınca kaldırılır."),
             ForeColor = Color.DimGray,
             Padding = new Padding(4, 4, 4, 4)
         };
 
         Ui.StyleList(_list,
-            (T("Sunucu"), 240), (T("Adres"), 200), (T("Oyun Portu"), 90), ("Sync", 80), (T("Şifre"), 80));
+            (T("Sunucu"), 220), (T("Adres"), 190), (T("Oyun Portu"), 85), ("Sync", 70),
+            (T("Şifre"), 65), (T("Durum"), 180));
         _list.Height = 190;
         _list.Dock = DockStyle.Top;
         _list.DoubleClick += (_, _) => EditServer();
@@ -56,7 +65,7 @@ public sealed class ServersTab : UserControl
         {
             Text = T("Bağlantı"),
             Dock = DockStyle.Top,
-            Height = 290,
+            Height = 315,
             Padding = new Padding(10)
         };
 
@@ -84,6 +93,29 @@ public sealed class ServersTab : UserControl
                 : "Oturum modu kapatıldı: sunucu modları kurulu kalacak.");
         };
 
+        _lowDesync.Text = T("Düşük gecikme profili (trafik/ped azalt, 4 NPC)");
+        _lowDesync.AutoSize = true;
+        _lowDesync.Checked = AppEnv.Settings.LowDesyncProfile;
+        _lowDesync.Margin = new Padding(12, 8, 4, 4);
+        _lowDesync.CheckedChanged += (_, _) =>
+        {
+            AppEnv.Settings.LowDesyncProfile = _lowDesync.Checked;
+            AppEnv.SaveSettings();
+            AppEnv.Log(_lowDesync.Checked
+                ? "Düşük gecikme profili açıldı: bağlantıda trafik/ped kapatılacak, NPC sayısı 4 olacak."
+                : "Düşük gecikme profili kapatıldı: istemci ayarları varsayılana dönecek.");
+
+            var gameFolder = AppEnv.Settings.GameFolder;
+            if (AddonApplier.IsGameRunning())
+            {
+                AppEnv.Log("Oyun açıkken profil yazılmadı; bir sonraki bağlantıda uygulanacak.");
+            }
+            else if (!string.IsNullOrWhiteSpace(gameFolder) && GameFolder.IsValid(gameFolder))
+            {
+                ClientSettingsEditor.SetLowDesyncProfile(gameFolder, _lowDesync.Checked, AppEnv.Log);
+            }
+        };
+
         _endSessionBtn = Ui.Btn(T("Oturumu Bitir (modları kaldır)"), (_, _) => _ = EndSessionAsync());
         _endSessionBtn.Enabled = false;
 
@@ -92,6 +124,7 @@ public sealed class ServersTab : UserControl
 
         var sessionRow = Ui.Flow();
         sessionRow.Controls.Add(_sessionMode);
+        sessionRow.Controls.Add(_lowDesync);
         sessionRow.Controls.Add(_endSessionBtn);
         sessionRow.Controls.Add(_sessionInfo);
 
@@ -126,8 +159,174 @@ public sealed class ServersTab : UserControl
         _sessionTimer.Tick += (_, _) => RefreshSessionUi();
         _sessionTimer.Start();
 
+        // Minecraft benzeri canlı durum: sekme görünürken 5 saniyede bir
+        // sync portuna kısa TCP bağlantısı dener, yeşil/kırmızı gösterir.
+        _statusTimer.Interval = 5000;
+        _statusTimer.Tick += (_, _) =>
+        {
+            if (Visible && !_busy) _ = CheckStatusesAsync();
+        };
+        _statusTimer.Start();
+
+        VisibleChanged += (_, _) =>
+        {
+            if (Visible && !_busy) _ = CheckStatusesAsync();
+        };
+
         RefreshList();
         RefreshSessionUi();
+    }
+
+    public bool IsBusy => _busy || _browserConnectBusy;
+
+    /// <summary>
+    /// Sunucu Tarayıcı sekmesinden bağlanır. Sunucuda GTACoop Remake mod
+    /// senkronizasyonu varsa modları kurar; yoksa oyunu modsuz başlatır.
+    /// </summary>
+    public async Task ConnectFromBrowserAsync(ServerEntry entry, bool launch = true)
+    {
+        if (IsBusy) return;
+        _browserConnectBusy = true;
+        try
+        {
+            // Tarayıcıdan bağlanırken sunucuyu "Sunucular" listesine ekleme:
+            // doğrudan keşfedilen adresle çalış. Kullanıcı isterse ayrıca
+            // "Sunuculara Ekle" düğmesini kullanabilir.
+            SetStatus(T("Sunucu Tarayıcı: mod senkronizasyonu kontrol ediliyor..."), Ui.WarnColor);
+            var syncPort = await FindSyncPortAsync(entry, CancellationToken.None);
+            if (syncPort > 0)
+            {
+                entry.SyncPort = syncPort;
+                AppEnv.Log($"Sunucu Tarayıcı: mod senkronizasyonu bulundu (port {syncPort}).");
+                await ConnectAsync(launch, entry);
+            }
+            else
+            {
+                AppEnv.Log("Sunucu Tarayıcı: mod senkronizasyonu yok; modsuz bağlantıya geçiliyor.");
+                await ConnectGameOnlyAsync(entry, launch);
+            }
+        }
+        catch (Exception ex)
+        {
+            SetStatus(T("Hata: ") + ex.Message, Ui.ErrColor);
+            AppEnv.LogError("Sunucu Tarayıcı bağlantısı: " + ex.Message);
+            Ui.Error(FindForm()!, ex.Message);
+        }
+        finally
+        {
+            _browserConnectBusy = false;
+            RefreshSessionUi();
+        }
+    }
+
+    /// <summary>Sunucu Tarayıcı'dan mod senkronizasyonunu atlayarak bağlanır.</summary>
+    public async Task ConnectGameOnlyFromBrowserAsync(ServerEntry entry, bool launch = true)
+    {
+        if (IsBusy) return;
+        _browserConnectBusy = true;
+        try
+        {
+            // Sunucuyu listeye eklemeden doğrudan modsuz bağlan.
+            await ConnectGameOnlyAsync(entry, launch);
+        }
+        catch (Exception ex)
+        {
+            SetStatus(T("Hata: ") + ex.Message, Ui.ErrColor);
+            AppEnv.LogError("Sunucu Tarayıcı (modsuz) bağlantısı: " + ex.Message);
+            Ui.Error(FindForm()!, ex.Message);
+        }
+        finally
+        {
+            _browserConnectBusy = false;
+            RefreshSessionUi();
+        }
+    }
+
+    /// <summary>Sunucu Tarayıcı'dan sunucuyu yalnızca listeye ekler.</summary>
+    public void AddServerFromBrowser(ServerEntry entry)
+    {
+        var saved = AddOrUpdateServer(entry);
+        RefreshList();
+        SelectEntry(saved);
+        AppEnv.Log($"Sunucu Tarayıcı: listeye eklendi: {saved.Name} ({saved.Host}:{saved.GamePort})");
+    }
+
+    private ServerEntry AddOrUpdateServer(ServerEntry entry)
+    {
+        var existing = AppEnv.Settings.Servers.FirstOrDefault(s =>
+            string.Equals(s.Host, entry.Host, StringComparison.OrdinalIgnoreCase) &&
+            s.GamePort == entry.GamePort);
+
+        if (existing != null)
+        {
+            existing.Name = string.IsNullOrWhiteSpace(entry.Name) ? existing.Name : entry.Name;
+            if (!string.IsNullOrWhiteSpace(entry.Password)) existing.Password = entry.Password;
+            if (entry.SyncPort is > 0 and <= 65535) existing.SyncPort = entry.SyncPort;
+            if (!string.IsNullOrWhiteSpace(entry.SyncToken)) existing.SyncToken = entry.SyncToken;
+            if (!string.IsNullOrWhiteSpace(entry.ShortCode)) existing.ShortCode = entry.ShortCode;
+            if (entry.UsesRelay)
+            {
+                existing.RelayHost = entry.RelayHost;
+                existing.RelaySyncPort = entry.RelaySyncPort;
+                existing.RelayGamePort = entry.RelayGamePort;
+                if (LocalAddresses.IsDirectReachable(entry.Host) ||
+                    !LocalAddresses.IsDirectReachable(existing.Host))
+                    existing.Host = entry.Host;
+            }
+            if (entry.AutoConnect) existing.AutoConnect = true;
+            AppEnv.SaveSettings();
+            return existing;
+        }
+
+        AppEnv.Settings.Servers.Add(entry);
+        AppEnv.SaveSettings();
+        return entry;
+    }
+
+    private void SelectEntry(ServerEntry entry)
+    {
+        foreach (ListViewItem item in _list.Items)
+        {
+            if (!ReferenceEquals(item.Tag, entry)) continue;
+            item.Selected = true;
+            item.Focused = true;
+            item.EnsureVisible();
+            _list.Select();
+            break;
+        }
+    }
+
+    /// <summary>
+    /// GTACoop Remake sunucularında sync portu genellikle oyun portu + 100'dür.
+    /// Bilinen portlar sırayla ve kısa zaman aşımıyla denenir.
+    /// </summary>
+    private static async Task<int> FindSyncPortAsync(ServerEntry entry, CancellationToken ct)
+    {
+        var candidates = new[] { entry.SyncPort, 4599 }
+            .Where(p => p is > 0 and <= 65535)
+            .Distinct()
+            .ToList();
+
+        foreach (var port in candidates)
+        {
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            cts.CancelAfter(TimeSpan.FromMilliseconds(1500));
+            try
+            {
+                using var client = new SyncClient(entry.Host, port, entry.SyncToken);
+                await client.PingAsync(cts.Token);
+                return port;
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch
+            {
+                // Bu portta sync sunucusu yok; sıradaki adayı dene.
+            }
+        }
+        return 0;
     }
 
     // ------------------------------------------------------------------ liste
@@ -138,18 +337,163 @@ public sealed class ServersTab : UserControl
         _list.Items.Clear();
         foreach (var s in AppEnv.Settings.Servers)
         {
+            var key = StatusKey(s);
+            var status = _statusCache.TryGetValue(key, out var cached) ? cached : default;
             var item = new ListViewItem(new[]
             {
                 s.Name,
                 s.UsesRelay ? T("{0} (relay)", s.Host) : s.Host,
                 s.UsesRelay ? s.RelayGamePort.ToString() : s.GamePort.ToString(),
                 s.UsesRelay ? s.RelaySyncPort.ToString() : s.SyncPort.ToString(),
-                string.IsNullOrEmpty(s.Password) ? "-" : T("var")
+                string.IsNullOrEmpty(s.Password) ? "-" : T("var"),
+                status.Known
+                    ? (status.Online
+                        ? "● " + T("Çevrimiçi") + $" ({status.Ms} ms)"
+                        : "● " + T("Çevrimdışı"))
+                    : "◌ " + T("Kontrol ediliyor...")
             });
             item.Tag = s;
+            item.UseItemStyleForSubItems = false;
+            item.SubItems[5].ForeColor = !status.Known
+                ? Color.DimGray
+                : status.Online ? Ui.OkColor : Ui.ErrColor;
             _list.Items.Add(item);
         }
         _list.EndUpdate();
+
+        if (Visible && !_busy) _ = CheckStatusesAsync();
+    }
+
+    // ------------------------------------------------------------------ canlı durum
+
+    private readonly record struct ServerStatus(bool Known, bool Online, int Ms);
+
+    private static string StatusKey(ServerEntry s) =>
+        $"{s.Host}|{s.SyncPort}|{s.RelayHost}|{s.RelaySyncPort}";
+
+    /// <summary>
+    /// Her sunucunun sync portuna kısa bir TCP bağlantısı dener. Relay varsa
+    /// önce doğrudan adres, sonra relay uç noktası denenir. Hiçbiri yoksa
+    /// (ör. yalnızca özel ağ adresi taşıyan eski kısa kod kaydı) durum
+    /// "bilinmiyor" kalır; kısa kod seyrek aralıkla tazelenir.
+    /// </summary>
+    private async Task CheckStatusesAsync()
+    {
+        if (_statusChecking) return;
+
+        var servers = AppEnv.Settings.Servers.ToList();
+        if (servers.Count == 0) return;
+
+        _statusChecking = true;
+        try
+        {
+            var now = DateTime.UtcNow;
+            foreach (var s in servers)
+            {
+                if (string.IsNullOrWhiteSpace(s.ShortCode)) continue;
+
+                var key = StatusKey(s);
+                if (_statusCache.TryGetValue(key, out var cached) && cached.Online) continue;
+                if (_codeRefreshAt.TryGetValue(key, out var last) &&
+                    now - last < TimeSpan.FromSeconds(30)) continue;
+
+                _codeRefreshAt[key] = now;
+                await RefreshRelayInfoAsync(s, CancellationToken.None, quiet: true);
+                break; // bir turda en fazla bir kısa kod sorgusu
+            }
+
+            var results = await Task.WhenAll(servers.Select(ProbeStatusAsync));
+
+            for (int i = 0; i < servers.Count; i++)
+            {
+                var server = servers[i];
+                var result = results[i];
+                var key = StatusKey(server);
+
+                if (_statusCache.TryGetValue(key, out var old) &&
+                    old.Known && result.Known && old.Online != result.Online)
+                {
+                    AppEnv.Log(result.Online
+                        ? $"Sunucu çevrimiçi: {server.Name} ({result.Ms} ms)"
+                        : $"Sunucu çevrimdışı: {server.Name}");
+                }
+
+                _statusCache[key] = result;
+                UpdateItemStatus(server, result);
+            }
+        }
+        catch (Exception ex)
+        {
+            AppEnv.Log("Sunucu durumu kontrol edilemedi: " + ex.Message);
+        }
+        finally
+        {
+            _statusChecking = false;
+        }
+    }
+
+    private static async Task<ServerStatus> ProbeStatusAsync(ServerEntry s)
+    {
+        var targets = new List<(string Host, int Port)>();
+
+        if (s.SyncPort is > 0 and <= 65535)
+        {
+            if (LocalAddresses.IsLocalAddress(s.Host))
+                targets.Add(("127.0.0.1", s.SyncPort));
+            else if (LocalAddresses.IsDirectReachable(s.Host))
+                targets.Add((s.Host, s.SyncPort));
+        }
+
+        if (s.UsesRelay && s.RelaySyncPort is > 0 and <= 65535)
+            targets.Add((s.RelayHost, s.RelaySyncPort));
+
+        if (targets.Count == 0) return default;
+
+        foreach (var (host, port) in targets)
+        {
+            var sw = Stopwatch.StartNew();
+            try
+            {
+                using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(1400));
+                using var client = new TcpClient();
+                await client.ConnectAsync(host, port, cts.Token);
+                sw.Stop();
+                return new ServerStatus(true, true,
+                    (int)Math.Min(sw.ElapsedMilliseconds, 9999));
+            }
+            catch
+            {
+                // Bu adres kapalı; sıradaki uç noktayı dene.
+            }
+        }
+
+        return new ServerStatus(true, false, 0);
+    }
+
+    private void UpdateItemStatus(ServerEntry server, ServerStatus status)
+    {
+        foreach (ListViewItem item in _list.Items)
+        {
+            if (!ReferenceEquals(item.Tag, server)) continue;
+
+            var cell = item.SubItems[5];
+            if (!status.Known)
+            {
+                cell.Text = "◌ " + T("Bilinmiyor");
+                cell.ForeColor = Color.DimGray;
+            }
+            else if (status.Online)
+            {
+                cell.Text = "● " + T("Çevrimiçi") + $" ({status.Ms} ms)";
+                cell.ForeColor = Ui.OkColor;
+            }
+            else
+            {
+                cell.Text = "● " + T("Çevrimdışı");
+                cell.ForeColor = Ui.ErrColor;
+            }
+            break;
+        }
     }
 
     private ServerEntry? Selected =>
@@ -172,26 +516,62 @@ public sealed class ServersTab : UserControl
         if (dlg.ShowDialog(FindForm()) != DialogResult.OK || dlg.Entry == null) return;
 
         var entry = dlg.Entry;
-        var existing = AppEnv.Settings.Servers.FirstOrDefault(s =>
+        var shortCode = NormalizeShortCode(entry.ShortCode);
+        if (shortCode.Length > 0) entry.ShortCode = shortCode;
+
+        // Aynı sunucu farklı bir adresle (ör. önce 192.168.137.1, sonra genel
+        // IP/relay) çözülebilir. Önce kısa koda, sonra adrese, en son aynı
+        // ad + portlara bakarak kopya kayıt oluşmasını engelle.
+        var existing = shortCode.Length > 0
+            ? AppEnv.Settings.Servers.FirstOrDefault(s =>
+                string.Equals(NormalizeShortCode(s.ShortCode), shortCode, StringComparison.Ordinal))
+            : null;
+        existing ??= AppEnv.Settings.Servers.FirstOrDefault(s =>
             string.Equals(s.Host, entry.Host, StringComparison.OrdinalIgnoreCase) &&
             s.GamePort == entry.GamePort && s.SyncPort == entry.SyncPort);
+        if (existing == null && !string.IsNullOrWhiteSpace(entry.Name))
+        {
+            existing = AppEnv.Settings.Servers.FirstOrDefault(s =>
+                string.Equals(s.Name, entry.Name, StringComparison.OrdinalIgnoreCase) &&
+                s.GamePort == entry.GamePort && s.SyncPort == entry.SyncPort);
+        }
 
         if (existing != null)
         {
             existing.Name = entry.Name;
             existing.Password = entry.Password;
             existing.SyncToken = entry.SyncToken;
-            existing.RelayHost = entry.RelayHost;
-            existing.RelaySyncPort = entry.RelaySyncPort;
-            existing.RelayGamePort = entry.RelayGamePort;
+            if (shortCode.Length > 0) existing.ShortCode = shortCode;
+            if (entry.SyncPort is > 0 and <= 65535) existing.SyncPort = entry.SyncPort;
+            if (entry.GamePort is > 0 and <= 65535) existing.GamePort = entry.GamePort;
+            if (LocalAddresses.IsDirectReachable(entry.Host) ||
+                !LocalAddresses.IsDirectReachable(existing.Host))
+                existing.Host = entry.Host;
+            if (entry.UsesRelay)
+            {
+                existing.RelayHost = entry.RelayHost;
+                existing.RelaySyncPort = entry.RelaySyncPort;
+                existing.RelayGamePort = entry.RelayGamePort;
+            }
+            else if (shortCode.Length == 0)
+            {
+                // Kısa kodu olmayan eski uzun kodlarda relay uç noktaları
+                // güncellenemez. Önceki oturumdan kalan ölü relay portlarını
+                // denemek yerine doğrudan bağlantıya düş.
+                existing.RelayHost = "";
+                existing.RelaySyncPort = 0;
+                existing.RelayGamePort = 0;
+            }
             entry = existing;
-            AppEnv.Log($"Katılım kodu mevcut kaydı güncelledi: {entry.Name} ({entry.Host})");
+            AppEnv.Log($"Katılım kodu mevcut kaydı güncelledi: {entry.Name} ({entry.Host})" +
+                       (entry.UsesRelay ? $" [relay {entry.RelayHost}]" : ""));
         }
         else
         {
             AppEnv.Settings.Servers.Add(entry);
             AppEnv.Log($"Katılım kodu ile sunucu eklendi: {entry.Name} " +
-                       $"({entry.Host}:{entry.GamePort}, sync {entry.SyncPort})");
+                       $"({entry.Host}:{entry.GamePort}, sync {entry.SyncPort})" +
+                       (entry.UsesRelay ? $" [relay {entry.RelayHost}]" : ""));
         }
 
         AppEnv.SaveSettings();
@@ -208,7 +588,15 @@ public sealed class ServersTab : UserControl
             }
         }
 
-        if (dlg.ConnectRequested) _ = ConnectAsync(launch: true);
+        if (dlg.ConnectRequested)
+        {
+            AppEnv.Log($"Katılım kodu bağlantısı başlatılıyor: {entry.Name} " +
+                       $"({entry.Host}:{entry.GamePort}, sync {entry.SyncPort})" +
+                       (entry.UsesRelay ? $" [relay {entry.RelayHost}]" : "") +
+                       (string.IsNullOrWhiteSpace(entry.ShortCode) ? "" : $" [kısa kod {entry.ShortCode}]"));
+            // Seçili öğeye güvenmek yerine çözülen kaydı doğrudan kullan.
+            _ = ConnectAsync(launch: true, entry);
+        }
     }
 
     private void EditServer()
@@ -266,10 +654,15 @@ public sealed class ServersTab : UserControl
 
     // ------------------------------------------------------------------ bağlantı
 
-    private async Task ConnectAsync(bool launch)
+    private async Task ConnectAsync(bool launch, ServerEntry? entry = null)
     {
-        if (_busy) return;
-        var sel = Selected;
+        if (_busy)
+        {
+            AppEnv.Log("Bağlantı isteği yok sayıldı: başka bir işlem sürüyor.");
+            Ui.Warn(FindForm()!, T("Zaten bir bağlantı işlemi sürüyor. Bitmesini bekleyin veya 'İptal' düğmesine basın."));
+            return;
+        }
+        var sel = entry ?? Selected;
         if (sel == null) { Ui.Warn(FindForm()!, T("Önce listeden bir sunucu seçin.")); return; }
         if (!MainForm.RequireGameFolder(FindForm()!, out var gameFolder)) return;
 
@@ -279,15 +672,16 @@ public sealed class ServersTab : UserControl
             return;
         }
 
-        // Önceki oturumdan kalıntı varsa önce onu temizle (oyun kapalıyken)
-        var leftover = SessionStore.Load(AppEnv.DataFolder);
-        if (leftover != null)
+        try
         {
-            AppEnv.Log("Önceki oturum kalıntıları temizleniyor...");
-            SetStatus(T("Önceki oturum kalıntıları temizleniyor..."), Ui.WarnColor);
-            SessionService.KillWatcher(leftover, AppEnv.Log);
-            await Task.Run(() => SessionService.Finish(AppEnv.DataFolder, gameFolder, AppEnv.Log));
-            RefreshSessionUi();
+            await CleanupLeftoverSessionAsync(gameFolder);
+        }
+        catch (Exception ex)
+        {
+            SetStatus(T("Hata: ") + ex.Message, Ui.ErrColor);
+            AppEnv.LogError("Oturum kalıntıları temizlenemedi: " + ex.Message);
+            Ui.Error(FindForm()!, ex.Message);
+            return;
         }
 
         _busy = true;
@@ -315,51 +709,135 @@ public sealed class ServersTab : UserControl
             var syncPort = sel.SyncPort;
             var gameHost = sel.Host;
             var gamePort = sel.GamePort;
-            var viaRelay = false;
+            var syncViaRelay = false;
+            var gameViaRelay = false;
 
-            if (sel.UsesRelay)
+            AppEnv.Log($"Bağlantı hazırlanıyor: {sel.Name} ({sel.Host}:{sel.GamePort}, sync {sel.SyncPort})");
+
+            // Kısa kodla eklenen kayıtlarda relay portları sunucu her
+            // başlatıldığında değişir. Bağlantıdan önce güncel uç noktaları
+            // koddan yenile; böylece eski portlar yüzünden başarısız olunmaz.
+            if (!string.IsNullOrWhiteSpace(sel.ShortCode))
+            {
+                SetStatus(T("Sunucunun güncel relay bilgisi alınıyor..."), Ui.WarnColor);
+                await RefreshRelayInfoAsync(sel, ct);
+                AppEnv.Log($"Kısa kod {sel.ShortCode}: " +
+                           (sel.UsesRelay
+                               ? $"güncel relay {sel.RelayHost} sync {sel.RelaySyncPort}, oyun {sel.RelayGamePort}"
+                               : "relay yok; doğrudan bağlantı denenecek"));
+            }
+
+            // Aynı bilgisayar veya aynı yerel ağ: relay gereksiz gecikme ve
+            // yük getirir. Doğrudan sync + doğrudan oyun kullan.
+            var localDirect = LocalAddresses.IsLocalAddress(sel.Host) ||
+                              LocalAddresses.IsSameSubnet(sel.Host);
+
+            if (localDirect)
+            {
+                if (LocalAddresses.IsLocalAddress(sel.Host))
+                {
+                    syncHost = "127.0.0.1";
+                    gameHost = "127.0.0.1";
+                }
+                AppEnv.Log($"Yerel/aynı ağ sunucusu: relay atlanıyor, doğrudan bağlantı ({sel.Host}).");
+            }
+            else if (sel.UsesRelay || !string.IsNullOrWhiteSpace(sel.ShortCode))
             {
                 SetStatus(T("Otomatik relay bağlantısı kuruluyor..."), Ui.WarnColor);
-                var relay = await TryStartRelayAsync(sel, ct);
+                var relay = await TryRelayWithRefreshAsync(sel, ct);
+
                 if (relay != null)
                 {
                     _activeRelay = relay;
-                    syncHost = "127.0.0.1";
-                    syncPort = relay.SyncPort;
                     gameHost = "127.0.0.1";
                     gamePort = relay.GamePort;
-                    viaRelay = true;
-                    AppEnv.Log($"Otomatik relay bağlantısı kuruldu: {sel.RelayHost} " +
-                               $"(sync {sel.RelaySyncPort} -> yerel {relay.SyncPort}, " +
-                               $"oyun {sel.RelayGamePort} -> yerel {relay.GamePort})");
+                    gameViaRelay = true;
+
+                    // Sync için doğrudan TCP erişimi varsa (port yönlendirme,
+                    // UPnP, Radmin/Tailscale, genel IP) büyük dosyaları relay
+                    // üzerinden taşımaya gerek yok. Oyun UDP'si yine relay'de
+                    // kalabilir; iki taşıma birbirinden bağımsızdır.
+                    var directSync = CanTryDirect(sel) && await ProbeDirectSyncAsync(sel, ct);
+                    if (directSync)
+                    {
+                        syncHost = sel.Host;
+                        syncPort = sel.SyncPort;
+                        AppEnv.Log($"Sync doğrudan: {sel.Host}:{sel.SyncPort}; " +
+                                   $"oyun relay: {sel.RelayHost}:{sel.RelayGamePort} -> yerel {relay.GamePort}");
+                    }
+                    else
+                    {
+                        syncHost = "127.0.0.1";
+                        syncPort = relay.SyncPort;
+                        syncViaRelay = true;
+                        AppEnv.Log($"Otomatik relay bağlantısı kuruldu: {sel.RelayHost} " +
+                                   $"(sync {sel.RelaySyncPort} -> yerel {relay.SyncPort}, " +
+                                   $"oyun {sel.RelayGamePort} -> yerel {relay.GamePort})");
+                    }
                 }
                 else if (CanTryDirect(sel))
                 {
                     SetStatus(T("Otomatik relay kurulamadı; doğrudan adres deneniyor..."), Ui.WarnColor);
-                    AppEnv.Log($"Otomatik relay kurulamadı; doğrudan adres denenecek: {sel.Host}:{sel.SyncPort}");
+                    if (!await ProbeDirectSyncAsync(sel, ct))
+                        throw new SyncException(T(
+                            "Sunucuya ne otomatik relay ne de doğrudan bağlantı kurulamadı. " +
+                            "Sunucu ve launcher açık mı? İnternet bağlantınızı kontrol edip yeniden deneyin."));
+
+                    AppEnv.Log($"Otomatik relay kurulamadı; doğrudan adres kullanılacak: " +
+                               $"{sel.Host}:{sel.SyncPort}");
+                    if (LocalAddresses.IsLocalAddress(sel.Host))
+                    {
+                        syncHost = "127.0.0.1";
+                        gameHost = "127.0.0.1";
+                    }
                 }
                 else
                 {
                     throw new SyncException(T(
-                        "Otomatik relay bağlantısı kurulamadı. İnternet bağlantınızı kontrol edip yeniden deneyin."));
+                        "Otomatik relay bağlantısı kurulamadı. Sunucu ve launcher açık mı? İnternet bağlantınızı kontrol edip yeniden deneyin."));
+                }
+            }
+            else
+            {
+                // Sunucu bu bilgisayarda çalışıyorsa yerel/ICS adresi yerine
+                // loopback kullan; aksi halde kapalı bir adaptör yüzünden
+                // bağlantı zaman aşımına uğrayabilir.
+                if (LocalAddresses.IsLocalAddress(sel.Host))
+                {
+                    syncHost = "127.0.0.1";
+                    gameHost = "127.0.0.1";
+                    AppEnv.Log($"Yerel sunucu adresi loopback'e çevrildi: {sel.Host} -> 127.0.0.1");
+                }
+                else if (!CanTryDirect(sel))
+                {
+                    throw new SyncException(T(
+                        "Bu sunucuya doğrudan ulaşılamaz: adres özel bir ağda (ör. hotspot/ICS) ve otomatik relay bilgisi yok.\r\n" +
+                        "Sunucu sahibinden güncel kısa kodu veya uzun GTC1 kodunu isteyip 'Kod ile Katıl...' ile yeniden ekleyin."));
                 }
             }
 
             var manifest = await Task.Run<Manifest?>(async () =>
             {
-                using var client = new SyncClient(syncHost, syncPort, sel.SyncToken);
+                using var client = new SyncClient(syncHost, syncPort, sel.SyncToken, AppEnv.Log);
 
-                AppEnv.Log(viaRelay
-                    ? $"Sunucuya bağlanılıyor (relay): {sel.RelayHost}:{sel.RelaySyncPort}"
-                    : $"Sunucuya bağlanılıyor: {syncHost}:{syncPort}");
-                var serverName = await client.PingAsync(ct);
-                AppEnv.Log($"Sunucu adı: {serverName}");
+                AppEnv.Log(syncViaRelay
+                    ? $"Sunucuya bağlanılıyor (sync relay): {sel.RelayHost}:{sel.RelaySyncPort}"
+                    : $"Sunucuya bağlanılıyor (sync doğrudan): {syncHost}:{syncPort}");
+
+                // İlk erişim denemesi sınırlı sürede tamamlanmalı; aksi halde
+                // ulaşılamayan bir doğrudan adres uzun süre asılı kalabilir.
+                using (var pingCts = CancellationTokenSource.CreateLinkedTokenSource(ct))
+                {
+                    pingCts.CancelAfter(TimeSpan.FromSeconds(15));
+                    var serverName = await client.PingAsync(pingCts.Token);
+                    AppEnv.Log($"Sunucu adı: {serverName}");
+                }
 
                 var mf = await client.GetManifestAsync(ct);
                 var state = SyncStateStore.Load(AppEnv.DataFolder, mf.ServerId);
                 var plan = applier.BuildPlan(mf, state);
 
-                ShowDetails(sel, mf, plan, state, viaRelay);
+                ShowDetails(sel, mf, plan, state, syncViaRelay, gameViaRelay);
 
                 // Onay (indirilecek veya güvenli kurulamayacak bir şey varsa)
                 if (plan.ToInstall.Count > 0 || plan.Blocked.Count > 0)
@@ -407,9 +885,10 @@ public sealed class ServersTab : UserControl
                 return;
             }
 
-            // İstemci ayarları: oyun açılınca bu sunucuya otomatik bağlan (isteğe göre)
+            // "Bağlan ve Oyna" açıkça bağlanma isteğidir; AutoConnect her zaman açılır.
             ClientSettingsEditor.Apply(gameFolder, AppEnv.Settings.Username, gameHost,
-                gamePort, sel.Password, autoConnect: sel.AutoConnect, AppEnv.Log);
+                gamePort, sel.Password, autoConnect: true,
+                lowDesync: AppEnv.Settings.LowDesyncProfile, log: AppEnv.Log);
 
             if (launch)
             {
@@ -445,10 +924,20 @@ public sealed class ServersTab : UserControl
 
             keepRelay = true;
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
             SetStatus(T("İşlem iptal edildi."), Ui.WarnColor);
             AppEnv.Log("Senkronizasyon iptal edildi.");
+        }
+        catch (OperationCanceledException)
+        {
+            // Zaman aşımı (kullanıcı iptali değil): sessizce "iptal edildi"
+            // demek yerine nedeni açıkça göster.
+            const string msg = "Sunucuya ulaşılamadı (zaman aşımı). Sunucu açık mı? " +
+                               "Kısa kod/uzun kod güncel mi? 'Yeniden Ara' veya yeni kod ile tekrar deneyin.";
+            SetStatus(T("Sunucuya ulaşılamadı: zaman aşımı."), Ui.ErrColor);
+            AppEnv.LogError("Bağlantı zaman aşımına uğradı: " + sel.Name);
+            Ui.Error(FindForm()!, T(msg));
         }
         catch (Exception ex)
         {
@@ -459,6 +948,149 @@ public sealed class ServersTab : UserControl
         finally
         {
             if (!keepRelay) DisposeActiveRelay();
+            _busy = false;
+            _connectBtn.Enabled = true;
+            _cancelBtn.Enabled = false;
+            _cts?.Dispose();
+            _cts = null;
+            RefreshSessionUi();
+        }
+    }
+
+    private async Task CleanupLeftoverSessionAsync(string gameFolder)
+    {
+        var leftover = SessionStore.Load(AppEnv.DataFolder);
+        if (leftover == null) return;
+
+        AppEnv.Log("Önceki oturum kalıntıları temizleniyor...");
+        SetStatus(T("Önceki oturum kalıntıları temizleniyor..."), Ui.WarnColor);
+        SessionService.KillWatcher(leftover, AppEnv.Log);
+        await Task.Run(() => SessionService.Finish(AppEnv.DataFolder, gameFolder, AppEnv.Log));
+        RefreshSessionUi();
+    }
+
+    /// <summary>
+    /// Mod senkronizasyonu olmayan (veya istenmeyen) sunuculara bağlanır.
+    /// Yalnızca istemci ayarlarını yazar ve oyunu başlatır; mod kurmaz.
+    /// </summary>
+    private async Task ConnectGameOnlyAsync(ServerEntry sel, bool launch)
+    {
+        if (_busy) return;
+        if (!MainForm.RequireGameFolder(FindForm()!, out var gameFolder)) return;
+
+        if (AddonApplier.IsGameRunning())
+        {
+            Ui.Warn(FindForm()!, T("GTA V açık. Modları değiştirmeden önce oyunu kapatın."));
+            return;
+        }
+
+        _busy = true;
+        _connectBtn.Enabled = false;
+        _endSessionBtn.Enabled = false;
+        _cancelBtn.Enabled = true;
+        _cts = new CancellationTokenSource();
+        var ct = _cts.Token;
+        SetStatus(T("Modsuz bağlantı hazırlanıyor..."), Ui.WarnColor);
+        SetProgress(0);
+        RelaySession? relay = null;
+        var keepRelay = false;
+
+        try
+        {
+            await CleanupLeftoverSessionAsync(gameFolder);
+            DisposeActiveRelay();
+
+            var gameHost = sel.Host;
+            var gamePort = sel.GamePort;
+
+            if (!string.IsNullOrWhiteSpace(sel.ShortCode))
+                await RefreshRelayInfoAsync(sel, ct);
+
+            var localDirect = LocalAddresses.IsLocalAddress(sel.Host) ||
+                              LocalAddresses.IsSameSubnet(sel.Host);
+
+            if (localDirect)
+            {
+                if (LocalAddresses.IsLocalAddress(sel.Host))
+                    gameHost = "127.0.0.1";
+                AppEnv.Log($"Modsuz bağlantı: yerel/aynı ağ sunucusu, relay atlanıyor ({sel.Host}).");
+            }
+            else if (sel.UsesRelay)
+            {
+                SetStatus(T("Otomatik relay bağlantısı kuruluyor..."), Ui.WarnColor);
+                relay = await TryStartRelayAsync(sel, ct, requireSync: false);
+                if (relay != null)
+                {
+                    gameHost = "127.0.0.1";
+                    gamePort = relay.GamePort;
+                    AppEnv.Log($"Modsuz bağlantı relay üzerinden: {sel.RelayHost} " +
+                               $"(oyun {sel.RelayGamePort} -> yerel {relay.GamePort})");
+                }
+                else if (!CanTryDirect(sel, requireSync: false))
+                {
+                    throw new SyncException(T(
+                        "Otomatik relay bağlantısı kurulamadı; bu sunucuya doğrudan da ulaşılamıyor. " +
+                        "Sunucu ve launcher açık mı? Güncel kodu kullanın."));
+                }
+                else
+                {
+                    AppEnv.Log($"Modsuz bağlantı: relay kurulamadı; doğrudan adres denenecek: {sel.Host}:{sel.GamePort}");
+                }
+            }
+
+            if (relay == null && !localDirect)
+            {
+                if (LocalAddresses.IsLocalAddress(sel.Host))
+                {
+                    gameHost = "127.0.0.1";
+                }
+                else if (!CanTryDirect(sel, requireSync: false))
+                {
+                    throw new SyncException(T(
+                        "Bu sunucuya doğrudan ulaşılamaz: adres özel bir ağda ve otomatik relay bilgisi yok. " +
+                        "Sunucu sahibinden güncel kısa kodu isteyin."));
+                }
+            }
+
+            ClientSettingsEditor.Apply(gameFolder, AppEnv.Settings.Username, gameHost,
+                gamePort, sel.Password, autoConnect: true,
+                lowDesync: AppEnv.Settings.LowDesyncProfile, log: AppEnv.Log);
+
+            if (relay != null)
+            {
+                // Ayar dosyası artık relay'in yerel portunu gösteriyor; oyun
+                // ister şimdi ister sonra başlatılsın tünel açık kalmalı.
+                _activeRelay = relay;
+                keepRelay = true;
+            }
+
+            if (launch)
+            {
+                SetStatus(T("Oyun açılıyor... (modsuz bağlantı)"), Ui.OkColor);
+                SetProgress(100);
+                AppEnv.Log("Oyun başlatılıyor (modsuz bağlantı)...");
+                GameLauncher.Launch(gameFolder, AppEnv.Settings.LaunchExe, AppEnv.Log);
+            }
+            else
+            {
+                SetStatus(T("Hazır: modsuz bağlantı ayarlandı."), Ui.OkColor);
+                SetProgress(100);
+            }
+        }
+        catch (Exception ex)
+        {
+            SetStatus(T("Hata: ") + ex.Message, Ui.ErrColor);
+            AppEnv.LogError(ex.Message);
+            Ui.Error(FindForm()!, ex.Message);
+        }
+        finally
+        {
+            if (!keepRelay && relay != null)
+            {
+                try { await relay.DisposeAsync(); }
+                catch (Exception ex) { AppEnv.Log("Relay kapatılırken hata: " + ex.Message); }
+            }
+
             _busy = false;
             _connectBtn.Enabled = true;
             _cancelBtn.Enabled = false;
@@ -502,32 +1134,80 @@ public sealed class ServersTab : UserControl
 
             var syncHost = sel.Host;
             var syncPort = sel.SyncPort;
-            if (sel.UsesRelay)
+
+            if (!string.IsNullOrWhiteSpace(sel.ShortCode))
+            {
+                SetStatus(T("Sunucunun güncel relay bilgisi alınıyor..."), Ui.WarnColor);
+                await RefreshRelayInfoAsync(sel, ct);
+            }
+
+            var localDirect = LocalAddresses.IsLocalAddress(sel.Host) ||
+                              LocalAddresses.IsSameSubnet(sel.Host);
+
+            if (localDirect)
+            {
+                if (LocalAddresses.IsLocalAddress(sel.Host))
+                    syncHost = "127.0.0.1";
+                AppEnv.Log($"Ön indirme: yerel/aynı ağ sunucusu, relay atlanıyor ({sel.Host}).");
+            }
+            else if (sel.UsesRelay)
             {
                 SetStatus(T("Otomatik relay bağlantısı kuruluyor..."), Ui.WarnColor);
-                relay = await TryStartRelayAsync(sel, ct);
+                relay = await TryStartRelayAsync(sel, ct, requireSync: true);
                 if (relay != null)
                 {
-                    syncHost = "127.0.0.1";
-                    syncPort = relay.SyncPort;
-                    AppEnv.Log($"Ön indirme relay bağlantısı: {sel.RelayHost} " +
-                               $"(sync {sel.RelaySyncPort} -> yerel {relay.SyncPort})");
+                    if (CanTryDirect(sel) && await ProbeDirectSyncAsync(sel, ct))
+                    {
+                        syncHost = sel.Host;
+                        syncPort = sel.SyncPort;
+                        AppEnv.Log($"Ön indirme sync doğrudan: {sel.Host}:{sel.SyncPort}");
+                    }
+                    else
+                    {
+                        syncHost = "127.0.0.1";
+                        syncPort = relay.SyncPort;
+                        AppEnv.Log($"Ön indirme relay bağlantısı: {sel.RelayHost} " +
+                                   $"(sync {sel.RelaySyncPort} -> yerel {relay.SyncPort})");
+                    }
                 }
                 else if (CanTryDirect(sel))
                 {
                     SetStatus(T("Otomatik relay kurulamadı; doğrudan adres deneniyor..."), Ui.WarnColor);
-                    AppEnv.Log($"Ön indirme: relay kurulamadı; doğrudan adres denenecek: {sel.Host}:{sel.SyncPort}");
+                    if (!await ProbeDirectSyncAsync(sel, ct))
+                        throw new SyncException(T(
+                            "Sunucuya ne otomatik relay ne de doğrudan bağlantı kurulamadı. " +
+                            "Sunucu ve launcher açık mı? İnternet bağlantınızı kontrol edip yeniden deneyin."));
+                    AppEnv.Log($"Ön indirme: relay kurulamadı; doğrudan adres kullanılacak: " +
+                               $"{sel.Host}:{sel.SyncPort}");
+                    if (LocalAddresses.IsLocalAddress(sel.Host))
+                        syncHost = "127.0.0.1";
                 }
                 else
                 {
                     throw new SyncException(T(
-                        "Otomatik relay bağlantısı kurulamadı. İnternet bağlantınızı kontrol edip yeniden deneyin."));
+                        "Otomatik relay bağlantısı kurulamadı. Sunucu ve launcher açık mı? İnternet bağlantınızı kontrol edip yeniden deneyin."));
                 }
+            }
+            else
+            {
+                if (LocalAddresses.IsLocalAddress(sel.Host))
+                    syncHost = "127.0.0.1";
+                else if (!CanTryDirect(sel))
+                    throw new SyncException(T(
+                        "Bu sunucuya doğrudan ulaşılamaz: adres özel bir ağda ve otomatik relay bilgisi yok. " +
+                        "Sunucu sahibinden güncel kısa kodu isteyin."));
             }
 
             await Task.Run(async () =>
             {
-                using var client = new SyncClient(syncHost, syncPort, sel.SyncToken);
+                using var client = new SyncClient(syncHost, syncPort, sel.SyncToken, AppEnv.Log);
+
+                using (var pingCts = CancellationTokenSource.CreateLinkedTokenSource(ct))
+                {
+                    pingCts.CancelAfter(TimeSpan.FromSeconds(15));
+                    await client.PingAsync(pingCts.Token);
+                }
+
                 var mf = await client.GetManifestAsync(ct);
                 AppEnv.Log($"Ön indirme: {mf.ServerName} ({mf.Addons.Count} eklenti)");
                 var contentDir = AppEnv.ServerContentFolder(sel, mf);
@@ -551,10 +1231,18 @@ public sealed class ServersTab : UserControl
                 : "Tüm mod dosyaları indirildi (oyuna kurulmadı). Bir sonraki girişte yeniden indirilmez."), Ui.OkColor);
             SetProgress(100);
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
             SetStatus(T("İndirme iptal edildi."), Ui.WarnColor);
             AppEnv.Log("Ön indirme iptal edildi.");
+        }
+        catch (OperationCanceledException)
+        {
+            const string msg = "Sunucuya ulaşılamadı (zaman aşımı). Sunucu açık mı? " +
+                               "Kısa kod/uzun kod güncel mi? Yeni kod ile tekrar deneyin.";
+            SetStatus(T("Sunucuya ulaşılamadı: zaman aşımı."), Ui.ErrColor);
+            AppEnv.LogError("Ön indirme zaman aşımına uğradı: " + sel.Name);
+            Ui.Error(FindForm()!, T(msg));
         }
         catch (Exception ex)
         {
@@ -685,20 +1373,217 @@ public sealed class ServersTab : UserControl
         }
     }
 
-    private static bool CanTryDirect(ServerEntry entry) =>
+    private static bool CanTryDirect(ServerEntry entry, bool requireSync = true) =>
         !string.IsNullOrWhiteSpace(entry.Host) &&
         !string.Equals(entry.Host, entry.RelayHost, StringComparison.OrdinalIgnoreCase) &&
-        entry.SyncPort is > 0 and <= 65535;
+        entry.GamePort is > 0 and <= 65535 &&
+        (!requireSync || entry.SyncPort is > 0 and <= 65535) &&
+        (LocalAddresses.IsDirectReachable(entry.Host) || LocalAddresses.IsLocalAddress(entry.Host));
+
+    /// <summary>
+    /// Sync sunucusuna doğrudan TCP erişimi olup olmadığını kısa sürede sınar.
+    /// Relay kurulmuş olsa bile doğrudan erişim varsa büyük dosyalar relay
+    /// üzerinden taşınmaz.
+    /// </summary>
+    private static async Task<bool> ProbeDirectSyncAsync(ServerEntry entry, CancellationToken ct)
+    {
+        if (entry.SyncPort is <= 0 or > 65535) return false;
+
+        try
+        {
+            using var probeCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            probeCts.CancelAfter(TimeSpan.FromSeconds(3));
+            using var client = new SyncClient(entry.Host, entry.SyncPort, entry.SyncToken);
+            await client.PingAsync(probeCts.Token);
+            AppEnv.Log($"Doğrudan sync erişilebilir: {entry.Host}:{entry.SyncPort}");
+            return true;
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            AppEnv.Log($"Doğrudan sync yok ({entry.Host}:{entry.SyncPort}): {ex.Message}");
+            return false;
+        }
+    }
+
+    private static string NormalizeShortCode(string? code) =>
+        ShortCodeDirectory.TryNormalize(code, out var normalized, out _) ? normalized : "";
+
+    /// <summary>
+    /// Kayıtlı kısa koddan güncel relay uç noktalarını ve doğrudan adresleri
+    /// yeniler. Sunucu her başlatıldığında relay portları değişebildiği için
+    /// bağlantı öncesinde çağrılır. Hata durumunda mevcut kayıt korunur.
+    /// </summary>
+    private static async Task<bool> RefreshRelayInfoAsync(
+        ServerEntry entry, CancellationToken ct, bool quiet = false)
+    {
+        if (string.IsNullOrWhiteSpace(entry.ShortCode)) return entry.UsesRelay;
+
+        try
+        {
+            using var lookupCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            lookupCts.CancelAfter(TimeSpan.FromSeconds(15));
+
+            var offer = await ShortCodeDirectory.LookupAsync(entry.ShortCode, lookupCts.Token);
+            if (offer == null)
+            {
+                if (!quiet)
+                    AppEnv.Log($"Kısa kod güncel değil/çevrimdışı: {entry.ShortCode}; kayıtlı relay bilgisi korunuyor.");
+                return entry.UsesRelay;
+            }
+
+            var changed = false;
+
+            if (offer.HasRelay &&
+                (!string.Equals(entry.RelayHost, offer.RelayHost, StringComparison.OrdinalIgnoreCase) ||
+                 entry.RelaySyncPort != offer.RelaySyncPort ||
+                 entry.RelayGamePort != offer.RelayGamePort))
+            {
+                entry.RelayHost = offer.RelayHost;
+                entry.RelaySyncPort = offer.RelaySyncPort;
+                entry.RelayGamePort = offer.RelayGamePort;
+                changed = true;
+            }
+
+            if (entry.GamePort != offer.GamePort) { entry.GamePort = offer.GamePort; changed = true; }
+            if (entry.SyncPort != offer.SyncPort) { entry.SyncPort = offer.SyncPort; changed = true; }
+            if (!string.Equals(entry.Password, offer.Password, StringComparison.Ordinal))
+            {
+                entry.Password = offer.Password;
+                changed = true;
+            }
+            if (!string.Equals(entry.SyncToken, offer.SyncToken, StringComparison.Ordinal))
+            {
+                entry.SyncToken = offer.SyncToken;
+                changed = true;
+            }
+
+            // Eski kayıt yalnızca hotspot/ICS adresi taşıyorsa ve yayında
+            // ulaşılabilir bir adres varsa onu kullan.
+            if (!LocalAddresses.IsDirectReachable(entry.Host) &&
+                !LocalAddresses.IsLocalAddress(entry.Host))
+            {
+                var best = offer.Hosts.FirstOrDefault(LocalAddresses.IsDirectReachable);
+                if (!string.IsNullOrWhiteSpace(best))
+                {
+                    entry.Host = best;
+                    changed = true;
+                }
+            }
+
+            if (changed)
+            {
+                AppEnv.SaveSettings();
+                AppEnv.Log($"Kısa koddan relay bilgisi güncellendi: {entry.ShortCode} " +
+                           $"(relay {entry.RelayHost}:{entry.RelaySyncPort}/{entry.RelayGamePort})");
+            }
+
+            return entry.UsesRelay;
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            if (!quiet)
+                AppEnv.Log("Kısa koddan relay bilgisi yenilenemedi: " + ex.Message);
+            return entry.UsesRelay;
+        }
+    }
+
+    /// <summary>
+    /// Otomatik relay'i kurmayı dener. ntfy önbelleği yeni yayını hemen
+    /// göstermediğinde kısa kod bir önceki oturumun relay portlarını
+    /// döndürebilir; bu durumda kısa kod birkaç kez yeniden sorgulanır ve
+    /// uç noktalar tazelenince relay yeniden denenir. Böylece sunucu yeniden
+    /// başlatıldığında eski portlar yüzünden bağlantı sessizce başarısız olmaz.
+    /// </summary>
+    private async Task<RelaySession?> TryRelayWithRefreshAsync(
+        ServerEntry entry, CancellationToken ct)
+    {
+        // Uzun kodun kendi taşıdığı uç noktalar, kod yeni oluşturulduysa
+        // günceldir. Kısa kod yayını ise ntfy önbelleği yüzünden eski
+        // olabilir; bu yüzden ikisi de denenir.
+        var originalHost = entry.RelayHost;
+        var originalSyncPort = entry.RelaySyncPort;
+        var originalGamePort = entry.RelayGamePort;
+        var hasOriginal = entry.UsesRelay;
+        var triedOriginal = hasOriginal;
+
+        var relay = hasOriginal
+            ? await TryStartRelayAsync(entry, ct, requireSync: true)
+            : null;
+
+        if (relay != null || string.IsNullOrWhiteSpace(entry.ShortCode))
+            return relay;
+
+        const int attempts = 5;
+        for (var attempt = 1; attempt <= attempts; attempt++)
+        {
+            SetStatus(T("Relay bilgisi yenileniyor; yeniden deneniyor... ({0}/{1})",
+                attempt, attempts), Ui.WarnColor);
+            await Task.Delay(TimeSpan.FromSeconds(2), ct);
+
+            var before = RelayKey(entry);
+            await RefreshRelayInfoAsync(entry, ct);
+            var after = RelayKey(entry);
+            AppEnv.Log($"Relay yenileme denemesi {attempt}/{attempts}: " +
+                       $"{(before.Length == 0 ? "relay yok" : before)} -> " +
+                       $"{(entry.UsesRelay ? after : "relay yok")}");
+
+            if (entry.UsesRelay)
+            {
+                relay = await TryStartRelayAsync(entry, ct, requireSync: true);
+                if (relay != null)
+                {
+                    AppEnv.Log($"Relay güncel uç noktalarla kuruldu: {after}");
+                    return relay;
+                }
+            }
+            else
+            {
+                AppEnv.Log($"Kısa kodda henüz relay yayını yok: {entry.ShortCode}");
+            }
+
+            // Kısa kod önbelleği eski bir oturumun portlarını döndürüp kodun
+            // içindeki çalışan uç noktaları ezmiş olabilir; koddakini de dene.
+            if (!triedOriginal && hasOriginal)
+            {
+                triedOriginal = true;
+                entry.RelayHost = originalHost;
+                entry.RelaySyncPort = originalSyncPort;
+                entry.RelayGamePort = originalGamePort;
+                AppEnv.Log($"Kısa kod önbelleği eski olabilir; koddaki relay deneniyor: {RelayKey(entry)}");
+                SetStatus(T("Otomatik relay bağlantısı kuruluyor..."), Ui.WarnColor);
+                relay = await TryStartRelayAsync(entry, ct, requireSync: true);
+                if (relay != null)
+                {
+                    AppEnv.Log($"Relay koddaki uç noktalarla kuruldu: {RelayKey(entry)}");
+                    return relay;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private static string RelayKey(ServerEntry entry) =>
+        $"{entry.RelayHost}:{entry.RelaySyncPort}/{entry.RelayGamePort}";
 
     /// <summary>
     /// Relay kurulamazsa doğrudan bağlantıya düşebilmek için hatayı yutar.
     /// Kullanıcı iptal ettiyse iptal istisnası yukarı çıkar.
     /// </summary>
-    private static async Task<RelaySession?> TryStartRelayAsync(ServerEntry entry, CancellationToken ct)
+    private static async Task<RelaySession?> TryStartRelayAsync(
+        ServerEntry entry, CancellationToken ct, bool requireSync = true)
     {
         try
         {
-            return await RelaySession.StartAsync(entry, ct);
+            return await RelaySession.StartAsync(entry, ct, requireSync, AppEnv.Log);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -789,14 +1674,16 @@ public sealed class ServersTab : UserControl
     }
 
     private void ShowDetails(ServerEntry sel, Manifest manifest, AddonApplier.InstallPlan plan, SyncState state,
-        bool viaRelay = false)
+        bool syncViaRelay = false, bool gameViaRelay = false)
     {
         var sb = new System.Text.StringBuilder();
-        sb.AppendLine(viaRelay
-            ? T("Sunucu : {0}  (otomatik relay: {1})", manifest.ServerName, sel.RelayHost)
-            : T("Sunucu : {0}  ({1}:{2})", manifest.ServerName, sel.Host, sel.SyncPort));
-        if (viaRelay)
-            sb.AppendLine(T("Bağlantı: otomatik relay (oyun sırasında launcher açık kalmalı)."));
+        sb.AppendLine(T("Sunucu : {0}", manifest.ServerName));
+        sb.AppendLine(syncViaRelay
+            ? T("Sync   : otomatik relay ({0})", sel.RelayHost)
+            : T("Sync   : doğrudan ({0}:{1})", sel.Host, sel.SyncPort));
+        sb.AppendLine(gameViaRelay
+            ? T("Oyun   : otomatik relay (oyun sırasında launcher açık kalmalı).")
+            : T("Oyun   : doğrudan ({0}:{1})", sel.Host, sel.GamePort));
         sb.AppendLine(T("Kimlik : {0}", manifest.ServerId));
         sb.AppendLine(T("Eklenti: {0}  |  kurulacak: {1}  |  güncel: {2}  |  kaldırılacak: {3}  |  sizde var: {4}  |  engellendi: {5}",
             manifest.Addons.Count, plan.ToInstall.Count, plan.UpToDate.Count, plan.ToRemove.Count,

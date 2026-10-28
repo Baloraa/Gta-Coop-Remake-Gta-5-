@@ -1,391 +1,396 @@
-# GTACoop Remake — Türkçe Mod + Sunucu Yöneticisi
+# GTACoop Remake
 
-2.2.7 sürümü - kendi sunucu yönetimi, otomatik mod indirme, **oturum modu**,
-**kısa kod** (ör. `Gel.com`) ile internetten sunucu bulma, **otomatik relay** ve
-**Bileşenler** sekmesinden ScriptHookV / ScriptHookVDotNet / OpenIV.asi / RageOpenV kurulumu:
-port yönlendirme veya Radmin VPN olmadan da arkadaşlarınız bağlanabilir. Sunucu modları
-yalnızca oyun açıkken kurulu kalır, oyundan çıkınca otomatik kaldırılır.
-Oyun başlatma dosyası seçilebilir; varsayılan **PlayGTAV.exe**'dir (GTA5.exe de seçilebilir).
-**Sesli sohbet** (bas-konuş, `[MIC]` göstergesi) ve **host-led hikaye görevi koordinasyonu**
-bu sürümde eklendi; ayrıntılar aşağıda.
+**English** | [Türkçe](README.tr.md)
 
----
+A Windows launcher and server manager for **GTA Coop**, the story-mode multiplayer mod for Grand Theft Auto V.
 
-## Ne işe yarar?
+GTACoop Remake is not a new multiplayer engine. It is the desktop layer around GTA Coop: it installs the in-game client, starts and configures a GTACoop server, publishes a join code, delivers the server's mods to the people who join, and removes those mods when the session ends. The network protocol and the in-game script come from the GPL-3.0 GTA Coop project; the launcher, the sync server, the relay bridge, and the session tooling are this project's work.
 
-- **Kendi modlarınız karışmaz**: PC'nize kurduğunuz modlara hiç dokunulmaz; kendi modlarınızı
-  yönetmenize gerek yoktur — zaten kurulu hâlleriyle çalışır.
-- **Kendi sunucunuz olsun**: kendi GTACoOp sunucunuzu bu launcher'dan başlatın; addon araç/ped
-  paketi, script, script klasörü, ASI eklentisi ekleyin.
-- **Port yönlendirme/Radmin olmadan**: kısa kod kullanırsanız launcher otomatik bir TCP relay
-  açar. Arkadaşınızın yönlendirici ayarı yapmasına gerek kalmaz; doğrudan bağlantı (LAN,
-  Radmin veya port yönlendirme) varsa önce o denenir, yoksa relay devreye girer.
-- **Sunucuya girince modlar inisin**: sunucunun tüm modları otomatik indirilir ve yalnızca siz
-  oynarken kurulu kalır. Oyunu kapatınca **otomatik kaldırılır**; tek oyunculu (offline) modda
-  sunucu modları çalışmaz.
-- **Tekrar indirme yok**: indirilen dosyalar bilgisayarınızda saklanır (önbellek); ikinci
-  girişte yeniden indirilmez. DLC paketleri oyun klasörüne kopyalanmaz, bağlantı (junction)
-  ile eklenir — GB'larca veri çoğaltılmaz.
-- **Büyük/bozuk update.rpf güvenliği**: `mods/update/update.rpf` 3,9 GB'a yakınsa veya
-  yapısı bozuksa DLC paketleri **kurulmaz/atlanır**; dosyanız değiştirilmez, otomatik yedekle
-  ezilmez. Diğer script/ASI modları kurulmaya devam eder. Onarım için **Yedekler** bölümünü
-  kullanabilirsiniz.
-- **Gerekirse elle yenileme**: bir sunucunun indirdiği dosyaları bozuk/eksik bulursanız
-  **Sunucular** sekmesinde sunucuyu seçip **Yeniden İndir...** deyin; yalnızca o sunucunun
-  önbelleği silinip baştan indirilir. Bu sunucunun modları oyuna kuruluyken yenileme
-  çalışmaz; önce **Oturumu Bitir** ile kaldırın.
-- **Aynı mod zaten sizde varsa atlanır**: sunucudaki bir mod bilgisayarınızda zaten mevcutsa
-  (aynı adlı script, ASI eklentisi veya DLC paketi) o mod **kabul edilmez**: indirilmez,
-  kurulmaz, üzerine yazılmaz. Bu kural addon pedler dahil tüm türler için geçerlidir
-  (ped içerikleri karşılaştırılmaz/ellenmez); sahip olduğunuz sürüm aynen korunur.
-- **Orijinal oyun bozulmaz**: dlclist her düzenlemeden önce yedeklenir; orijinal `update.rpf`
-  dosyasına asla dokunulmaz. Sizin dosyalarınız (aynı adlı olsa bile) korunur.
+GTACoop Remake is for private Story Mode co-op. It does not touch GTA Online, does not bypass anti-cheat, and does not inject into online sessions.
+
+**Current release:** 2.3.5  
+**Platform:** Windows 10/11, x64  
+**UI:** Turkish and English  
+**License:** GNU GPL v3
+
+> Not affiliated with Rockstar Games or Take-Two Interactive. This is not an official product. It requires a legitimate copy of GTA V.
 
 ---
 
-## Uygulamadaki sekmeler
+## Why this exists
 
-- **Oyun**: oyun klasörünü seçme, istemciyi kurma (GTACoOp), **oyuncu adınızı** seçme, oyun
-  durumu, yedekler.
-- **Bileşenler**: ScriptHookV, ScriptHookVDotNet (stable / nightly / Enhanced), paket içi
-  OpenIV.asi ve RageOpenV alternatifini sürüm seçerek kurma/güncelleme; eski dosyaları
-  yedekleme ve geri yükleme. NativeTrainer.asi hiçbir zaman kurulmaz; kendi
-  script/modlarınıza dokunulmaz.
-- **Sunucular**: sunucu ekleme, **Bağlan ve Oyna** (modlar otomatik iner-kurulur), oturum modu
-  ayarı, modları önceden indirme, oturumu bitirme.
-- **Sunucum**: kendi sunucunuzu başlatma/durdurma, ayarlar, mod ekleme, **mod yöneticisi**
-  (seçip tek tek devre dışı bırakma/kaldırma), **kısa kod** (ör. `Gel.com`) ile sunucuyu
-  internetten bulunur yapma.
-- **Günlük / Araçlar**: günlük, yedekten geri yükleme, kalıntı temizleme.
+Setting up GTA Coop by hand is possible, but it is easy to get wrong:
+
+- ScriptHookV and ScriptHookVDotNet have to match the installed GTA V build.
+- The GTACoOp client DLL and its dependencies have to land in the game's `scripts/` folder.
+- The server has its own settings, ports, and mod folder.
+- Every player needs the same add-on packs, scripts, and ASI plugins.
+- Those files have to be removed afterward so single-player is left clean.
+- If the host is behind a router, the guest needs a working path to the host.
+
+Each step is manageable. Together, they are enough to stop a casual session before it starts. GTACoop Remake turns them into one repeatable workflow: choose the game folder, start a server, send a short code, and let the launcher handle the rest.
 
 ---
 
-## Sesli sohbet ve hikaye görevleri (2.2.7)
+## What it does
 
-### Sesli sohbet
+### Hosting
 
-- Oyun içinde **F9 > Ayarlar > Voice Chat (Push-to-Talk)** ile sesli sohbeti açıp
-  kapatabilirsiniz. Varsayılan olarak açıktır.
-- **Voice Chat Key** satırına basıp istediğiniz tuşu atayabilirsiniz (varsayılan **N**).
-  Tuş atarken menü kapanır; **Esc** ile iptal edilir.
-- Konuşurken oyuncunun adının solunda `[MIC]` görünür ve adı yeşil olur. Oyuncu
-  listesinde de `[MIC]` işareti gösterilir.
-- Ses, sunucudaki **GTACoop.Remake.Plugin.dll** köprü eklentisi üzerinden taşınır.
-  Eklenti yoksa ses akışı çalışmaya devam eder, ancak `[MIC]` durumu gösterilmez.
-- Mikrofon yoksa veya Windows izin vermiyorsa sesli sohbet sessiz kalır; oyunu
-  etkilemez.
+- Starts and stops a GTACoop server from the launcher.
+- Writes the server configuration and launches `gtaserver.core`.
+- Uses the default ports **4499 UDP** for game traffic and **4599 TCP** for synchronization.
+- Attempts UPnP port mapping for both ports when the router supports it. If UPnP is disabled or unavailable, the launcher does not fail; it continues with the relay or a direct connection.
+- Can open a **bore-compatible TCP relay** for the sync port and the game's UDP bridge, so the host does not have to configure port forwarding or Radmin VPN.
+- Supports a custom relay server with `host` or `host:port`. If a custom relay is selected and fails, the launcher does not silently fall back to `bore.pub`; it keeps retrying the selected server.
+- Publishes a **short code** such as `Gel.com` through `ntfy.sh`. The code is a handle, not a password; the actual connection data is encrypted.
+- Lets the host enable, disable, add, and remove server mods without editing folders by hand.
 
-### Hikaye görevleri (host-led)
+### Joining
 
-GTA V'ın kendi hikaye görevleri tek oyunculu scriptlerdir. Aynı görevi her
-istemcide ayrı ayrı başlatmak görev hedeflerini, cutscene'leri ve kayıt durumunu
-birbirinden koparır; bu yüzden görev yalnızca **host** tarafında çalıştırılır.
+- Adds servers by IP address, short code, or a long `GTC1...` code.
+- Shows a **live status column** on the Servers tab: online, offline, or unknown, with latency in milliseconds. The row is green for online, red for offline, and gray while the state is unknown.
+- Probes the sync port every five seconds while the Servers tab is visible. Each probe has a 1.4-second timeout. It tries the direct address first and the relay endpoint second.
+- Does not run background probes while the tab is hidden.
+- Refreshes stale short-code relay information at most every 30 seconds, so a restarted server does not leave a dead relay port in the list.
+- Includes a server browser for the public GTACoop master list, LAN discovery, and direct `IP:port` entries.
+- Shows server name, player count, mod, password flag, ping, and protocol version. Connecting from the browser does not automatically add the server to the saved list; the **Add to Servers** button does that.
 
-- **F9 > Story Mission Co-op (Host-led)** menüsünden bir görev seçin. Arkadaşlarınıza
-  davet bildirimi gider.
-- Host, gerçek görevi **Pause > Game > Replay Mission** üzerinden başlatır. Bu ekranda
-  yalnızca daha önce tamamladığınız görevler görünür.
-- Arkadaşlar aynı dünyada kalır ve senkronize edilen araç/piyade aksiyonunda host'a
-  yardım eder. Görev hedefleri ve cutscene'ler host'a aittir; arkadaşlar kendi
-  kayıtlarını oynamaz.
-- Görev başlangıcı/bitişi istemcilere bildirilir. **Hiçbir kayıt dosyası yazılmaz**
-  ve aynı kayıt dosyasına sahip olmanız gerekmez.
-- Bu mod gerçek bir görev senkronizasyon motoru değildir; GTA V'ın hikaye
-  scriptlerini çok oyunculu hale getirmez. Arkadaşların görev hedeflerini ayrı ayrı
-  tamamlaması beklenmemelidir.
+### Mod delivery
+
+- Downloads the server's manifest and verifies each file with SHA-256 before installing it.
+- Uses HTTP Range requests for large files: two parallel connections above 4 MB, four above 12 MB. Each part resumes from its own offset.
+- Falls back to a single connection when the server does not support Range requests.
+- Detects stalled downloads after 45 seconds and retries instead of leaving the launcher hanging.
+- Caches downloaded files per server, so joining the same server again does not download everything twice.
+- Installs DLC packs with directory junctions instead of copying gigabytes of data.
+- Copies scripts into `scripts/` and ASI plugins into the game root.
+- Leaves an existing file with the same name alone, even if the server has a different version. The local file wins.
+- In **session mode**, removes the server's mods when the game exits. A separate watcher process handles Alt+F4, a game crash, or a reboot; if cleanup is missed, the next launcher start finishes it.
+- Moves removed files to `%LOCALAPPDATA%\GTACoopRemake\removed\<date>` instead of deleting them. The three most recent sessions are kept.
+
+### Safety around the game folder
+
+- Edits only `mods/update/update.rpf` when adding DLC packs. The original `update/update.rpf` is never modified.
+- Backs up the dlclist before each edit and keeps the last three backups.
+- If `mods/update/update.rpf` is close to 4 GB or structurally unhealthy, DLC installation is skipped rather than risking corruption. Scripts and ASI plugins can still be installed.
+- Never installs `NativeTrainer.asi`, even though it ships inside the official ScriptHookV archive.
+- Does not scan, delete, or overwrite the user's own `scripts/`, `mods/`, or component files.
+
+### Components
+
+The Components tab installs and updates the files the GTA Coop client needs:
+
+- **ScriptHookV** from the official `dev-c.com` release.
+- **ScriptHookVDotNet** stable, nightly, or the Enhanced build that supports both Legacy and Enhanced.
+- **OpenIV.asi** from the user-supplied file in the share package.
+- **RageOpenV** as an open-source alternative to OpenIV.asi.
+
+It backs up every file it replaces under `mods/GTACoop/backups/components/<component>/<date>/`, offers a restore action, and caches the version list for six hours. ScriptHookV and RageOpenV are downloaded on the user's machine and are not placed in the share ZIP.
+
+### In-game features
+
+- **Voice chat** with push-to-talk. The default key is `N`; the in-game menu is under `F9 > Settings > Voice Chat`. A `[MIC]` marker appears next to the speaking player when the server bridge plugin is installed.
+- **Host-led story mission co-op.** The host selects a mission and starts it through `Pause > Game > Replay Mission`; clients receive a notification and stay in the same world. Mission objectives and cutscenes belong to the host. No save files are written and clients do not need matching save games.
+- **Low-latency profile.** Disables traffic and pedestrians and reduces streamed NPCs to four. It is a mitigation for crowded areas, not a rewrite of the synchronization engine; it does not eliminate every desync.
+
+### Diagnostics and language
+
+- **Copy Diagnostics** collects the launcher version, Windows version, .NET version, GTA folder, server and relay settings, local addresses, and the last 80 log lines. Passwords and sync tokens are excluded.
+- The UI and logs are available in Turkish and English. The language can be changed from the top bar and is applied on the next launch.
 
 ---
 
-## Bileşenler (ScriptHookV / ScriptHookVDotNet / OpenIV.asi / RageOpenV)
+## How it works
 
-**Bileşenler** sekmesi, oyunun çalışması için gereken temel mod dosyalarını oyun kök
-klasörüne kurar. ScriptHookV / ScriptHookVDotNet / RageOpenV internetten indirilir;
-OpenIV.asi ise kullanıcı tarafından sağlanan dosya olarak **paylaşım paketinde gelir**.
+The repository is split into small projects with separate responsibilities:
 
-| Bileşen | Kaynak | Not |
+| Project | Target | Role |
 |---|---|---|
-| **ScriptHookV** | `dev-c.com` (resmî, Alexander Blade) | GitHub'da resmî sürüm yoktur ve yeniden dağıtım yasaktır. Yalnızca güncel resmî sürüm sunulur. |
-| **ScriptHookVDotNet — Stable** | GitHub `scripthookvdotnet/scripthookvdotnet` | Kararlı sürümler; istediğiniz eski sürümü seçebilirsiniz. |
-| **ScriptHookVDotNet — Nightly** | GitHub `scripthookvdotnet/scripthookvdotnet-nightly` | Günlük derlemeler; yeni oyun sürümleri için daha güncel olabilir. |
-| **ScriptHookVDotNet — Enhanced** | GitHub `Chiheb-Bacha/ScriptHookVDotNetEnhanced` | Legacy + Enhanced uyumlu genişletilmiş sürüm. |
-| **OpenIV.asi (paket içi)** | Paylaşım paketindeki kullanıcı dosyası | ZIP ile gelir; **Bileşenler > OpenIV.asi (paket içi)** seçilince oyun köküne kurulur. `OpenIV.asi`, `OpenRPF.asi` veya `RageOpenV.asi` zaten kuruluysa **çakışmayı önlemek için kurulmaz**; mevcut dosyanız korunur. ASI loader gerekir (ScriptHookV ile birlikte kurun). |
-| **RageOpenV (alternatif)** | GitHub `Chiheb-Bacha/RageOpenV` (GPL) | OpenIV.asi'nin açık kaynak alternatifi. Yukarıdaki köprülerden biri zaten kuruluysa **kurulmaz**; mevcut dosyanız korunur. RageOpenV için ASI loader gerekir (ScriptHookV ile birlikte kurun). |
+| `GTACoop.Launcher` | `net8.0-windows` | WinForms UI, server lifecycle, connection selection, relay, components, diagnostics |
+| `GTACoOp.Client` | `net48` | In-game ScriptHookVDotNet 3 client; derived from GTA Coop |
+| `GTACoop.Sync` | `net8.0` | Shared sync protocol, manifest, add-on and RPF handling, short codes, relay tunnels |
+| `GTACoop.SyncServer` | `net8.0` | HTTP file server for the server's mod manifest and files |
+| `GTACoop.ServerPlugin` | `net10.0` | Server-side bridge for voice and host-led mission state |
+| `GTACoop.Rpf` | `net8.0` | RPF archive and dlclist reader/writer |
+| `GTACoop.RpfTool` | `net8.0` | Command-line RPF helper |
+| `GTACoop.SyncTool` | `net8.0` | Command-line sync helper and the detached session watcher |
 
-Kurallar:
+### The join path
 
-- **NativeTrainer.asi asla kurulmaz.** ScriptHookV arşivinde bulunsa bile dışarıda bırakılır.
-  Daha önce kendi kurduğunuz bir trainer varsa silinmez.
-- Yalnızca bilinen dosyalar değiştirilir: `ScriptHookV.dll`, gerekirse ASI loader
-  (`dinput8.dll` / `xinput1_4.dll`), `ScriptHookVDotNet.asi`, `ScriptHookVDotNet2/3.dll`,
-  `OpenIV.asi`, `RageOpenV.asi`. `scripts/`, `mods/` ve kendi dosyalarınız
-  **taranmaz/silinmez**.
-- Mevcut `dinput8.dll` / `xinput1_4.dll` ve `ScriptHookVDotNet.ini` kullanıcı dosyası olarak
-  korunur; yalnızca bu launcher'ın daha önce kurduğu ve siz değiştirmediğiniz dosyalar
-  güncellenir.
-- Değiştirilecek her dosya önce
-  `mods/GTACoop/backups/components/<bileşen>/<tarih>/` altına yedeklenir. **Son Yedeği Geri
-  Yükle** ile geri dönebilirsiniz; geri yüklemeden önce mevcut dosyalar da ayrıca saklanır.
-- Aynı sürüm zaten kuruluysa **yeniden indirilmez**; dosyalardan biri eksik/bozuksa **Onar**
-  düğmesi görünür. Farklı bir sürüm seçerseniz **Güncelle** denir.
-- Sürüm listesi 6 saat önbellekte tutulur; GitHub API'sine gereksiz istek gitmez. İnternet
-  yoksa son başarılı liste kullanılır.
-- ScriptHookV ve RageOpenV lisansları yeniden dağıtıma izin vermediği için bu dosyalar
-  paylaşım ZIP'ine **konmaz**; indirme yalnızca kullanıcının kendi bilgisayarında yapılır.
-  OpenIV.asi kullanıcı tarafından sağlandığı için ZIP içinde
-  `Distribution\Components\OpenIV.asi` olarak gelir. Kurulumdan önce oyunu kapatın;
-  launcher bunu kontrol eder.
-- Arkadaşlarınız OpenIV.asi'yi **Bileşenler > OpenIV.asi (paket içi)** ile kalıcı olarak
-  kurabilir. Ayrıca **Sunucum > ASI Eklentisi Ekle...** ile sunucuya eklerseniz, bağlanan
-  oyuncuda uyumlu bir mods köprüsü yoksa oturum sırasında otomatik kurulur; varsa kendi
-  dosyası korunur.
+1. The host starts the server. The launcher writes the server settings, starts `gtaserver.core`, tries UPnP, opens relay tunnels if needed, and publishes the short code with the current relay endpoints.
+2. The guest adds the server by short code, long code, or IP. A short code is resolved through `ntfy.sh`; a long code carries the connection data itself.
+3. The guest's launcher chooses a path. On the same machine or the same LAN, it connects directly. Otherwise it tries the relay endpoints; if the sync port is directly reachable, large downloads can go direct while game traffic stays on the relay. If the relay cannot be established, it falls back to a direct address.
+4. The guest's launcher downloads the manifest from the sync server, compares hashes with the local cache, downloads what is missing, and applies the add-ons.
+5. The launcher starts `PlayGTAV.exe` by default. `GTA5_Enhanced.exe` and `GTA5.exe` can be selected if the installed edition and ScriptHookV/SHVDN build require them.
+6. The GTACoOp client joins the server over Lidgren UDP. The server bridge plugin carries voice and mission state.
+7. When the game exits, the watcher removes the session's add-ons and restores the dlclist. The download cache stays in place for the next session.
 
----
+### Direct, UPnP, and relay
 
-## Dil (Türkçe / İngilizce)
+The launcher prefers the shortest path:
 
-- İlk açılışta **Türkçe** veya **English** seçimi sorulur.
-- Daha sonra üst çubuktaki **Dil:** kutusundan değiştirebilirsiniz; değişiklik bir sonraki
-  açılışta geçerli olur (isterseniz anında yeniden başlatmayı onaylayabilirsiniz).
+- Same machine or same LAN: direct connection, no relay.
+- Internet host with a reachable sync port: direct downloads, relay only for game traffic if a relay was opened.
+- Internet host without a reachable port: relay for sync and game traffic.
+- Relay failure: direct address fallback; if neither works, the launcher reports the failure instead of hanging.
 
----
+UPnP is attempted because a direct connection is faster. It is not treated as a requirement. Many routers ship with UPnP disabled, and some ISPs use carrier-grade NAT; the relay exists for those cases.
 
-## Kurulum (uygulama konumu + kısayollar)
+The relay is a transport tunnel, not a VPN. It does not add end-to-end encryption. `bore.pub` is a public service; if that is not acceptable, point the launcher at a relay you host yourself.
 
-- `build.ps1` yalnızca `dist\GTACoopRemake\` klasörünü üretir.
-- Uygulamayı **güzel konumuna kurmak / güncellemek** için:
+### Short codes
 
-  ```powershell
-  powershell -ExecutionPolicy Bypass -File kur.ps1
-  ```
+A short code is normalized to lowercase and limited to 3–64 ASCII letters, digits, dots, dashes, and underscores. The code itself is never sent to `ntfy.sh`:
 
-- Bu betik uygulamayı `%LOCALAPPDATA%\Programs\GTACoop Remake` klasörüne kopyalar ve
-  **masaüstü** + **Başlat menüsü** kısayollarını buraya bağlar. Hiçbir şey silinmez
-  (eski `dist` klasörü olduğu yerde kalır).
-- Uygulama simgesi ve sürüm bilgisi (2.2.7) exe dosyasına işlenmiştir.
+- The topic is `gtacoop-v1-` plus a base64url-encoded SHA-256 hash of the code and a fixed domain separator.
+- The payload is encrypted with AES-GCM using a key derived from the code with SHA-256.
+- The payload contains the server name, direct IPv4 addresses, game and sync ports, optional password and sync token, relay endpoints, and a timestamp.
+- The host publishes a heartbeat every 60 seconds. A lookup rejects an offer older than five minutes, and the host publishes an offline marker when the server stops.
+
+This keeps the code out of the topic name and makes the payload unreadable without the code. It is not a replacement for trusting the person you send the code to; anyone with the code can decrypt the offer.
+
+### Session cleanup
+
+Session cleanup is deliberately boring:
+
+- A detached `GTACoop.SyncTool session-watch` process watches the game process.
+- If the launcher is closed while the game is running, the watcher keeps going.
+- If the game crashes or the machine reboots, the next launcher start notices the leftover session and finishes the cleanup.
+- If the game never starts, the session expires after 12 minutes.
+- Removed files are moved, not deleted, so a mistaken cleanup can be inspected or recovered manually.
 
 ---
 
-## Hızlı başlangıç (tek PC)
+## Requirements
 
-### 1. Oyun klasörünü seçin
+| Requirement | Notes |
+|---|---|
+| Windows 10/11 x64 | The launcher is WinForms; the game mods are Windows-only. |
+| A legitimate GTA V installation | Legacy and Enhanced layouts are detected. Use the ScriptHookV/SHVDN build that matches your game version. |
+| .NET 8 Desktop Runtime | Required by the launcher. Guests need this. |
+| .NET 10 runtime | Required by the server core and the server bridge plugin. Hosts need this. |
+| ScriptHookV | The official release from `dev-c.com`. The Components tab can install it. |
+| ScriptHookVDotNet | Stable, nightly, or Enhanced, depending on the game edition. The Components tab can install it. |
+| An ASI loader | ScriptHookV ships with `dinput8.dll`; use a compatible loader. |
+| OpenIV.asi or RageOpenV | Needed for the `mods/` folder and DLC packs. The Components tab can install either. |
+| Microsoft Visual C++ 2015–2022 x64 | Required by ScriptHookV/SHVDN. |
+| Firewall access | Allow the launcher/server on private networks. Direct hosting uses 4499 UDP and 4599 TCP. |
 
-1. Launcher'ı açın.
-2. **Oyun** sekmesinden **Gözat...** ile GTA V klasörünüzü seçin (GTA5.exe'nin olduğu klasör).
-3. **İstemciyi Kur / Güncelle** düğmesine basın. Bu işlem yalnızca **scripts/** klasörüne
-   GTACoOp.dll ve yanındaki dosyaları kopyalar; oyunun orijinal dosyalarına dokunulmaz.
-4. İsterseniz **Oyuncu** bölümünden **oyuncu adınızı** yazıp **Kaydet**'e basın — sunucularda
-   bu ad görünür.
-
-### 2. Kendi sunucunuzu başlatın
-
-1. **Sunucum** sekmesinden **Sunucuyu Başlat** düğmesine basın.
-2. Sunucunuz otomatik oluşturulur ve başlar (ilk seferde birkaç saniye sürebilir). Durum
-   kutusunda "çalışıyor" yazısını görün.
-3. Kapılar: oyun portu **4499 UDP**, senkronizasyon portu **4599 TCP**. Kısa kod kullanırsanız
-   **otomatik relay** devreye girer; arkadaşlarınız için yönlendirici (router) ayarı veya
-   Radmin VPN gerekmez. Doğrudan bağlantı/uzun kod kullanacaksanız bu portları yönlendirin;
-   Windows Güvenlik Duvarı ilk başlatmada izin ister.
-
-### 3. Sunucuya bağlanın
-
-4. **Sunucular** sekmesinde **kendi sunucum (127.0.0.1) ekle** düğmesine basın; çıkan pencerede
-   **Ekle**'ye basın (varsayılanlar doğrudur).
-5. Sunucuyu seçip **Bağlan ve Oyna**'ya basın. Sunucu modları (varsa) otomatik iner ve kurulur;
-   **yeni ve farklı** modlar için bir kez onay sorulur. Oyun açılır ve sunucuya bağlanır.
-6. İlk girişte oyunda **T** tuşuna basıp sohbeti açın ve `/register şifreniz` yazın (bir
-   kerelik kayıt). Sonraki girişlerde `/login şifreniz`. (Oyuncu listesi: **Z** tuşu.)
-7. Oyunu kapatınca sunucu modları **otomatik kaldırılır** (aşağıdaki "Oturum modu" bölümü).
+The share ZIP contains the launcher, the sync server, the documentation, the GPL notice, and a user-supplied `OpenIV.asi`. It does **not** contain GTA V, ScriptHookV, ScriptHookVDotNet, RageOpenV, or any copyrighted mod pack.
 
 ---
 
-## Oturum modu (modlar oyunda kalmaz)
+## Installation
 
-**Sunucular** sekmesindeki "Oyun kapanınca sunucu modları otomatik kaldırılsın (oturum modu)"
-seçeneği varsayılan olarak **açıktır**. Çalışma biçimi:
+### From a release
 
-- **Bağlan ve Oyna** dediğinizde sunucunun modları indirilir ve oyuna eklenir:
-  - DLC paketleri `mods/update/x64/dlcpacks/gcs_<ad>` altına **bağlantı (junction)** ile eklenir —
-    dosyalar kopyalanmaz, GB'larca veri çoğaltılmaz.
-  - Scriptler `scripts/` klasörüne, ASI eklentileri oyun kök klasörüne kopyalanır (küçük dosyalar).
-  - Aynı adlı bir dosya sizde zaten **farklı sürümde** varsa sizinki korunur, dokunulmaz.
-- Oyunu kapatınca arka plandaki izleyici sunucu modlarını kaldırır; dlclist ve tüm dosyalar
-  eski hâline döner. Launcher açık olmasa bile temizlik yapılır (izleyici ayrı süreç olarak çalışır).
-  **Alt+F4 ile kapatsanız, oyun çökse veya bilgisayarı kapatıp yeniden açsanız bile** temizlik
-  otomatik yapılır (temizlik kaçırılırsa launcher bir sonraki açılışta tamamlar).
-- Kaldırılan mod dosyaları **silinmez**; `%LOCALAPPDATA%\GTACoopRemake\removed\<tarih>` klasörüne
-  taşınır (en yeni 3 oturum saklanır, eskiler otomatik temizlenir). İndirme önbelleği ayrıca
-  durduğu için tekrar bağlandığınızda **hiçbir şey yeniden indirilmez**.
-- Oyun hiç başlamazsa (örn. başlatmayı iptal ederseniz) 12 dakika sonra yine otomatik temizlenir.
-- **Oturumu Bitir (modları kaldır)** düğmesiyle istediğiniz an (oyun kapalıyken) modları
-  hemen kaldırabilirsiniz.
-- Seçeneği kapatırsanız modlar kurulu kalır (eski davranış). Önerilen: açık.
+1. Download `GTACoop-Remake-Share-<version>.zip` from the Releases page.
+2. Extract it to a writable folder. Avoid `Program Files`; the launcher prefers to keep per-server data next to the executable and falls back to `%LOCALAPPDATA%` when that folder is read-only.
+3. Run `GTACoop.Launcher.exe`.
+4. On the **Game** tab, select the folder that contains `GTA5.exe` (or `PlayGTAV.exe` / `GTA5_Enhanced.exe`).
+5. Press **Install / Update Client**. This copies the GTACoOp client into `scripts/`; it does not touch the game's original files.
+6. Open **Components** and install ScriptHookV and the ScriptHookVDotNet channel that matches your game. Install OpenIV.asi or RageOpenV if you plan to use DLC/mod packs.
+7. To host: open **My Server**, start the server, and send the short code to your friend. To join: open **Servers**, add the server or use **Join with Code**, then press **Connect and Play**.
 
-**Modları önceden indirme**: **Sunucu Modlarını İndir (ön yükleme)** düğmesi, modları *oyuna
-kurmadan* yalnızca indirir. Böylece **Bağlan ve Oyna** sırasında beklemezsiniz; dosyalar bir
-daha indirilmez. İndirilmiş dosyaları elle yenilemek için **Yeniden İndir...** kullanın
-(o sunucunun dosyaları silinip baştan indirilir, oyuna kurulmaz). Modlar oyuna kuruluyken
-yenileme engellenir; önce **Oturumu Bitir**.
+The ZIP includes Turkish and English guides: `OKUBENI-ARKADASLAR.txt`, `READ-ME-EN.txt`, `KODLA-KATIL.txt`, and `JOIN-WITH-CODE-EN.txt`.
 
-**Dosyalar nerede durur?** indirilen mod dosyaları program klasöründe sunucu başına ayrı
-saklanır: `Servers\<sunucu adı>__<kimlik>\`. Oyun klasörüne yalnızca oynarken eklenir; oyun
-kapanınca oyun klasörü temizlenir, indirilen dosyalar kalır (tekrar indirme olmaz).
+### From source
 
----
+You need Windows, the .NET 8 SDK, the .NET 10 SDK, and PowerShell.
 
-## 4. Mod ekleme (sunucuya)
+```powershell
+git clone <repository-url>
+cd GTACoopRemakeV2
 
-**Sunucum** sekmesi → **Sunucu Modları** bölümü:
+# The client build needs the SHVDN3 reference assembly.
+# It is intentionally not committed; copy it from a ScriptHookVDotNet release.
+# Place it at: vendor\Build\ScriptHookVDotNet3.dll
 
-- **DLC Paketi Ekle (araç/ped)...**: `dlc.rpf` içeren paket klasörünü seçin (araç/ped/harita
-  paketleri). İç içe klasörler (`x64\dlcpacks\...`) desteklenir.
-- **İstemci Scripti Ekle (dll + ini/xml/pdb)...**: script dosyalarını ve **yanındaki destek
-  dosyalarını** (ini, xml, pdb, json, txt, config...) hep birlikte seçin; hepsi birlikte
-  oyuncuların `scripts/` klasörüne kurulur. Alt klasörlü scriptler için aşağıdaki seçeneği
-  kullanın.
-- **Script Klasörü Ekle...**: scriptin **kendi klasörünü** (dll + ini + xml + alt dosyalar)
-  olduğu gibi ekleyin. Klasör adı script adı olur.
-- **ASI Eklentisi Ekle (.asi)...**: `.asi` eklentisini ve varsa yanındaki destek dosyalarını
-  seçin. Oyuncuların oyun **kök klasörüne** kurulur (ASI Loader'ın okuduğu yer) ve oyundan
-  çıkınca kaldırılır. İzinli uzantılar: `.asi .ini .xml .pdb .log .txt .cfg .config`
-  (yeni bir .asi eklentisi eklerken yanındaki ini/xml'leri de seçmeyi unutmayın).
-- **Sunucu Eklentisi Ekle (plugin dll)...**: yalnızca sunucuda çalışan eklenti (istemciye
-  indirilmez).
+dotnet restore GTACoopRemake.sln
+dotnet build GTACoopRemake.sln -c Release
 
-Notlar:
+powershell -ExecutionPolicy Bypass -File build.ps1
+```
 
-- Eklediğiniz dosyalar `Addons` klasörüne kopyalanır ve sunucuya bağlanan oyunculara otomatik
-  indirilir; sunucu yeniden başlatılmadan etkin olur.
-- Sunucuya eklediğiniz paketler, oyuncularda zaten kurulu paketlerden **farklı** olmalı
-  (aynı dlc.rpf adları çakışabilir). Ayrıca addon araç/ped paketleri oyunun `mods` klasöründe
-  OpenIV.asi + dlclist düzenini gerektirir (launcher bunu otomatik yönetir).
-- Ayrıntılı meta veri (görünen ad/açıklama) için paket klasörüne `addon.json` koyabilirsiniz.
+`build.ps1` produces `dist\GTACoopRemake\`. It builds the GTACoOp client, the server bridge plugin, the launcher, the sync server, and the SyncTool, then copies the vendored runtime files and the license notices.
 
-### Mod yöneticisi: seç, devre dışı bırak, kaldır
+Useful scripts:
 
-**Sunucum > Sunucu Modları** bölümünde kurulu modların listesi görünür:
+```powershell
+# Install/update to %LOCALAPPDATA%\Programs\GTACoop Remake and create shortcuts
+powershell -ExecutionPolicy Bypass -File kur.ps1
 
-- **Kurulu modlar (işaretli = etkin)**: her modun yanındaki onay kutusu o modu tek tek
-  etkinleştirir/devre dışı bırakır. İşaret kaldırıldığında mod oyunculara gönderilmez; daha önce
-  kurmuş oyuncular bir sonraki bağlantıda o modu otomatik kaldırır. Dosyalar sunucudan silinmez.
-  Addons modları için değişiklik sunucu çalışırken de etkilidir.
-- **Seçilenleri Kaldır...**: listeden bir veya birden fazla mod seçip kaldırır. Dosyalar
-  silinmez; `Addons-Removed\<tarih-saat>\` altına taşınır. Sunucu kimliği
-  (`.gtacoop-server.json`) korunur. Güvenlik için sunucu durdurulmuş olmalıdır.
-- **Yenile**: listeyi diskten yeniden okur.
+# Build the friend/share ZIP under dist\
+powershell -ExecutionPolicy Bypass -File paylas.ps1
+```
 
-Liste DLC paketlerini, istemci scriptlerini, ASI eklentilerini, istemci dosyalarını ve sunucu
-eklentilerini gösterir. Sunucu eklentisi (plugin) değişiklikleri sunucu yeniden başlatılınca
-etkili olur.
+Notes for builders:
+
+- `vendor\Build\ScriptHookVDotNet3.dll` is excluded by `.gitignore` because it is a third-party binary. A fresh clone will not build without it.
+- `vendor\Distribution` contains the runtime DLLs used by the client and server. `build.ps1` copies them; it does not rebuild them.
+- `Directory.Build.props` disables NuGet's vulnerability audit and the build scripts opt out of .NET telemetry, so those steps do not make network calls. Restore still needs access to the configured package sources.
+- `dist\`, `bin\`, `obj\`, and `publish\` are ignored. Release ZIPs belong in GitHub Releases, not in the git history.
 
 ---
 
-## Yedekleme ve güvenlik
+## Data and configuration
 
-- dlclist (update.rpf) her düzenlemeden önce `mods/GTACoop/backups/` altına yedeklenir
-  (günde bir kez, son 3 yedek saklanır).
-- Bileşenler sekmesinde değiştirilen dosyalar
-  `mods/GTACoop/backups/components/<bileşen>/<tarih>/` altına yedeklenir; her bileşen için
-  son yedek geri yüklenebilir.
-- **Orijinal** `update/update.rpf` dosyasına asla dokunulmaz; yalnızca `mods/update/update.rpf`
-  düzenlenir.
-- Silme işlemleri yalnızca launcher'ın kurduğu dosyaları kapsar; kendi dosyalarınıza ve
-  oyunun dosyalarına dokunulmaz.
-- **Günlük / Araçlar** sekmesinden: yedekleri listeleyip geri yükleyebilir, sunuculardan
-  kurulmuş tüm eklentileri (script, ASI, dlc paketi) tek tuşla temizleyebilirsiniz.
+| Path | Contents |
+|---|---|
+| `%LOCALAPPDATA%\GTACoopRemake\settings.json` | Launcher settings, server list, language, game folder |
+| `%LOCALAPPDATA%\GTACoopRemake\logs\launcher-YYYYMMDD.log` | Launcher log |
+| `%LOCALAPPDATA%\GTACoopRemake\logs\session-watch.log` | Detached cleanup watcher log |
+| `%LOCALAPPDATA%\GTACoopRemake\cache` | Shared download/cache data |
+| `%LOCALAPPDATA%\GTACoopRemake\removed\<date>` | Files removed after a session; last three sessions kept |
+| `Servers\<server name>__<id>` | Per-server mod cache, next to the launcher when writable |
+| `<GTA V>\mods\GTACoop\backups` | dlclist and component backups |
+| `<GTA V>\scripts` | GTACoOp client and session scripts; cleaned after the session |
+| `<GTA V>\mods\update\x64\dlcpacks\gcs_<name>` | DLC junctions created for a session |
 
----
-
-## Arkadaşlarla oynama (kısa kod, uzun kod veya IP)
-
-**En kolay yol (kısa kod, ör. `Gel.com`):**
-
-1. **Sunucum** sekmesindeki **Kısa kod** alanına `Gel.com` gibi bir kod yazın.
-   3–64 karakter; harf, rakam, nokta, tire ve alt çizgi kullanılabilir, büyük/küçük harf
-   fark etmez. Boş bırakırsanız kısa kod kapalıdır. **Kaydet**'e basın.
-2. **Sunucuyu Başlat** deyin. Launcher kodu internet üzerinden yayınlar ve 60 saniyede bir
-   tazeler; durum satırında **Kısa kod yayında: Gel.com** yazısını görün.
-3. Arkadaşınıza **yalnızca kısa kodu** gönderin (WhatsApp/Discord). Arkadaşınız
-   **Sunucular → Kod ile Katıl...** ekranına kodu yazıp **Ekle ve Bağlan**'a bassın; launcher
-   sunucu bilgilerini internetten alır.
-4. Sunucuyu durdurunca (veya uygulamayı kapatınca) kod çevrimdışı olur; arkadaşınız bağlanamaz.
-
-Kısa kod, sunucu bilgilerini şifreli olarak **ntfy.sh** üzerinden yayınlar; hesap açmanız veya
-kendi sunucunuzu kurmanız gerekmez. Sunucu başlayınca launcher ayrıca **otomatik relay**
-(`bore.pub`) açar ve kısa koda relay uç noktalarını da ekler. Arkadaşınızın launcher'ı önce
-doğrudan adresleri (LAN/Radmin/port yönlendirme) dener; ulaşamazsa relay'e geçer. Böylece
-**port yönlendirme veya Radmin VPN gerekmeden** internetten oynayabilirsiniz. Relay, doğrudan
-bağlantıdan biraz daha yavaş olabilir; sunucu sahibi ve arkadaşın launcher'ı oyun sırasında
-**açık kalmalıdır**. Sunucu açık ve internet bağlantınız çalışır olmalıdır.
-
-**Uzun kod (`GTC1...`) — internet gerektirmez:**
-
-1. Siz **Sunucum → Katılım Kodu Oluştur...** ile adresi seçip kodu kopyalayın,
-   arkadaşınıza gönderin (WhatsApp/Discord).
-2. Arkadaşınız **Sunucular → Kod ile Katıl...** deyip kodu yapıştırsın ve
-   **Ekle ve Bağlan**'a bassın. Uzun kod bağlantı bilgilerini kendi taşır; hesap/internet
-   sunucusu gerekmez, sunucu kapalıyken de oluşturulabilir (şifre/token içerebilir, yalnızca
-   güvendiğiniz kişiye verin).
-3. Siz **Sunucuyu Başlat** deyin; arkadaşınız bağlanınca modlar otomatik iner.
-
-**Not:** Uzun kod relay bilgisi taşımaz; CGNAT/port yönlendirme sorunu varsa **kısa kod**
-kullanın. Kısa kodla gelen arkadaşınızın launcher'ı oyun boyunca açık kalmalıdır.
-
-**IP ile (kod olmadan):**
-
-1. Yönlendiricinizde port yönlendirme yapın: **4499 UDP** ve **4599 TCP** → kendi bilgisayarınız.
-2. Arkadaşınız **Sunucular** sekmesinden sizin dış IP adresinizle sunucuyu ekleyip
-   **Bağlan ve Oyna**'ya basar; gerekli değilse oyun kapılarını (4499/4599) açık tutun.
-3. İlk girişte arkadaşınız da oyunda **T** → `/register şifre` yazar.
-
-**Modlar nerede?** Sunucudan indirilen içerik program klasöründe sunucu başına ayrı
-saklanır: `Servers\<sunucu adı>__<kimlik>\` (`Sunucum → Sunucu Klasörlerini Aç`).
-Oyun sırasında geçici kurulur/bağlanır; oyundan çıkınca kaldırılır. Ayrıntı: `KODLA-KATIL.txt`.
+The launcher does not store passwords or sync tokens in the diagnostic text. They can still appear in the server configuration files on disk; treat those files as private.
 
 ---
 
-## Arkadaşlara gönderme ve lisans
+## Security and privacy
 
-- Bu araç **GNU GPL v3** lisanslıdır (GTA Coop upstream'i ile birlikte). Arkadaşlarınıza
-  **ücretsiz** paylaşabilirsiniz; lisans metni ve atıf pakette kalır
-  (`Distribution\LICENSE.md`, `Distribution\ATIF-README.md`).
-- Hazır paylaşım paketi üretmek için:
+This is a tool for playing with friends, not a hardened anti-cheat or privacy system. The boundaries matter:
 
-  ```powershell
-  powershell -ExecutionPolicy Bypass -File paylas.ps1
-  ```
-
-  → `dist\GTACoop-Remake-Share.zip` (uygulama + arkadaş okubeni + lisans) oluşur.
-  Pakette Türkçe (`OKUBENI-ARKADASLAR.txt`, `KODLA-KATIL.txt`) ve İngilizce
-  (`READ-ME-EN.txt`, `JOIN-WITH-CODE-EN.txt`) rehberler birlikte yer alır.
-- **Pakete asla eklemeyin:** GTA V oyun dosyaları; ScriptHook V / ScriptHookVDotNet /
-  RageOpenV dosyaları (lisansları yeniden dağıtıma izin vermez). Bileşenler sekmesi bunları
-  yalnızca kullanıcının bilgisayarında, resmî/GitHub kaynağından indirir; ZIP'e konmaz.
-- Arkadaşınızda olması gerekenler: orijinal GTA V + **.NET 8 Desktop Runtime** (launcher
-  için). ScriptHookV ve ScriptHookVDotNet'i artık **Bileşenler** sekmesinden kendisi
-  kurabilir; ayrıntılı liste `OKUBENI-ARKADASLAR.txt` içinde de yazılıdır. Kendi sunucusunu
-  kurarsa ayrıca **.NET 10**.
-- Ücretsiz, arkadaş arası paylaşım sorun değildir. **Satmayın / ticari dağıtmayın**;
-  sunucunuza eklediğiniz modların paylaşım izni olduğundan emin olun (başkasına ait telifli
-  araç/ped paketlerini arkadaşlarınıza otomatik indirtmeyin — modun kendi lisansına bakın).
-
-### GitHub'da yayınlama
-
-- Bu proje **GPL v3** uyumludur; GitHub'da açık kaynak olarak yayınlanabilir. Kök dizindeki
-  `LICENSE.md` lisans metnidir; kaynak kod repoda olduğu için GPL'in kaynak koşulu sağlanır.
-- `dist\`, `bin\`, `obj\` klasörleri `.gitignore` ile dışlanır. Repoya **oyun dosyası,
-  ScriptHook V / ScriptHookVDotNet dosyası veya telifli mod içeriği koymayın**.
-- Paylaşım ZIP'ini (`paylas.ps1` çıktısı) repoya değil, **Releases** bölümüne ekleyin.
-- Repo açıklamasına şu notu koyun: "Rockstar Games / Take-Two Interactive ile bağlantılı
-  değildir. Resmi ürün değildir. Orijinal GTA V gerektirir."
-- Ücretsiz tutun; satıştan ve GTA Online'a yönelik özelliklerden kaçının.
+- **No launcher telemetry.** The launcher does not include analytics or crash reporting. The upstream server's public listing and error reporting are disabled by default.
+- **External services are feature-specific.** Depending on what you use, the launcher may contact `ntfy.sh` for short codes, `bore.pub` (or your relay) for tunnels, `api.ipify.org` for the public IP, `master.gtacoop.com` and its backup for the server browser, and GitHub/`dev-c.com` for component downloads.
+- **Short-code payloads are encrypted.** The topic is a SHA-256 hash of the code, and the payload uses AES-GCM with a key derived from the code. The code itself is not sent to `ntfy.sh`. The service can still see topic metadata and message timing.
+- **The relay does not add end-to-end encryption.** It forwards traffic between the host and the guest. Use a relay you trust, or use a direct connection/Radmin/Tailscale if you need a private path.
+- **SHA-256 proves integrity, not safety.** A server's mods are executable code. The launcher verifies that a file matches the host's manifest; it cannot verify that the code is harmless. Join servers you trust.
+- **GTA Online is out of scope.** ScriptHookV itself does not work in GTA Online and closes the game when entering multiplayer. GTACoop Remake does not attempt to bypass that behavior.
+- **Diagnostics exclude secrets.** **Copy Diagnostics** omits passwords and sync tokens, but review the text before posting it publicly; it includes local addresses and log lines.
 
 ---
 
-## Notlar
+## Known limitations
 
-- Oyunu **Steam açıkken** başlatın; senkronizasyon ve kurulum işlemleri için oyunun kapalı
-  olması gerekir (launcher kontrol eder).
-- Kurulum gereksinimleri: **.NET 8** (launcher/sunucu) ve **.NET 10** (oyun sunucusu çekirdeği).
-- Günlük dosyası: `%LOCALAPPDATA%\GTACoopRemake\logs\` (oturum izleyici günlüğü:
-  `session-watch.log`).
-- Sorun olursa **Günlük / Araçlar** sekmesine bakın; kalıntı temizliği çoğu sorunu çözer.
+- Windows only. There is no Linux or macOS build.
+- The host's PC and the launcher must stay online for the session. If the relay is used, the guest's launcher must stay open as well.
+- Relay latency depends on the relay server and the route between both players. It is usually slower than a direct connection.
+- UPnP is not guaranteed. If the router has it disabled, use the relay or forward 4499 UDP and 4599 TCP manually.
+- GTA V updates can break ScriptHookV or ScriptHookVDotNet. Install a matching build before blaming the launcher.
+- Host-led story missions are not a full mission synchronization engine. Objectives and cutscenes belong to the host; clients help in the shared world.
+- The low-latency profile reduces traffic and NPC density. It does not fix every desync.
+- The server browser depends on the public GTACoop master list and its backup. If those are unavailable, direct IP and short-code joins still work.
+- There is no automated test suite or CI pipeline yet. Testing is manual on Windows, so a bug report with the diagnostic text and the relevant log lines is much easier to act on.
+- Server owners are responsible for the mods they distribute. The launcher automates delivery; it does not grant permission to redistribute someone else's work.
+
+---
+
+## What is new in 2.3.5
+
+The main addition is the **Status** column on the Servers tab:
+
+- A short TCP probe of each server's sync port every five seconds while the tab is visible, with a 1.4-second timeout per probe.
+- Direct address first, relay endpoint second.
+- `Online (ms)`, `Offline`, or `Unknown`, with green, red, and gray rows.
+- No background probing when the tab is hidden.
+- Short-code records with stale relay data are refreshed quietly at most every 30 seconds.
+
+The release also updates the About tab to credit the first tester, `zaza specialist`.
+
+The 2.3.4 release added UPnP mapping, custom relay servers, and the diagnostic copy. The 2.3.3 release added parallel Range downloads and the resume/stall handling described above. Those features are all present in 2.3.5.
+
+---
+
+## Contributing
+
+Bug reports are most useful when they include:
+
+- Launcher version and Windows version.
+- GTA V edition and game build.
+- ScriptHookV and ScriptHookVDotNet channel/version.
+- Whether the connection was direct, UPnP, or relay.
+- The **Copy Diagnostics** text and the relevant lines from `launcher-YYYYMMDD.log`.
+
+Remove passwords, sync tokens, and anything else you do not want public.
+
+For pull requests:
+
+- Keep the project under GPL-3.0 and preserve the upstream attribution.
+- Do not add GTA V files, ScriptHookV/SHVDN/RageOpenV binaries, or copyrighted mod packs.
+- Test on Windows and describe the manual test path in the PR.
+- Follow the existing C#/WinForms style; avoid adding NuGet packages when a vendored dependency already covers the job.
+- Update the README and the Turkish/English guides when behavior changes.
+
+The repository has no CI workflow yet. A reproducible test harness for the sync server and addon applier, plus a Windows build workflow, would be the most useful infrastructure contribution.
+
+---
+
+## Credits
+
+**GTACoop Remake:** Turkish Mods  
+- YouTube: [@Reelone123](https://www.youtube.com/@Reelone123)
+- X: [@imp_loyal38310](https://x.com/imp_loyal38310)
+- gta5-mods: [Turkish Mods](https://www.gta5-mods.com/users/Turkish%20Mods)
+
+**First tester:** zaza specialist
+
+**Upstream GTA Coop:** original code © 2016 Guad; modifications © 2016 Bluscream and wolfmitchell; maintained by [oldnapalm](https://github.com/oldnapalm) and contributors. The upstream project is licensed under GPL-3.0.
+
+**Third-party components:** ScriptHookV by Alexander Blade, ScriptHookVDotNet and its nightly/Enhanced builds, RageOpenV, OpenIV, LemonUI, Lidgren.Network, NAudio, protobuf-net, Newtonsoft.Json, MaxMind GeoIP2, BCrypt.Net-Next, .NET, bore by Eric Zhang, and ntfy. Each project keeps its own license; see the references below.
+
+If a credit is missing or wrong, open an issue with the correction.
+
+---
+
+## License
+
+GTACoop Remake is free software under the **GNU General Public License v3.0**. The full text is in [LICENSE.md](LICENSE.md). The upstream GTA Coop code is also GPL-3.0; the launcher and tooling are released under the same license.
+
+Third-party binaries keep their own terms. In particular:
+
+- **ScriptHookV** is proprietary freeware; redistribution is not allowed. The launcher downloads it from the official `dev-c.com` release.
+- **RageOpenV** is GPL-3.0, but its upstream asks users not to redistribute built binaries; link to the official release instead.
+- **OpenIV.asi** is user-supplied. Check that you have the right to redistribute it before publishing a package or repository that contains it.
+- **ScriptHookVDotNet** is zlib-licensed. Other vendored libraries have their own licenses; review them before republishing binaries.
+
+This software comes with no warranty. Use it at your own risk, and keep backups of your game folder.
+
+---
+
+## References
+
+### Upstream and platform
+
+1. [GTA Coop upstream repository](https://github.com/oldnapalm/GTACoop) — original client, server, and game scripts; GPL-3.0.
+2. [GTA Coop releases](https://github.com/oldnapalm/GTACoop/releases) and [wiki](https://github.com/oldnapalm/GTACoop/wiki) — upstream builds and setup notes.
+3. [ScriptHookV](https://www.dev-c.com/gtav/scripthookv/) — Alexander Blade's official release; the page also documents that it does not work in GTA Online.
+4. [ScriptHookVDotNet](https://github.com/scripthookvdotnet/scripthookvdotnet) — stable SHVDN.
+5. [ScriptHookVDotNet nightly](https://github.com/scripthookvdotnet/scripthookvdotnet-nightly) — daily builds for newer game versions.
+6. [ScriptHookVDotNet Enhanced](https://github.com/Chiheb-Bacha/ScriptHookVDotNetEnhanced) — Legacy + Enhanced support.
+7. [RageOpenV](https://github.com/Chiheb-Bacha/RageOpenV) — open-source OpenIV.asi/OpenRPF.asi alternative.
+8. [OpenIV](https://openiv.com/) — mods folder and RPF tooling.
+
+### Runtime and libraries
+
+9. [.NET 8 download](https://dotnet.microsoft.com/download/dotnet/8.0) — launcher runtime.
+10. [.NET 10 download](https://dotnet.microsoft.com/download/dotnet/10.0) — server core and plugin runtime.
+11. [bore](https://github.com/ekzhang/bore) — the TCP tunnel protocol used by the relay.
+12. [ntfy](https://ntfy.sh/) — the short-code transport.
+13. [Lidgren.Network](https://github.com/lidgren/lidgren-network-gen3) — game networking library used by GTA Coop.
+14. [LemonUI](https://github.com/justalemon/LemonUI) — in-game menu library.
+15. [NAudio](https://github.com/naudio/NAudio) — voice capture/playback.
+16. [protobuf-net](https://github.com/protobuf-net/protobuf-net) — message serialization.
+17. [Newtonsoft.Json](https://github.com/JamesNK/Newtonsoft.Json) — JSON handling.
+18. [MaxMind GeoIP2](https://github.com/maxmind/GeoIP2-dotnet) — GeoIP lookups used by the upstream server.
+19. [BCrypt.Net-Next](https://github.com/BcryptNet/bcrypt.net) — password hashing used by the upstream server.
+20. [GNU GPL v3](https://www.gnu.org/licenses/gpl-3.0.html) — the project license.
+
+### Code references
+
+| Area | File |
+|---|---|
+| Launcher UI, live status, connection selection | `src/GTACoop.Launcher/ServersTab.cs` |
+| Server lifecycle, UPnP, relay orchestration | `src/GTACoop.Launcher/MyServerTab.cs` |
+| Relay host/client and UDP bridge | `src/GTACoop.Launcher/RelayService.cs` |
+| Short-code publication, lookup, AES-GCM payload | `src/GTACoop.Sync/ShortCodeDirectory.cs` |
+| Add-on install, RPF/dlclist handling, cleanup | `src/GTACoop.Sync/AddonApplier.cs` |
+| Component downloads and backups | `src/GTACoop.Sync/ComponentManager.cs` |
+| HTTP sync server | `src/GTACoop.SyncServer/Program.cs` |
+| Voice/mission server bridge | `src/GTACoop.ServerPlugin/Plugin.cs` |
+| In-game client and story mission coordination | `src/GTACoOp.Client/Main.cs`, `src/GTACoOp.Client/StoryMissionCoop.cs` |
+| Build, install, and share scripts | `build.ps1`, `kur.ps1`, `paylas.ps1` |

@@ -23,6 +23,13 @@ public sealed class MyServerSettings
     public string ShortCode { get; set; } = "";
 
     /// <summary>
+    /// Otomatik relay için kullanılacak sunucu. "host" veya "host:port"
+    /// biçiminde olabilir; boşsa varsayılan olarak bore.pub kullanılır.
+    /// Özel bir sunucu girildiğinde launcher sessizce bore.pub'a dönmez.
+    /// </summary>
+    public string RelayServer { get; set; } = "bore.pub";
+
+    /// <summary>
     /// Tek tek devre dışı bırakılan modlar. Anahtar biçimi: "Tür:Id"
     /// (ör. "DlcPack:araclarim", "RootPlugin:Plugin.dll").
     /// </summary>
@@ -169,7 +176,7 @@ public sealed class MyServer : IDisposable
                 new XElement("DebugMode", "false"),
                 new XElement("Motd", s.Motd),
                 new XElement("UseGroups", "true"),
-                new XElement("UPnP", "false"),
+                new XElement("UPnP", "true"),
                 new XElement("DualStack", "false"),
                 new XElement("RconPassword", ""),
                 new XElement("ServerPlugins",

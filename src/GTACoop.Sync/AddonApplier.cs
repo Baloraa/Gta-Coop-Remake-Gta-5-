@@ -60,7 +60,8 @@ public sealed class AddonApplier
             var version = ServerScanner.ComputeVersion(addon);
             var installed = state.Addons.FirstOrDefault(a => a.Id == addon.Id);
 
-            if (installed == null || installed.Version != version || !IsInstalledIntact(installed))
+            if (installed == null || installed.Version != version ||
+                HasLegacyScriptLayout(installed) || !IsInstalledIntact(installed))
             {
                 // Kullanıcı bu moda zaten sahipse (kendi kurulumu) kabul etme, üzerine yazma.
                 var conflict = LocalConflictReason(addon, state);
@@ -235,8 +236,10 @@ public sealed class AddonApplier
 
                 foreach (var file in addon.Files)
                 {
-                    var rel = file.Path.Replace('\\', '/');
-                    if (addon.Type == AddonType.ClientScript) rel = "scripts/" + rel;
+                    var rel = file.Path.Replace('\\', '/').TrimStart('/');
+                    if (addon.Type == AddonType.ClientScript &&
+                        !rel.StartsWith("scripts/", StringComparison.OrdinalIgnoreCase))
+                        rel = "scripts/" + rel;
                     var relWin = rel.Replace('/', '\\');
                     if (owned.Contains(relWin)) continue; // bizim kurduğumuz dosya
                     var dest = Path.Combine(_gameFolder, relWin);
@@ -245,6 +248,18 @@ public sealed class AddonApplier
                 return null;
             }
         }
+    }
+
+    /// <summary>
+    /// Eski sürümler, sunucudaki "scripts/..." yollarını ikinci kez öne ekleyerek
+    /// dosyaları <c>scripts\scripts\...</c> altına kuruyordu. Böyle bir kayıt varsa
+    /// mod "güncel" sayılmaz; bir sonraki bağlantıda doğru yola yeniden kurulur.
+    /// </summary>
+    private static bool HasLegacyScriptLayout(InstalledAddon inst)
+    {
+        if (inst.Type != AddonType.ClientScript) return false;
+        return inst.InstalledPaths.Any(p =>
+            p.Replace('\\', '/').StartsWith("scripts/scripts/", StringComparison.OrdinalIgnoreCase));
     }
 
     /// <summary>Kurulu kaydın dosyaları hâlâ yerinde mi (hafif kontrol)?</summary>
@@ -420,11 +435,32 @@ public sealed class AddonApplier
 
             if (!cached)
             {
-                var fileDone = 0L;
-                var fileProgress = new Progress<long>(b => fileDone = b);
+                var fileStart = doneBytes + addonDone;
+                var lastAt = Stopwatch.StartNew();
+                long lastBytes = -1;
+                var speed = 0.0;
+
+                var fileProgress = new Progress<long>(b =>
+                {
+                    var elapsed = lastAt.Elapsed.TotalSeconds;
+                    if (lastBytes >= 0 && elapsed > 0.2)
+                        speed = (b - lastBytes) / elapsed;
+                    lastBytes = b;
+                    lastAt.Restart();
+
+                    var message = SyncText.Translate(
+                        $"İndiriliyor: {addon.DisplayName} / {file.Path} — " +
+                        $"{FormatBytes(b)} / {FormatBytes(file.Size)}" +
+                        (speed > 1 ? $" ({FormatBytes((long)speed)}/s)" : ""));
+                    progress?.Report(new SyncProgress(
+                        message, Fraction(fileStart + b, totalBytes),
+                        fileStart + b, totalBytes));
+                });
+
                 progress?.Report(new SyncProgress(
-                    SyncText.Translate($"İndiriliyor: {addon.DisplayName} / {file.Path}"),
-                    Fraction(doneBytes + addonDone, totalBytes)));
+                    SyncText.Translate($"İndiriliyor: {addon.DisplayName} / {file.Path} " +
+                                       $"({FormatBytes(file.Size)})"),
+                    Fraction(fileStart, totalBytes), fileStart, totalBytes));
                 await client.DownloadFileAsync(addon.Id, file, dest, fileProgress, ct);
             }
 
@@ -454,6 +490,14 @@ public sealed class AddonApplier
 
     private static double Fraction(long done, long total) =>
         total <= 0 ? 0 : Math.Clamp((double)done / total, 0, 1);
+
+    private static string FormatBytes(long bytes)
+    {
+        if (bytes >= 1024L * 1024 * 1024) return $"{bytes / 1073741824.0:0.0} GB";
+        if (bytes >= 1024L * 1024) return $"{bytes / 1048576.0:0.0} MB";
+        if (bytes >= 1024) return $"{bytes / 1024.0:0} KB";
+        return $"{bytes} B";
+    }
 
     // ------------------------------------------------------------------ kurulum
 
@@ -711,8 +755,20 @@ public sealed class AddonApplier
 
         foreach (var file in addon.Files)
         {
-            var rel = file.Path.Replace('\\', '/');
-            if (forceRoot != null) rel = forceRoot.TrimEnd('/') + "/" + rel;
+            var rel = file.Path.Replace('\\', '/').TrimStart('/');
+            if (forceRoot != null)
+            {
+                // Sunucudaki klasör yapısı bazen "scripts/..." ile gelir
+                // (ör. bir mod arşivi MyMod\scripts\MyMod.dll olarak paketlenmişse).
+                // Bu durumda ikinci kez "scripts/" eklemek dosyayı
+                // scripts\scripts\... altına kurar ve oyun modu yüklemez.
+                var root = forceRoot.TrimEnd('/');
+                if (!rel.StartsWith(root + "/", StringComparison.OrdinalIgnoreCase))
+                    rel = root + "/" + rel;
+            }
+
+            if (rel.Contains(".."))
+                throw new SyncException($"Güvenlik: geçersiz hedef yol: {rel}");
 
             if (addon.Type == AddonType.ClientFiles && !ServerScanner.IsAllowedClientPath(rel))
                 throw new SyncException($"Güvenlik: izin verilmeyen hedef yol: {rel}");

@@ -1,5 +1,5 @@
 ==========================================================
- GTACoop Remake - Friend Edition (English, v2.2.7)
+ GTACoop Remake - Friend Edition (English, v2.3.5)
 ==========================================================
 
 This is a friend-to-friend co-op tool for GTA V (Story Mode).
@@ -43,18 +43,42 @@ INSTALLATION
    - EASIEST: ask the server owner for the SHORT CODE
      (for example Gel.com). Click "Join with Code...", type the
      short code and click "Add and Connect". The launcher looks
-     the server up over the internet and uses the automatic relay
-     if direct addresses do not work. No port forwarding or
+     the server up over the internet and tries the automatic
+     relay first; if the relay cannot be established, it falls
+     back to a reachable direct address. No port forwarding or
      Radmin VPN is required. The server must be running and you
-     need an internet connection.
+     need an internet connection. The server owner may choose a
+     custom relay under "My Server > Relay server"; the launcher
+     then never silently falls back to bore.pub. If the router
+     supports UPnP, the game/sync ports are opened automatically;
+     otherwise the relay keeps working.
    - The owner may instead send a long GTC1 code. That code
      carries the address/ports/password by itself and needs no
-     internet lookup (no relay; direct connectivity is required).
+     internet lookup. If it was created while the server was
+     running, it also carries the automatic relay details. If the
+     code contains a short code, the relay ports are refreshed
+     automatically when you connect. Without a short code, ask for
+     a new code after the server was restarted.
    - Alternative: click "Add Server..." and enter the address and
      ports given by the server owner (game port 4499 UDP,
      sync port 4599 TCP).
    - Click "Connect & Play". Server mods download automatically
      and the game starts. Details: JOIN-WITH-CODE-EN.txt
+   - Alternative: use the "Server Browser" tab to scan the GTACoOp
+     master list, LAN, or a direct IP:port. Server name, player count,
+     mode, password, ping, and version (current/old) are shown. If the
+     server has no sync server, the game starts without mods.
+
+   NOTE: if mods\update\update.rpf is near 3.9 GB or structurally
+   damaged, DLC packs are skipped for safety; script/ASI mods still
+   install. If a download is very slow or the connection drops, the
+   launcher retries and resumes where it left off. Large files use
+   2 (over 4 MB) or 4 (over 12 MB) parallel connections when the
+   server supports HTTP Range; each part resumes separately, and
+   the final file is SHA-256 verified. Same-network servers skip the
+   relay. If the problem
+   persists, send %LOCALAPPDATA%\GTACoopRemake\logs\launcher-<date>.log
+   to the server owner.
 
 5) In game:
    - F9  : GTA Coop menu
@@ -76,6 +100,8 @@ IMPORTANT NOTES
   written, and identical save files are not required.
 - YOUR OWN mods are never touched. If a server mod already exists
   on your PC, it is skipped: not downloaded, not overwritten.
+- Server scripts are installed directly into scripts\; the launcher
+  never creates a wrong nested scripts\scripts\... folder.
 - Server mods are installed only while you play; they are removed
   automatically when you exit the game.
 - If the server owner disables server mods, they are not downloaded
@@ -90,6 +116,9 @@ IMPORTANT NOTES
   download that server's files again (they are not installed
   into the game). This is blocked while that server's mods are
   installed in the game; use "End Session" first.
+- While a large DLC downloads, the screen shows downloaded/total
+  size and speed. If the connection drops, the download resumes
+  where it left off.
 - Your game files are not modified. The "Components" tab updates
   only the component files you choose; changed files are backed up
   under mods\GTACoop\backups\components first. Your own mods and
