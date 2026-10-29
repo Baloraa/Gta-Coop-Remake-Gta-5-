@@ -1,5 +1,5 @@
 ==========================================================
- GTACoop Remake - Friend Edition (English, v2.3.5)
+ GTACoop Remake - Friend Edition (English, v2.3.6)
 ==========================================================
 
 This is a friend-to-friend co-op tool for GTA V (Story Mode).
