@@ -10,7 +10,7 @@ GTACoop Remake is for private Story Mode co-op. It does not touch GTA Online, do
 
 **Current release:** 2.3.5  
 **Platform:** Windows 10/11, x64  
-**UI:** Turkish and English  
+**UI:** Turkish, English, and Russian  
 **License:** GNU GPL v3
 
 > Not affiliated with Rockstar Games or Take-Two Interactive. This is not an official product. It requires a legitimate copy of GTA V.
@@ -96,7 +96,7 @@ It backs up every file it replaces under `mods/GTACoop/backups/components/<compo
 ### Diagnostics and language
 
 - **Copy Diagnostics** collects the launcher version, Windows version, .NET version, GTA folder, server and relay settings, local addresses, and the last 80 log lines. Passwords and sync tokens are excluded.
-- The UI and logs are available in Turkish and English. The language can be changed from the top bar and is applied on the next launch.
+- The UI and logs are available in Turkish, English, and Russian. The language can be changed from the top bar and is applied on the next launch.
 
 ---
 

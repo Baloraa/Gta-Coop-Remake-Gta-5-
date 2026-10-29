@@ -203,9 +203,9 @@ Kurallar:
 
 ---
 
-## Dil (Türkçe / İngilizce)
+## Dil (Türkçe / İngilizce / Rusça)
 
-- İlk açılışta **Türkçe** veya **English** seçimi sorulur.
+- İlk açılışta **Türkçe**, **English** veya **Русский** seçimi sorulur.
 - Daha sonra üst çubuktaki **Dil:** kutusundan değiştirebilirsiniz; değişiklik bir sonraki
   açılışta geçerli olur (isterseniz anında yeniden başlatmayı onaylayabilirsiniz).
 

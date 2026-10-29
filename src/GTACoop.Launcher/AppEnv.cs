@@ -40,7 +40,7 @@ public static class AppEnv
         Settings.DataFolder = DataFolder;
 
         // Günlük dosyası ilk satırdan itibaren seçili dilde olsun.
-        SyncText.English = string.Equals(Settings.Language, "en", StringComparison.OrdinalIgnoreCase);
+        SyncText.Language = Loc.NormalizeLanguage(Settings.Language);
 
         if (string.IsNullOrWhiteSpace(Settings.GameFolder) || !GameFolder.IsValid(Settings.GameFolder))
         {

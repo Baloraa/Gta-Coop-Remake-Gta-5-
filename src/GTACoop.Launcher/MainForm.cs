@@ -133,10 +133,10 @@ public sealed class MainForm : Form
             Margin = new Padding(12, 8, 2, 0)
         });
         _langCombo.DropDownStyle = ComboBoxStyle.DropDownList;
-        _langCombo.Width = 110;
+        _langCombo.Width = 120;
         _langCombo.Margin = new Padding(2, 5, 4, 4);
-        _langCombo.Items.AddRange(new object[] { "Türkçe", "English" });
-        _langCombo.SelectedIndex = Loc.English ? 1 : 0;
+        _langCombo.Items.AddRange(new object[] { "Türkçe", "English", "Русский" });
+        _langCombo.SelectedIndex = Loc.LanguageIndex;
         _langCombo.SelectedIndexChanged += (_, _) => ChangeLanguage(_langCombo.SelectedIndex);
         headerButtons.Controls.Add(_langCombo);
 
@@ -183,15 +183,15 @@ public sealed class MainForm : Form
     /// <summary>Dil değişince ayara yazılır; uygulanması için yeniden başlatma önerilir.</summary>
     private void ChangeLanguage(int index)
     {
-        var newLang = index == 1 ? "en" : "tr";
+        var newLang = index switch { 1 => "en", 2 => "ru", _ => "tr" };
         if (newLang == AppEnv.Settings.Language) return;
 
         AppEnv.Settings.Language = newLang;
         AppEnv.SaveSettings();
 
-        var wasEnglish = Loc.English;
-        Loc.English = newLang == "en";
-        SyncText.English = Loc.English;
+        var previous = Loc.Language;
+        Loc.Language = newLang;
+        SyncText.Language = newLang;
         var answer = MessageBox.Show(this,
             T("Dil değiştirildi. Uygulamak için launcher yeniden başlatılsın mı?"),
             T("Dil Değişikliği"), MessageBoxButtons.YesNo, MessageBoxIcon.Question);
@@ -203,8 +203,8 @@ public sealed class MainForm : Form
         }
         else
         {
-            Loc.English = wasEnglish; // seçim kaydedildi; sonraki açılışta geçerli olur
-            SyncText.English = Loc.English;
+            Loc.Language = previous; // seçim kaydedildi; sonraki açılışta geçerli olur
+            SyncText.Language = previous;
         }
     }
 

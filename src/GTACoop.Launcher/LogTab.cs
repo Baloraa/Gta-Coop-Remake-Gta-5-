@@ -223,7 +223,7 @@ public sealed class LogTab : UserControl
             sb.AppendLine(T("İşletim sistemi: {0}", System.Runtime.InteropServices.RuntimeInformation.OSDescription +
                 (Environment.Is64BitOperatingSystem ? " (64-bit)" : " (32-bit)")));
             sb.AppendLine(T(".NET: {0}", Environment.Version));
-            sb.AppendLine(T("Dil: {0}", Loc.English ? "English" : "Türkçe"));
+            sb.AppendLine(T("Dil: {0}", Loc.LanguageName));
             sb.AppendLine(T("GTA klasörü: {0}",
                 string.IsNullOrWhiteSpace(AppEnv.Settings.GameFolder) ? T("(seçilmemiş)") : AppEnv.Settings.GameFolder));
             sb.AppendLine(T("Sunucu: {0} | oyun: {1} UDP | sync: {2} TCP",

@@ -4,16 +4,25 @@ namespace GTACoop.Sync;
 
 /// <summary>
 /// Sync katmanındaki günlük/ilerleme/hata metinlerini arayüz diline çevirir.
-/// Launcher Türkçe ise metinler olduğu gibi kalır; İngilizce ise bilinen
-/// Türkçe kalıplar İngilizceye çevrilir. Dosya yolları ve kullanıcı adları
-/// değiştirilmez; yalnızca metin parçaları eşleştirilir.
+/// Launcher Türkçe ise metinler olduğu gibi kalır; İngilizce ve Rusça ise
+/// bilinen Türkçe kalıplar İngilizceye çevrilir (Rusça için İngilizce yedek).
+/// Dosya yolları ve kullanıcı adları değiştirilmez; yalnızca metin parçaları
+/// eşleştirilir.
 /// </summary>
 public static class SyncText
 {
-    public static bool English { get; set; }
+    /// <summary>Geçerli dil: "tr", "en" veya "ru".</summary>
+    public static string Language { get; set; } = "tr";
+
+    /// <summary>Geriye dönük uyumluluk: İngilizce veya Rusça modda true.</summary>
+    public static bool English
+    {
+        get => Language != "tr";
+        set => Language = value ? "en" : "tr";
+    }
 
     public static string T(string tr) =>
-        English && En.TryGetValue(tr, out var en) ? en : tr;
+        Language != "tr" && En.TryGetValue(tr, out var en) ? en : tr;
 
     public static string T(string tr, params object?[] args) =>
         string.Format(T(tr), args);
@@ -24,7 +33,7 @@ public static class SyncText
     /// </summary>
     public static string Translate(string? message)
     {
-        if (!English || string.IsNullOrWhiteSpace(message)) return message ?? "";
+        if (Language == "tr" || string.IsNullOrWhiteSpace(message)) return message ?? "";
 
         if (En.TryGetValue(message, out var exact)) return exact;
 

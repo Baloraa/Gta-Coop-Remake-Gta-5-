@@ -38,8 +38,9 @@ internal static class Program
             AppEnv.Settings.Language = chosen;
             AppEnv.SaveSettings();
         }
-        Loc.English = string.Equals(AppEnv.Settings.Language, "en", StringComparison.OrdinalIgnoreCase);
-        GTACoop.Sync.SyncText.English = Loc.English;
+        AppEnv.Settings.Language = Loc.NormalizeLanguage(AppEnv.Settings.Language);
+        Loc.Language = AppEnv.Settings.Language;
+        GTACoop.Sync.SyncText.Language = Loc.Language;
 
         Application.Run(new MainForm());
 

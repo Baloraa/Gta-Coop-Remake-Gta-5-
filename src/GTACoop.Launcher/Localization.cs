@@ -1,19 +1,61 @@
 namespace GTACoop.Remake;
 
 /// <summary>
-/// Basit çoklu dil desteği. Anahtarlar Türkçe metinlerdir; İngilizce modda
-/// sözlükteki karşılıkları kullanılır. Eksik anahtar olursa Türkçesi gösterilir.
+/// Basit çoklu dil desteği. Anahtarlar Türkçe metinlerdir; İngilizce ve Rusça
+/// modda sözlükteki karşılıkları kullanılır. Eksik Rusça anahtar İngilizceye,
+/// o da yoksa Türkçeye düşer.
 /// </summary>
 public static partial class Loc
 {
-    /// <summary>true ise arayüz İngilizce gösterilir.</summary>
-    public static bool English { get; set; }
+    /// <summary>Geçerli arayüz dili: "tr", "en" veya "ru".</summary>
+    public static string Language { get; set; } = "tr";
+
+    /// <summary>Geriye dönük uyumluluk için İngilizce kısayolu.</summary>
+    public static bool English
+    {
+        get => Language == "en";
+        set => Language = value ? "en" : "tr";
+    }
+
+    public static bool Russian => Language == "ru";
+
+    /// <summary>Ayar dosyasındaki dil değerini "tr", "en" veya "ru" olarak döndürür.</summary>
+    public static string NormalizeLanguage(string? language) => language?.Trim().ToLowerInvariant() switch
+    {
+        "en" => "en",
+        "ru" => "ru",
+        _ => "tr"
+    };
+
+    public static int LanguageIndex => Language switch
+    {
+        "en" => 1,
+        "ru" => 2,
+        _ => 0
+    };
+
+    public static string LanguageName => Language switch
+    {
+        "en" => "English",
+        "ru" => "Русский",
+        _ => "Türkçe"
+    };
 
     public static string T(string tr)
     {
-        if (!English) return tr;
-        if (En.TryGetValue(tr, out var en)) return en;
-        return RelayEn.TryGetValue(tr, out en) ? en : tr;
+        if (Language == "tr") return tr;
+
+        string? source = null;
+        if (En.TryGetValue(tr, out var en)) source = en;
+        else if (RelayEn.TryGetValue(tr, out en)) source = en;
+
+        if (Language == "ru")
+        {
+            var key = source ?? tr;
+            if (Ru.TryGetValue(key, out var ru)) return ru;
+        }
+
+        return source ?? tr;
     }
 
     public static string T(string tr, params object?[] args)
