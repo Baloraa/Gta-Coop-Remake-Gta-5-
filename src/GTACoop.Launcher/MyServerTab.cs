@@ -156,6 +156,7 @@ public sealed class MyServerTab : UserControl
         modsRow1.Controls.Add(Ui.Btn(T("Script Klasörü Ekle..."), (_, _) => AddScriptFolder()));
 
         var modsRow2 = Ui.Flow();
+        modsRow2.Controls.Add(Ui.Btn(T("OIV Paketi Ekle (.oiv)..."), (_, _) => AddOivPackage()));
         modsRow2.Controls.Add(Ui.Btn(T("ASI Eklentisi Ekle (.asi)..."), (_, _) => AddAsi()));
         modsRow2.Controls.Add(Ui.Btn(T("Sunucu Eklentisi Ekle (plugin dll)..."), (_, _) => AddPlugin()));
 
@@ -165,7 +166,7 @@ public sealed class MyServerTab : UserControl
             AutoSize = false,
             Height = 40,
             ForeColor = Color.DimGray,
-            Text = T("DLC paketleri: Addons\\dlcpacks\\  |  Scriptler: Addons\\scripts\\  |  ASI eklentileri: Addons\\asi\\  |  Sunucu eklentileri: Plugins\\\r\nScript/ASI eklentileri yanındaki ini/xml/pdb gibi dosyalarla birlikte eklenir. Meta için: addon.json")
+            Text = T("DLC paketleri: Addons\\dlcpacks\\  |  OIV paketleri: Addons\\oiv\\  |  Scriptler: Addons\\scripts\\  |  ASI: Addons\\asi\\  |  Sunucu eklentileri: Plugins\\\r\nHer OIV paketi kendi klasöründe saklanır. Meta için: addon.json")
         };
         modsGroup.Controls.Add(modsInfo);
         modsGroup.Controls.Add(modsRow2);
@@ -470,6 +471,8 @@ public sealed class MyServerTab : UserControl
 
         AddFolderEntries(entries, Path.Combine(addons, "dlcpacks"),
             "dlcpacks", T("DLC Paketi"), AddonType.DlcPack);
+        AddFolderEntries(entries, Path.Combine(addons, "oiv"),
+            "oiv", T("OIV Paketi"), AddonType.OivPackage);
         AddFolderEntries(entries, Path.Combine(addons, "scripts"),
             "scripts", T("Script"), AddonType.ClientScript);
         AddFolderEntries(entries, Path.Combine(addons, "asi"),
@@ -565,14 +568,25 @@ public sealed class MyServerTab : UserControl
         try
         {
             var path = Path.Combine(dir, "addon.json");
-            if (!File.Exists(path)) return null;
-            using var doc = JsonDocument.Parse(File.ReadAllText(path));
-            if (doc.RootElement.TryGetProperty("displayName", out var name) &&
-                name.ValueKind == JsonValueKind.String)
-                return name.GetString();
+            if (File.Exists(path))
+            {
+                using var doc = JsonDocument.Parse(File.ReadAllText(path));
+                if (doc.RootElement.TryGetProperty("displayName", out var name) &&
+                    name.ValueKind == JsonValueKind.String)
+                    return name.GetString();
+            }
         }
         catch { /* meta okunamazsa klasör adı kullanılır */ }
-        return null;
+
+        // OIV paketlerinde meta assembly.xml içindedir.
+        try
+        {
+            return ServerScanner.ReadOivDisplayName(dir);
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     private sealed class ModEntry
@@ -1206,6 +1220,80 @@ public sealed class MyServerTab : UserControl
     }
 
     // ------------------------------------------------------------------ mod ekleme
+
+    private void AddOivPackage()
+    {
+        using var dlg = new OpenFileDialog
+        {
+            Title = T("OpenIV paketini seçin (.oiv)."),
+            Filter = T("OpenIV paketi (*.oiv)|*.oiv|Tüm dosyalar (*.*)|*.*"),
+            Multiselect = true
+        };
+        if (dlg.ShowDialog(FindForm()) != DialogResult.OK) return;
+
+        int added = 0, skipped = 0, partial = 0;
+        var errors = new List<string>();
+        try
+        {
+            UseWaitCursor = true;
+            foreach (var file in dlg.FileNames)
+            {
+                OivPackage? pkg = null;
+                try
+                {
+                    pkg = OivPackage.Open(file);
+                    if (pkg.Unsupported.Count > 0) partial++;
+
+                    var id = AddonApplier.Safe(Path.GetFileNameWithoutExtension(file));
+                    var target = Path.Combine(ServerDirAddons(), "oiv", id);
+                    if (Directory.Exists(target) &&
+                        !Ui.Confirm(FindForm()!, T(
+                            "'{0}' zaten Addons\\oiv içinde. Üzerine yazılsın mı?", id)))
+                    {
+                        skipped++;
+                        continue;
+                    }
+
+                    if (Directory.Exists(target)) Directory.Delete(target, recursive: true);
+                    Directory.CreateDirectory(target);
+                    File.Copy(file, Path.Combine(target, "package.oiv"), overwrite: true);
+                    added++;
+                }
+                catch (Exception ex)
+                {
+                    errors.Add(Path.GetFileName(file) + ": " + ex.Message);
+                }
+                finally
+                {
+                    pkg?.Dispose();
+                }
+            }
+
+            if (added > 0)
+            {
+                Ui.Info(FindForm()!, T(
+                    "OIV paketi eklendi: {0}\r\nSunucu çalışıyorsa bir sonraki manifest isteğinde otomatik dağıtılır.",
+                    added) +
+                    (partial > 0 ? T("\r\n{0} pakette desteklenmeyen işlemler atlanacak.", partial) : "") +
+                    (skipped > 0 ? T("\r\n{0} paket atlandı.", skipped) : ""));
+                AppEnv.Log($"Sunucu OIV paketi eklendi: {added} paket" +
+                           (partial > 0 ? $", {partial} kısmi" : ""));
+            }
+            if (errors.Count > 0)
+                Ui.Warn(FindForm()!, T("Bazı OIV paketleri eklenemedi:\r\n") +
+                    string.Join("\r\n", errors.Take(6)));
+            RefreshModsList();
+        }
+        catch (Exception ex)
+        {
+            AppEnv.LogError(ex.Message);
+            Ui.Error(FindForm()!, T("OIV paketi eklenemedi:\r\n") + ex.Message);
+        }
+        finally
+        {
+            UseWaitCursor = false;
+        }
+    }
 
     private void AddDlcPack()
     {

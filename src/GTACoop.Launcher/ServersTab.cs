@@ -853,7 +853,7 @@ public sealed class ServersTab : UserControl
                             (plan.LocalSkipped.Count > 5 ? "..." : ""));
                     if (plan.Blocked.Count > 0)
                     {
-                        note += T("DLC paketleri kurulamıyor (update.rpf güvenli değil) ({0}): {1}\r\n{2}\r\n\r\n",
+                        note += T("DLC/OIV paketleri kurulamıyor (update.rpf güvenli değil) ({0}): {1}\r\n{2}\r\n\r\n",
                             plan.Blocked.Count,
                             string.Join(", ", plan.Blocked.Take(5).Select(s => s.Addon.DisplayName)) +
                             (plan.Blocked.Count > 5 ? "..." : ""),
@@ -1705,6 +1705,7 @@ public sealed class ServersTab : UserControl
             var typeName = a.Type switch
             {
                 AddonType.DlcPack => T("DLC paketi"),
+                AddonType.OivPackage => T("OIV paketi"),
                 AddonType.ClientScript => "script",
                 AddonType.AsiPlugin => T("ASI eklentisi"),
                 AddonType.ClientFiles => T("dosya"),

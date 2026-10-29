@@ -9,7 +9,7 @@ namespace GTACoop.Sync;
 /// Dosya yolları ve kullanıcı adları değiştirilmez; yalnızca metin parçaları
 /// eşleştirilir.
 /// </summary>
-public static class SyncText
+public static partial class SyncText
 {
     /// <summary>Geçerli dil: "tr", "en" veya "ru".</summary>
     public static string Language { get; set; } = "tr";
@@ -21,8 +21,13 @@ public static class SyncText
         set => Language = value ? "en" : "tr";
     }
 
-    public static string T(string tr) =>
-        Language != "tr" && En.TryGetValue(tr, out var en) ? en : tr;
+    public static string T(string tr)
+    {
+        if (Language == "tr") return tr;
+        if (En.TryGetValue(tr, out var en)) return en;
+        if (OivEn.TryGetValue(tr, out en)) return en;
+        return tr;
+    }
 
     public static string T(string tr, params object?[] args) =>
         string.Format(T(tr), args);
@@ -36,6 +41,7 @@ public static class SyncText
         if (Language == "tr" || string.IsNullOrWhiteSpace(message)) return message ?? "";
 
         if (En.TryGetValue(message, out var exact)) return exact;
+        if (OivEn.TryGetValue(message, out exact)) return exact;
 
         var text = message;
 

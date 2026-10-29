@@ -2,16 +2,32 @@
 
 **Türkçe** | [English](README.md)
 
-2.3.5 sürümü - kendi sunucu yönetimi, otomatik mod indirme, **oturum modu**,
+2.3.6 sürümü - kendi sunucu yönetimi, otomatik mod indirme, **oturum modu**,
 **kısa kod** (ör. `Gel.com`) ile internetten sunucu bulma, **otomatik relay**,
 **UPnP doğrudan bağlantı**, **özel relay sunucusu**, **tanılama kopyalama**,
-**canlı sunucu durumu**, **Sunucu Tarayıcı** sekmesi ve **Bileşenler** sekmesinden
+**canlı sunucu durumu**, **Sunucu Tarayıcı** sekmesi, **OpenIV (.oiv) paket desteği**
+ve **Bileşenler** sekmesinden
 ScriptHookV / ScriptHookVDotNet / OpenIV.asi / RageOpenV kurulumu:
 port yönlendirme veya Radmin VPN olmadan da arkadaşlarınız bağlanabilir. Sunucu modları
 yalnızca oyun açıkken kurulu kalır, oyundan çıkınca otomatik kaldırılır.
 Oyun başlatma dosyası seçilebilir; varsayılan **PlayGTAV.exe**'dir (GTA5.exe de seçilebilir).
 **Sesli sohbet** (bas-konuş, `[MIC]` göstergesi) ve **host-led hikaye görevi koordinasyonu**
 bu sürümde eklendi; ayrıntılar aşağıda.
+
+### 2.3.6 — OpenIV (.oiv) paket desteği
+
+- **Sunucum > OIV Paketi Ekle (.oiv)...** ile `.oiv` dosyalarını sunucuya ekleyin.
+  Her paket kendi klasöründe saklanır: `Addons\oiv\<paket>\package.oiv`; böylece
+  aynı addaki veya farklı sürümdeki paketler birbirine karışmaz.
+- OIV'nin yalnızca **güvenli alt kümesi** uygulanır: `scripts\`, `mods\` ve
+  `update\x64\dlcpacks\...` altına dosya ekleme; `mods\update\update.rpf` içindeki
+  dlclist'e eksik girdi ekleme. `delete`, `replace`, orijinal RPF düzenlemesi ve
+  doğrudan `update.rpf` değiştirme **uygulanmaz**, günlüğe uyarı yazılır.
+- Var olan farklı bir dosyanın üzerine **asla** yazılmaz. Kurulan her dosyanın
+  SHA-256 değeri kaydedilir; kaldırırken yalnızca launcher'ın yazdığı ve hâlâ
+  aynı olan dosyalar silinir. Kullanıcı dosyası değiştirildiyse korunur.
+- Güncelleme başarısız olursa eski sürümün dosyaları geri getirilir; dlclist
+  girdileri yalnızca başka bir kurulu paket aynı DLC klasörünü sağlamıyorsa kaldırılır.
 
 ### 2.3.5 — canlı sunucu durumu
 
@@ -61,7 +77,7 @@ bu sürümde eklendi; ayrıntılar aşağıda.
 - **Kendi modlarınız karışmaz**: PC'nize kurduğunuz modlara hiç dokunulmaz; kendi modlarınızı
   yönetmenize gerek yoktur — zaten kurulu hâlleriyle çalışır.
 - **Kendi sunucunuz olsun**: kendi GTACoOp sunucunuzu bu launcher'dan başlatın; addon araç/ped
-  paketi, script, script klasörü, ASI eklentisi ekleyin.
+  paketi, **OpenIV `.oiv` paketi**, script, script klasörü, ASI eklentisi ekleyin.
 - **Port yönlendirme/Radmin olmadan**: kısa kod kullanırsanız launcher otomatik bir TCP relay
   açar. Arkadaşınızın yönlendirici ayarı yapmasına gerek kalmaz; launcher önce relay'i dener,
   relay kurulamazsa aynı ağ/Radmin/port yönlendirme adreslerine geçer.
@@ -223,7 +239,7 @@ Kurallar:
 - Bu betik uygulamayı `%LOCALAPPDATA%\Programs\GTACoop Remake` klasörüne kopyalar ve
   **masaüstü** + **Başlat menüsü** kısayollarını buraya bağlar. Hiçbir şey silinmez
   (eski `dist` klasörü olduğu yerde kalır).
-- Uygulama simgesi ve sürüm bilgisi (2.3.5) exe dosyasına işlenmiştir.
+- Uygulama simgesi ve sürüm bilgisi (2.3.6) exe dosyasına işlenmiştir.
 
 ---
 
@@ -312,6 +328,9 @@ kapanınca oyun klasörü temizlenir, indirilen dosyalar kalır (tekrar indirme 
 
 - **DLC Paketi Ekle (araç/ped)...**: `dlc.rpf` içeren paket klasörünü seçin (araç/ped/harita
   paketleri). İç içe klasörler (`x64\dlcpacks\...`) desteklenir.
+- **OIV Paketi Ekle (.oiv)...**: OpenIV `.oiv` dosyalarını seçin. Her paket
+  `Addons\oiv\<paket>\package.oiv` altında ayrı saklanır; oyunculara DLC paketleri gibi
+  dağıtılır. Yalnızca güvenli işlemler uygulanır; desteklenmeyen işlemler atlanır.
 - **İstemci Scripti Ekle (dll + ini/xml/pdb)...**: script dosyalarını ve **yanındaki destek
   dosyalarını** (ini, xml, pdb, json, txt, config...) hep birlikte seçin; hepsi birlikte
   oyuncuların `scripts/` klasörüne kurulur. Alt klasörlü scriptler için aşağıdaki seçeneği
@@ -349,9 +368,9 @@ Notlar:
   (`.gtacoop-server.json`) korunur. Güvenlik için sunucu durdurulmuş olmalıdır.
 - **Yenile**: listeyi diskten yeniden okur.
 
-Liste DLC paketlerini, istemci scriptlerini, ASI eklentilerini, istemci dosyalarını ve sunucu
-eklentilerini gösterir. Sunucu eklentisi (plugin) değişiklikleri sunucu yeniden başlatılınca
-etkili olur.
+Liste DLC paketlerini, OIV paketlerini, istemci scriptlerini, ASI eklentilerini, istemci
+dosyalarını ve sunucu eklentilerini gösterir. Sunucu eklentisi (plugin) değişiklikleri sunucu
+yeniden başlatılınca etkili olur.
 
 ---
 
@@ -366,6 +385,9 @@ etkili olur.
   düzenlenir.
 - Silme işlemleri yalnızca launcher'ın kurduğu dosyaları kapsar; kendi dosyalarınıza ve
   oyunun dosyalarına dokunulmaz.
+- OIV paketlerinde kurulan her dosyanın SHA-256 değeri saklanır; kaldırırken yalnızca
+  launcher'ın yazdığı ve içeriği değişmemiş dosyalar silinir. Var olan farklı bir dosya
+  hiçbir zaman ezilmez; `delete`/`replace` ve orijinal RPF düzenlemeleri uygulanmaz.
 - **Günlük / Araçlar** sekmesinden: yedekleri listeleyip geri yükleyebilir, sunuculardan
   kurulmuş tüm eklentileri (script, ASI, dlc paketi) tek tuşla temizleyebilirsiniz.
 

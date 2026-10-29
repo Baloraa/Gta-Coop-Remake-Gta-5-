@@ -25,7 +25,7 @@ public sealed class ServerScanner
     /// <summary>Sunucu klasör yapısını oluşturur.</summary>
     public static void EnsureLayout(string addonsDir)
     {
-        foreach (var sub in new[] { "dlcpacks", "scripts", "asi", "files", "plugins" })
+        foreach (var sub in new[] { "dlcpacks", "oiv", "scripts", "asi", "files", "plugins" })
             Directory.CreateDirectory(Path.Combine(addonsDir, sub));
     }
 
@@ -73,6 +73,7 @@ public sealed class ServerScanner
         var before = _cache.Count;
 
         ScanDlcPacks(manifest, result);
+        ScanOivPackages(manifest, result);
         ScanScripts(manifest, result);
         ScanAsi(manifest, result);
         ScanFiles(manifest, result);
@@ -119,6 +120,75 @@ public sealed class ServerScanner
                 RelativePackPath = relPackPath.Replace('\\', '/'),
                 Files = HashTree(packDir, result, id)
             });
+        }
+    }
+
+    private void ScanOivPackages(Manifest manifest, ScanResult result)
+    {
+        var dir = Path.Combine(_addonsDir, "oiv");
+        if (!Directory.Exists(dir)) return;
+
+        foreach (var packDir in Directory.GetDirectories(dir))
+        {
+            var id = Path.GetFileName(packDir);
+            if (id.StartsWith('.')) continue;
+
+            // Her OIV paketi kendi klasöründe durur; klasör içinde tek .oiv beklenir.
+            var oiv = Directory.EnumerateFiles(packDir, "*.oiv", SearchOption.AllDirectories)
+                .OrderBy(p => p.Count(c => c == Path.DirectorySeparatorChar))
+                .FirstOrDefault();
+            if (oiv == null)
+            {
+                result.Warnings.Add($"OIV '{id}' atlandı: içinde .oiv dosyası bulunamadı.");
+                continue;
+            }
+
+            try
+            {
+                using var pkg = OivPackage.Open(oiv);
+                var files = HashTree(packDir, result, id);
+                if (files.Count == 0)
+                {
+                    result.Warnings.Add($"OIV '{id}' atlandı: boş klasör.");
+                    continue;
+                }
+
+                var meta = ReadAddonMeta(packDir);
+                manifest.Addons.Add(new AddonInfo
+                {
+                    Id = id,
+                    Type = AddonType.OivPackage,
+                    DisplayName = meta?.DisplayName ?? pkg.Name,
+                    Description = meta?.Description ??
+                        (pkg.Description.Length > 0 ? pkg.Description : ""),
+                    Version = pkg.Version,
+                    Required = meta?.Required ?? true,
+                    Files = files,
+                    OivTargets = pkg.FileAdds.Select(f => f.Destination).ToList(),
+                    OivDlclistEntries = pkg.DlclistEntries.ToList(),
+                    OivUnsupportedCount = pkg.Unsupported.Count
+                });
+            }
+            catch (Exception ex)
+            {
+                result.Warnings.Add($"OIV '{id}' atlandı: {ex.Message}");
+            }
+        }
+    }
+
+    /// <summary>OIV klasöründeki paketin görünen adını okur (sunucu mod listesi için).</summary>
+    public static string? ReadOivDisplayName(string dir)
+    {
+        try
+        {
+            var oiv = Directory.EnumerateFiles(dir, "*.oiv", SearchOption.AllDirectories)
+                .OrderBy(p => p.Count(c => c == Path.DirectorySeparatorChar))
+                .FirstOrDefault();
+            return oiv == null ? null : OivPackage.ReadDisplayName(oiv);
+        }
+        catch
+        {
+            return null;
         }
     }
 

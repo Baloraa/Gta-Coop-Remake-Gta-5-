@@ -58,7 +58,8 @@ public sealed class AddonApplier
             if (addon.Type == AddonType.ServerPlugin) continue; // istemciye kurulmaz
 
             var version = ServerScanner.ComputeVersion(addon);
-            var installed = state.Addons.FirstOrDefault(a => a.Id == addon.Id);
+            var installed = state.Addons.FirstOrDefault(a =>
+                a.Id == addon.Id && a.Type == addon.Type);
 
             if (installed == null || installed.Version != version ||
                 HasLegacyScriptLayout(installed) || !IsInstalledIntact(installed))
@@ -92,9 +93,20 @@ public sealed class AddonApplier
             }
         }
 
+        // OIV paketleri de dlclist düzenleyebilir. update.rpf güvenli değilse
+        // paketi indirmeye başlamadan engelle; mevcut dosyalara dokunma.
+        foreach (var addon in plan.ToInstall
+                     .Where(a => a.Type == AddonType.OivPackage && a.OivDlclistEntries.Count > 0)
+                     .ToList())
+        {
+            if (CanAddDlclistEntries(addon.OivDlclistEntries, out var oivReason)) continue;
+            plan.ToInstall.Remove(addon);
+            plan.Blocked.Add(new SkippedAddon { Addon = addon, Reason = oivReason });
+        }
+
         foreach (var inst in state.Addons)
         {
-            if (!manifest.Addons.Any(a => a.Id == inst.Id))
+            if (!manifest.Addons.Any(a => a.Id == inst.Id && a.Type == inst.Type))
                 plan.ToRemove.Add(inst);
         }
 
@@ -114,11 +126,27 @@ public sealed class AddonApplier
         reason = "";
         var list = addons.Where(a => a.Type == AddonType.DlcPack).ToList();
         if (list.Count == 0) return true;
+        return CanAddDlclistEntries(list.Select(DlclistEntryFor), out reason);
+    }
+
+    /// <summary>
+    /// Verilen dlclist girdileri update.rpf'ye güvenle yazılabilir mi?
+    /// DLC ve OIV paketleri aynı koruma kurallarını kullanır.
+    /// </summary>
+    public bool CanAddDlclistEntries(IEnumerable<string> entries, out string reason)
+    {
+        reason = "";
+        var wanted = entries
+            .Where(e => !string.IsNullOrWhiteSpace(e))
+            .Select(e => e.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        if (wanted.Count == 0) return true;
 
         if (!File.Exists(UpdateRpfPath))
         {
             reason = SyncText.T(
-                "mods/update/update.rpf bulunamadı. DLC paketleri için OpenIV ile mods klasörü oluşturulmalı.");
+                "mods/update/update.rpf bulunamadı. DLC/OIV paketleri için OpenIV ile mods klasörü oluşturulmalı.");
             return false;
         }
 
@@ -141,13 +169,11 @@ public sealed class AddonApplier
 
             var (xml, enc) = Dlclist.Decode(archive.ReadFile(file));
             var existing = Dlclist.GetPackNames(xml);
-            var missing = list
-                .Select(DlclistEntryFor)
+            var missing = wanted
                 .Where(e => !existing.Contains(e, StringComparer.OrdinalIgnoreCase))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
-            // Girdiler zaten varsa update.rpf'ye yazma gerekmez; DLC dosyaları
+            // Girdiler zaten varsa update.rpf'ye yazma gerekmez; dosyalar
             // güncellenebilir, mevcut (sağlıksız/büyük) arşive dokunulmaz.
             if (missing.Count == 0) return true;
 
@@ -190,7 +216,7 @@ public sealed class AddonApplier
     {
         // Bizim kurduğumuz (kayıtlı) bir mod güncelleniyorsa atlama yapılmaz:
         // güncelleme akışı dosya bazında kullanıcı dosyalarını zaten korur.
-        if (state.Addons.Any(x => x.Id == addon.Id)) return null;
+        if (state.Addons.Any(x => x.Id == addon.Id && x.Type == addon.Type)) return null;
 
         // OpenIV.asi / OpenRPF.asi / RageOpenV.asi aynı mods-folder köprüsünü açar.
         // Bir arkadaşta bunlardan biri varsa diğerini üzerine kurup çakışma yaratmayalım.
@@ -224,6 +250,38 @@ public sealed class AddonApplier
                     var name = Path.GetFileName(dir);
                     if (name.StartsWith("gcs_", StringComparison.OrdinalIgnoreCase)) continue; // bizim bağladıklarımız
                     if (Safe(name) == wanted) return dir;
+                }
+                return null;
+            }
+            case AddonType.OivPackage:
+            {
+                var owned = state.Addons
+                    .SelectMany(a => a.InstalledPaths)
+                    .Select(p => p.Replace('\\', '/').TrimStart('/'))
+                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+                foreach (var target in addon.OivTargets)
+                {
+                    var rel = target.Replace('\\', '/').TrimStart('/');
+                    if (rel.Length == 0 || rel.Contains("..")) continue;
+
+                    const string dlcPrefix = "mods/update/x64/dlcpacks/";
+                    if (rel.StartsWith(dlcPrefix, StringComparison.OrdinalIgnoreCase))
+                    {
+                        var rest = rel[dlcPrefix.Length..];
+                        var folder = rest.Split('/')[0];
+                        if (folder.Length == 0) continue;
+                        var dir = Path.Combine(_gameFolder, "mods", "update", "x64", "dlcpacks", folder);
+                        if (!Directory.Exists(dir)) continue;
+                        if (state.Addons.SelectMany(a => a.InstalledPaths).Any(p =>
+                                p.Replace('\\', '/').StartsWith(dlcPrefix + folder + "/",
+                                    StringComparison.OrdinalIgnoreCase)))
+                            continue; // bizim kurduğumuz paket klasörü
+                        return dir;
+                    }
+
+                    var full = Path.Combine(_gameFolder, rel.Replace('/', Path.DirectorySeparatorChar));
+                    if (File.Exists(full) && !owned.Contains(rel)) return full;
                 }
                 return null;
             }
@@ -285,10 +343,77 @@ public sealed class AddonApplier
                 if (!File.Exists(UpdateRpfPath)) return false;
                 return DlclistEntryExists(inst.DlclistEntry) != false;
             }
+            case AddonType.OivPackage:
+            {
+                var entries = InstalledDlclistEntries(inst);
+                if (inst.InstalledPaths.Count == 0 && entries.Count == 0) return false;
+                foreach (var p in inst.InstalledPaths)
+                {
+                    if (!File.Exists(Path.Combine(_gameFolder,
+                            p.Replace('/', Path.DirectorySeparatorChar))))
+                        return false;
+                }
+                if (entries.Count > 0 && !File.Exists(UpdateRpfPath)) return false;
+                foreach (var entry in entries)
+                {
+                    if (DlclistEntryExists(entry) == false) return false;
+                }
+                return true;
+            }
             default:
                 return inst.InstalledPaths.Any(p =>
                     File.Exists(Path.Combine(_gameFolder, p.Replace('/', Path.DirectorySeparatorChar))));
         }
+    }
+
+    private static List<string> InstalledDlclistEntries(InstalledAddon inst)
+    {
+        var entries = new List<string>();
+        if (inst.DlclistEntries.Count > 0) entries.AddRange(inst.DlclistEntries);
+        else if (!string.IsNullOrWhiteSpace(inst.DlclistEntry)) entries.Add(inst.DlclistEntry);
+        return entries
+            .Where(e => !string.IsNullOrWhiteSpace(e))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    /// <summary>
+    /// Kaldırılacak paketin dlclist girdilerinden hangileri başka bir kurulu
+    /// eklenti tarafından hâlâ gerekiyor? Yalnızca gerçekten dlcpack klasörünü
+    /// sağlayan (veya kendi DLC kaydı olan) paketler koruma sayılır; böylece
+    /// yalnızca liste yöneten paketler gereksiz girdileri canlı tutmaz.
+    /// </summary>
+    private static HashSet<string> DlclistEntriesStillNeededByOthers(
+        InstalledAddon removing, IEnumerable<InstalledAddon> all)
+    {
+        var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var removingEntries = InstalledDlclistEntries(removing);
+        if (removingEntries.Count == 0) return result;
+
+        foreach (var other in all)
+        {
+            if (ReferenceEquals(other, removing)) continue;
+            if (other.Id == removing.Id && other.Type == removing.Type) continue;
+
+            var paths = other.InstalledPaths
+                .Select(p => p.Replace('\\', '/').TrimStart('/'))
+                .ToList();
+
+            foreach (var entry in removingEntries)
+            {
+                if (ProvidesDlcFolder(paths, entry) ||
+                    (other.Type == AddonType.DlcPack &&
+                     string.Equals(other.DlclistEntry, entry, StringComparison.OrdinalIgnoreCase)))
+                    result.Add(entry);
+            }
+        }
+        return result;
+    }
+
+    private static bool ProvidesDlcFolder(IEnumerable<string> installedPaths, string entry)
+    {
+        var prefix = "mods/update/x64/dlcpacks/" + entry + "/";
+        return installedPaths.Any(p => p.StartsWith(prefix, StringComparison.OrdinalIgnoreCase));
     }
 
     // ------------------------------------------------------------------ senkronizasyon
@@ -325,10 +450,10 @@ public sealed class AddonApplier
         // İndirme yapılmaz, mevcut dosyalara dokunulmaz; diğer eklentiler devam eder.
         foreach (var blocked in plan.Blocked)
         {
-            _log(SyncText.T("Atlandı (DLC kurulamıyor): {0} -> {1}",
+            _log(SyncText.T("Atlandı (paket kurulamıyor): {0} -> {1}",
                 blocked.Addon.DisplayName, blocked.Reason));
             progress?.Report(new SyncProgress(
-                SyncText.T("Atlandı: {0} (DLC kurulamıyor)", blocked.Addon.DisplayName), 0));
+                SyncText.T("Atlandı: {0} (paket kurulamıyor)", blocked.Addon.DisplayName), 0));
         }
 
         // 1) Sunucudan kaldırılanları temizle
@@ -338,7 +463,8 @@ public sealed class AddonApplier
             progress?.Report(new SyncProgress(
                 SyncText.Translate($"Kaldırılıyor: {inst.Id}"), 0));
             _log(SyncText.Translate($"Kaldırılıyor: {inst.Id} ({inst.Type})"));
-            Uninstall(inst);
+            Uninstall(inst,
+                protectedDlclistEntries: DlclistEntriesStillNeededByOthers(inst, state.Addons));
             state.Addons.Remove(inst);
             SyncStateStore.Save(dataFolder, state); // çökme güvenliği: artımlı kayıt
         }
@@ -354,18 +480,18 @@ public sealed class AddonApplier
             // DLC güncellemelerinde eski sürümün önbelleğini EZMEYELİM: hedef
             // klasör eski önbelleğe junction olabilir. Sürüm başına ayrı önbellek
             // kullanınca indirme/kurulum başarısız olsa bile eski DLC sağlam kalır.
-            var addonCacheDir = addon.Type == AddonType.DlcPack
+            var addonCacheDir = addon.Type is AddonType.DlcPack or AddonType.OivPackage
                 ? Path.Combine(serverCacheDir, Safe(addon.Id) + "__" + Safe(version))
                 : Path.Combine(serverCacheDir, Safe(addon.Id));
 
-            // Güncelleme senaryosu. DLC paketlerinde eski klasörü önceden SİLMEYİZ:
-            // InstallDlcPack yeni sürümü geçici klasöre hazırlar, başarısız olursa
-            // eski sürümü geri getirir. Böylece indirme/kurulum hatası modu bozmaz.
-            var old = state.Addons.FirstOrDefault(a => a.Id == addon.Id);
+            // Güncelleme senaryosu. DLC ve OIV paketlerinde eski dosyaları önceden
+            // SİLMEYİZ: yeni sürüm başarıyla kurulana kadar eski sürüm korunur.
+            var old = state.Addons.FirstOrDefault(a =>
+                a.Id == addon.Id && a.Type == addon.Type);
             if (old != null)
             {
                 _log(SyncText.T("Güncelleniyor: {0} ({1} -> {2})", addon.Id, old.Version, version));
-                if (addon.Type != AddonType.DlcPack)
+                if (addon.Type is not (AddonType.DlcPack or AddonType.OivPackage))
                 {
                     Uninstall(old);
                     state.Addons.Remove(old);
@@ -380,14 +506,20 @@ public sealed class AddonApplier
                 progress?.Report(new SyncProgress(
                     SyncText.T("Kuruluyor: {0}", addon.DisplayName),
                     Fraction(doneBytes, totalBytes)));
-                var installed = Install(addon, addonCacheDir, version);
+                var protectedEntries = old == null
+                    ? null
+                    : DlclistEntriesStillNeededByOthers(old, state.Addons);
+                var installed = Install(addon, addonCacheDir, version, old, protectedEntries);
 
-                if (old != null && addon.Type == AddonType.DlcPack)
+                if (old != null && addon.Type is (AddonType.DlcPack or AddonType.OivPackage))
                 {
                     state.Addons.Remove(old);
                     // Yeni sürüm başarıyla kuruldu; eski sürümün önbelleği artık
                     // kullanılmıyorsa temizle. Yedek hâlâ duruyorsa dokunma.
-                    CleanupOldDlcCache(old, addonCacheDir);
+                    if (addon.Type == AddonType.DlcPack)
+                        CleanupOldDlcCache(old, addonCacheDir);
+                    else
+                        CleanupOldOivCache(old, addonCacheDir);
                 }
 
                 state.Addons.Add(installed);
@@ -395,15 +527,26 @@ public sealed class AddonApplier
                 _log(SyncText.T("Kuruldu: {0} ({1})", addon.DisplayName, addon.Type));
             }
             catch (Exception ex) when (ex is not OperationCanceledException &&
-                                       addon.Type == AddonType.DlcPack)
+                                       addon.Type is (AddonType.DlcPack or AddonType.OivPackage))
             {
-                // DLC hatası tüm senkronizasyonu durdurmasın; diğer modlar kurulur.
-                // InstallDlcPack hata durumunda eski sürümü geri getirmeye çalışır.
-                _log(SyncText.T("UYARI: DLC paketi kurulamadı: {0} ({1})",
-                    addon.DisplayName, ex.Message));
-                progress?.Report(new SyncProgress(
-                    SyncText.T("Atlandı: {0} (DLC kurulamadı)", addon.DisplayName),
-                    Fraction(doneBytes, totalBytes)));
+                // Paket hatası tüm senkronizasyonu durdurmasın; diğer modlar kurulur.
+                // DLC/OIV kurulumu hata durumunda eski sürümü geri getirmeye çalışır.
+                if (addon.Type == AddonType.OivPackage)
+                {
+                    _log(SyncText.T("UYARI: OIV paketi kurulamadı: {0} ({1})",
+                        addon.DisplayName, ex.Message));
+                    progress?.Report(new SyncProgress(
+                        SyncText.T("Atlandı: {0} (OIV kurulamadı)", addon.DisplayName),
+                        Fraction(doneBytes, totalBytes)));
+                }
+                else
+                {
+                    _log(SyncText.T("UYARI: DLC paketi kurulamadı: {0} ({1})",
+                        addon.DisplayName, ex.Message));
+                    progress?.Report(new SyncProgress(
+                        SyncText.T("Atlandı: {0} (DLC kurulamadı)", addon.DisplayName),
+                        Fraction(doneBytes, totalBytes)));
+                }
             }
         }
 
@@ -501,16 +644,242 @@ public sealed class AddonApplier
 
     // ------------------------------------------------------------------ kurulum
 
-    private InstalledAddon Install(AddonInfo addon, string cacheDir, string version)
+    private InstalledAddon Install(AddonInfo addon, string cacheDir, string version,
+        InstalledAddon? old = null, ISet<string>? protectedDlclistEntries = null)
     {
         return addon.Type switch
         {
             AddonType.DlcPack => InstallDlcPack(addon, cacheDir, version),
+            AddonType.OivPackage => InstallOivPackage(addon, cacheDir, version, old,
+                protectedDlclistEntries),
             AddonType.ClientScript => InstallFiles(addon, cacheDir, version, "scripts"),
             AddonType.AsiPlugin => InstallFiles(addon, cacheDir, version, null),
             AddonType.ClientFiles => InstallFiles(addon, cacheDir, version, null),
             _ => throw new SyncException($"Bu eklenti türü istemciye kurulamaz: {addon.Type}")
         };
+    }
+
+    /// <summary>
+    /// OIV paketini güvenli alt kümeyle kurar. Eski sürümün dosyaları önce
+    /// uygulama önbelleğine yedeklenir; yeni sürüm başarısız olursa geri getirilir.
+    /// Kullanıcı tarafından değiştirilmiş dosyalar asla taşınmaz/silinmez.
+    /// </summary>
+    private InstalledAddon InstallOivPackage(AddonInfo addon, string cacheDir, string version,
+        InstalledAddon? old, ISet<string>? protectedDlclistEntries)
+    {
+        if (IsGameRunning())
+            throw new SyncException(SyncText.T("GTA V açıkken OIV paketi kurulamaz. Lütfen oyunu kapatın."));
+
+        var packageFile = addon.Files.FirstOrDefault(f =>
+            f.Path.EndsWith(".oiv", StringComparison.OrdinalIgnoreCase))
+            ?? throw new SyncException(SyncText.T("OIV: paket dosyası manifestte yok."));
+        var packagePath = Path.Combine(cacheDir,
+            packageFile.Path.Replace('/', Path.DirectorySeparatorChar));
+        if (!File.Exists(packagePath))
+            throw new SyncException(SyncText.T("OIV paketi önbellekte bulunamadı: {0}", packagePath));
+
+        using var pkg = OivPackage.Open(packagePath, _log);
+        _log(SyncText.T("OIV: {0} ({1})", pkg.Name,
+            string.IsNullOrWhiteSpace(pkg.Version) ? addon.Id : pkg.Version));
+
+        var oldEntries = old == null ? new List<string>() : InstalledDlclistEntries(old);
+        var backupRoot = Path.Combine(
+            Path.GetDirectoryName(cacheDir.TrimEnd('\\', '/')) ?? cacheDir,
+            ".oiv-backup-" + Safe(addon.Id) + "-" + Guid.NewGuid().ToString("N")[..8]);
+        var moved = new List<(string Rel, string Backup)>();
+        var copied = new List<(string Rel, string Hash)>();
+        var addedEntries = new List<string>();
+        int preserved = 0;
+
+        try
+        {
+            // 1) Eski sürümün bizim yazdığımız dosyalarını yedekle.
+            if (old != null)
+            {
+                foreach (var rel in old.InstalledPaths.Distinct(StringComparer.OrdinalIgnoreCase))
+                {
+                    if (!TryGamePath(rel, out var full) || !File.Exists(full)) continue;
+                    if (!old.InstalledHashes.TryGetValue(rel, out var known) ||
+                        string.IsNullOrWhiteSpace(known))
+                    {
+                        preserved++;
+                        _log(SyncText.T("OIV: bilinmeyen/eski dosya korundu: {0}", rel));
+                        continue;
+                    }
+                    if (!FileHashMatches(full, known))
+                    {
+                        preserved++;
+                        _log(SyncText.T("OIV: kullanıcı dosyası korundu: {0}", rel));
+                        continue;
+                    }
+
+                    var backup = Path.Combine(backupRoot,
+                        rel.Replace('/', Path.DirectorySeparatorChar));
+                    MoveFileSafe(full, backup);
+                    moved.Add((rel, backup));
+                }
+            }
+
+            // 2) Yeni dosyaları yaz. Var olan farklı dosyanın üzerine ASLA yazma.
+            foreach (var copy in pkg.FileAdds)
+            {
+                if (!TryGamePath(copy.Destination, out var full))
+                    throw new SyncException(SyncText.T("OIV: güvenlik dışı hedef: {0}",
+                        copy.Destination));
+
+                if (File.Exists(full))
+                {
+                    preserved++;
+                    _log(SyncText.T("OIV: mevcut dosya korundu: {0}", copy.Destination));
+                    continue;
+                }
+
+                var hash = pkg.CopyEntryTo(copy, full);
+                copied.Add((copy.Destination, hash));
+            }
+
+            // 3) dlclist girdilerini ekle (yalnızca eksik olanlar).
+            foreach (var entry in pkg.DlclistEntries)
+            {
+                if (AddDlclistEntry(entry)) addedEntries.Add(entry);
+            }
+
+            var ownedEntries = pkg.DlclistEntries
+                .Where(e => oldEntries.Contains(e, StringComparer.OrdinalIgnoreCase) ||
+                            addedEntries.Contains(e, StringComparer.OrdinalIgnoreCase))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            // 4) Yeni sürümde olmayan eski dlclist girdilerini kaldır.
+            bool oldEntriesOk = true;
+            foreach (var entry in oldEntries.Except(pkg.DlclistEntries,
+                         StringComparer.OrdinalIgnoreCase))
+            {
+                if (protectedDlclistEntries != null &&
+                    protectedDlclistEntries.Contains(entry))
+                    continue;
+                if (!TryRemoveDlclistEntry(entry)) oldEntriesOk = false;
+            }
+
+            if (!oldEntriesOk)
+            {
+                // Girdi kaldırılamadıysa eski dosyaları geri getir; böylece dlclist
+                // var olmayan bir klasöre işaret etmez.
+                RestoreMovedFiles(moved);
+                _log(SyncText.T(
+                    "UYARI: eski OIV dlclist girdisi kaldırılamadı; eski dosyalar korundu."));
+            }
+            else if (Directory.Exists(backupRoot))
+            {
+                DeleteDirectoryWithRetry(backupRoot, _log);
+            }
+
+            _log(SyncText.T(
+                "OIV: {0} dosya kuruldu, {1} dosya korundu, {2} dlclist girdisi eklendi.",
+                copied.Count, preserved, addedEntries.Count));
+
+            // Eski sürümün indirme önbelleği artık kullanılmıyor.
+            if (old != null) CleanupOldOivCache(old, cacheDir);
+
+            return new InstalledAddon
+            {
+                Id = addon.Id,
+                Type = addon.Type,
+                Version = version,
+                DlclistEntries = ownedEntries,
+                DlclistEntry = ownedEntries.FirstOrDefault() ?? "",
+                InstalledPaths = copied.Select(c => c.Rel).ToList(),
+                InstalledHashes = copied.ToDictionary(c => c.Rel, c => c.Hash,
+                    StringComparer.OrdinalIgnoreCase)
+            };
+        }
+        catch
+        {
+            // Yeni eklenenleri geri al; eski sürümü yerine koy.
+            foreach (var entry in addedEntries)
+                TryRemoveDlclistEntry(entry);
+            foreach (var (rel, hash) in copied)
+            {
+                if (!TryGamePath(rel, out var full) || !File.Exists(full)) continue;
+                try
+                {
+                    if (FileHashMatches(full, hash)) File.Delete(full);
+                }
+                catch { }
+                PruneEmptyParents(Path.GetDirectoryName(full));
+            }
+            RestoreMovedFiles(moved);
+            if (Directory.Exists(backupRoot))
+                DeleteDirectoryWithRetry(backupRoot, _log);
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Yedeklenen eski dosyaları geri taşır. Hedefte yeni sürümün dosyası varsa
+    /// (başarılı güncelleme) üzerine yazmaz; kullanıcı dosyası varsa da dokunmaz.
+    /// </summary>
+    private void RestoreMovedFiles(List<(string Rel, string Backup)> moved)
+    {
+        foreach (var (rel, backup) in moved.AsEnumerable().Reverse())
+        {
+            if (!File.Exists(backup)) continue;
+            if (!TryGamePath(rel, out var full)) continue;
+            if (File.Exists(full)) continue;
+            try
+            {
+                MoveFileSafe(backup, full);
+            }
+            catch (Exception ex)
+            {
+                _log(SyncText.T("UYARI: eski OIV dosyası geri getirilemedi: {0} ({1})",
+                    rel, ex.Message));
+            }
+        }
+    }
+
+    private bool TryGamePath(string rel, out string full)
+    {
+        full = "";
+        var normalized = (rel ?? "").Replace('\\', '/').TrimStart('/');
+        if (normalized.Length == 0 || normalized.Contains("..")) return false;
+        var root = Path.GetFullPath(_gameFolder).TrimEnd('\\', '/') +
+                   Path.DirectorySeparatorChar;
+        var candidate = Path.GetFullPath(Path.Combine(_gameFolder,
+            normalized.Replace('/', Path.DirectorySeparatorChar)));
+        if (!candidate.StartsWith(root, StringComparison.OrdinalIgnoreCase)) return false;
+        full = candidate;
+        return true;
+    }
+
+    private static void MoveFileSafe(string source, string destination)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+        if (File.Exists(destination)) File.Delete(destination);
+        try
+        {
+            File.Move(source, destination);
+        }
+        catch (IOException)
+        {
+            File.Copy(source, destination, overwrite: true);
+            File.Delete(source);
+        }
+    }
+
+    private static bool FileHashMatches(string path, string expected)
+    {
+        try
+        {
+            using var sha = System.Security.Cryptography.SHA256.Create();
+            using var fs = File.OpenRead(path);
+            var hash = Convert.ToHexString(sha.ComputeHash(fs)).ToLowerInvariant();
+            return string.Equals(hash, expected, StringComparison.OrdinalIgnoreCase);
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private InstalledAddon InstallDlcPack(AddonInfo addon, string cacheDir, string version)
@@ -673,6 +1042,40 @@ public sealed class AddonApplier
         }
     }
 
+    /// <summary>
+    /// OIV güncellemesi başarılı olduktan sonra eski sürümün indirme önbelleğini
+    /// temizler. Yalnızca bu eklentiye ait "&lt;id&gt;__&lt;sürüm&gt;" klasörü silinir.
+    /// </summary>
+    private void CleanupOldOivCache(InstalledAddon old, string newCacheDir)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(old.Version)) return;
+
+            var newCache = Path.GetFullPath(newCacheDir);
+            var cacheRoot = Path.GetDirectoryName(newCache);
+            if (string.IsNullOrWhiteSpace(cacheRoot)) return;
+
+            var oldCache = Path.GetFullPath(Path.Combine(cacheRoot,
+                Safe(old.Id) + "__" + Safe(old.Version)));
+            if (string.Equals(oldCache, newCache, StringComparison.OrdinalIgnoreCase))
+                return;
+
+            var rootPrefix = cacheRoot.TrimEnd('\\', '/') + Path.DirectorySeparatorChar;
+            if (!oldCache.StartsWith(rootPrefix, StringComparison.OrdinalIgnoreCase))
+                return;
+            if (!Directory.Exists(oldCache)) return;
+
+            DeleteDirectoryWithRetry(oldCache, _log);
+            if (!Directory.Exists(oldCache))
+                _log(SyncText.T("Eski OIV önbelleği temizlendi: {0}", old.Id));
+        }
+        catch (Exception ex)
+        {
+            _log(SyncText.T("UYARI: eski OIV önbelleği temizlenemedi: {0}", ex.Message));
+        }
+    }
+
     /// <summary>DLC güncellemesi başarısızsa eski klasörü hedefe geri taşır.</summary>
     private void RestoreDlcBackup(string backup, string target)
     {
@@ -736,7 +1139,7 @@ public sealed class AddonApplier
             var version = ServerScanner.ComputeVersion(addon);
             // Ön indirme de DLC'lerde sürüm başına ayrı önbellek kullanmalı;
             // aksi halde eski sürüme junction olan hedef klasörün dosyaları ezilir.
-            var addonCacheDir = addon.Type == AddonType.DlcPack
+            var addonCacheDir = addon.Type is (AddonType.DlcPack or AddonType.OivPackage)
                 ? Path.Combine(serverCacheDir, Safe(addon.Id) + "__" + Safe(version))
                 : Path.Combine(serverCacheDir, Safe(addon.Id));
             doneBytes = await DownloadAddonAsync(
@@ -782,6 +1185,8 @@ public sealed class AddonApplier
             if (action)
             {
                 installed.InstalledPaths.Add(rel);
+                if (!string.IsNullOrWhiteSpace(file.Sha256))
+                    installed.InstalledHashes[rel] = file.Sha256;
                 copied++;
             }
             else if (keptExisting)
@@ -827,7 +1232,8 @@ public sealed class AddonApplier
     /// Eklentiyi oyundan kaldırır. <paramref name="quarantineRoot"/> verilirse dosyalar
     /// silinmez; o klasörün altına (klasör yapısı korunarak) taşınır — hiçbir şey kaybolmaz.
     /// </summary>
-    public void Uninstall(InstalledAddon inst, string? quarantineRoot = null)
+    public void Uninstall(InstalledAddon inst, string? quarantineRoot = null,
+        ISet<string>? protectedDlclistEntries = null)
     {
         switch (inst.Type)
         {
@@ -854,6 +1260,55 @@ public sealed class AddonApplier
                 }
                 break;
             }
+            case AddonType.OivPackage:
+            {
+                // Önce dlclist girdilerini kaldır. Kaldırılamazsa dosyaları silme:
+                // aksi hâlde oyun var olmayan bir paketi yüklemeye çalışabilir.
+                var entries = InstalledDlclistEntries(inst);
+                bool entriesOk = true;
+                foreach (var entry in entries)
+                {
+                    // Başka bir kurulu paket bu girdiye ait klasörü sağlıyorsa
+                    // girdiyi bırak; aksi hâlde o modun DLC'si yüklenmez.
+                    if (protectedDlclistEntries != null &&
+                        protectedDlclistEntries.Contains(entry))
+                        continue;
+                    if (!TryRemoveDlclistEntry(entry)) entriesOk = false;
+                }
+                if (!entriesOk)
+                {
+                    _log(SyncText.T(
+                        "UYARI: OIV dlclist girdisi kaldırılamadı; dosyalar korundu."));
+                    break;
+                }
+
+                foreach (var relPath in inst.InstalledPaths)
+                {
+                    var full = Path.Combine(_gameFolder,
+                        relPath.Replace('/', Path.DirectorySeparatorChar));
+                    try
+                    {
+                        if (!File.Exists(full)) continue;
+                        if (inst.InstalledHashes.TryGetValue(relPath, out var known) &&
+                            !string.IsNullOrWhiteSpace(known) && !FileHashMatches(full, known))
+                        {
+                            _log(SyncText.T("Kullanıcı dosyası korundu: {0}", relPath));
+                            continue;
+                        }
+
+                        if (quarantineRoot != null)
+                            MoveFileToQuarantine(full, relPath, quarantineRoot);
+                        else
+                            File.Delete(full);
+                        PruneEmptyParents(Path.GetDirectoryName(full));
+                    }
+                    catch (Exception ex)
+                    {
+                        _log($"UYARI: kaldırılamadı: {relPath} ({ex.Message})");
+                    }
+                }
+                break;
+            }
             default:
             {
                 foreach (var relPath in inst.InstalledPaths)
@@ -862,6 +1317,12 @@ public sealed class AddonApplier
                     try
                     {
                         if (!File.Exists(full)) continue;
+                        if (inst.InstalledHashes.TryGetValue(relPath, out var known) &&
+                            !string.IsNullOrWhiteSpace(known) && !FileHashMatches(full, known))
+                        {
+                            _log(SyncText.T("Kullanıcı dosyası korundu: {0}", relPath));
+                            continue;
+                        }
                         if (quarantineRoot != null) MoveFileToQuarantine(full, relPath, quarantineRoot);
                         else File.Delete(full);
                         PruneEmptyParents(Path.GetDirectoryName(full));
@@ -888,7 +1349,8 @@ public sealed class AddonApplier
         foreach (var inst in state.Addons.ToList())
         {
             _log($"Kaldırılıyor: {inst.Id}");
-            Uninstall(inst, quarantine);
+            Uninstall(inst, quarantine,
+                DlclistEntriesStillNeededByOthers(inst, state.Addons));
             state.Addons.Remove(inst);
             SyncStateStore.Save(dataFolder, state); // çökme güvenliği: artımlı kayıt
         }
@@ -914,7 +1376,10 @@ public sealed class AddonApplier
             _gameFolder.TrimEnd('\\', '/'),
             Path.Combine(_gameFolder, "scripts").TrimEnd('\\', '/'),
             Path.Combine(_gameFolder, "mods").TrimEnd('\\', '/'),
-            Path.Combine(_gameFolder, "mods", "GTACoop").TrimEnd('\\', '/')
+            Path.Combine(_gameFolder, "mods", "GTACoop").TrimEnd('\\', '/'),
+            Path.Combine(_gameFolder, "mods", "update").TrimEnd('\\', '/'),
+            Path.Combine(_gameFolder, "mods", "update", "x64").TrimEnd('\\', '/'),
+            Path.Combine(_gameFolder, "mods", "update", "x64", "dlcpacks").TrimEnd('\\', '/')
         };
 
         while (dir != null &&
@@ -1097,13 +1562,14 @@ public sealed class AddonApplier
             "OpenIV ile mods klasörünü onarın veya Launcher > Yedekler bölümünden geri dönün."));
     }
 
-    public void AddDlclistEntry(string entry)
+    /// <summary>Girdi eklendiyse true, zaten varsa false döner.</summary>
+    public bool AddDlclistEntry(string entry)
     {
         if (IsGameRunning())
             throw new SyncException(SyncText.T("GTA V açıkken dlclist düzenlenemez. Lütfen oyunu kapatın."));
         if (!File.Exists(UpdateRpfPath))
             throw new SyncException(SyncText.T(
-                "mods/update/update.rpf bulunamadı. DLC paketleri için OpenIV ile mods klasörü oluşturulmalı."));
+                "mods/update/update.rpf bulunamadı. DLC/OIV paketleri için OpenIV ile mods klasörü oluşturulmalı."));
 
         // Girdi zaten varsa update.rpf'ye yazma gerekmez. Bu sayede büyük/bozuk
         // arşivlerde bile yalnızca DLC dosyaları güncellenebilir; arşive dokunulmaz.
@@ -1112,7 +1578,7 @@ public sealed class AddonApplier
         if (DlclistEntryExists(entry) == true)
         {
             _log(SyncText.T("dlclist: '{0}' zaten kayıtlı, değişiklik yok.", entry));
-            return;
+            return false;
         }
 
         EnsureUpdateRpfUsable();
@@ -1131,7 +1597,7 @@ public sealed class AddonApplier
             if (existing.Contains(entry, StringComparer.OrdinalIgnoreCase))
             {
                 _log(SyncText.T("dlclist: '{0}' zaten kayıtlı, değişiklik yok.", entry));
-                return;
+                return false;
             }
 
             if (large)
@@ -1153,6 +1619,7 @@ public sealed class AddonApplier
 
             _log(SyncText.T("dlclist: eklendi -> {0}", entry));
         }
+        return true;
     }
 
     public void RemoveDlclistEntry(string entry)

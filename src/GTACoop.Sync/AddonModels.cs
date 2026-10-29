@@ -18,6 +18,9 @@ public enum AddonType
     /// <summary>files/&lt;ad&gt;: oyun klasörüne kopyalanan dosyalar (yalnızca scripts/ ve mods/GTACoop/).</summary>
     ClientFiles,
 
+    /// <summary>oiv/&lt;ad&gt;: OpenIV .oiv paketi (güvenli alt küme; kendi klasöründe saklanır).</summary>
+    OivPackage,
+
     /// <summary>plugins/&lt;ad&gt;: yalnızca sunucuda çalışan eklenti (istemciye indirilmez).</summary>
     ServerPlugin
 }
@@ -48,6 +51,18 @@ public sealed class AddonInfo
     public string RelativePackPath { get; set; } = "";
 
     public List<AddonFileInfo> Files { get; set; } = new();
+
+    /// <summary>
+    /// OivPackage: paketin güvenli biçimde yazacağı oyun içi hedefler ("/" ayraçlı).
+    /// İndirmeden önce kullanıcı çakışmalarını tespit etmek için kullanılır.
+    /// </summary>
+    public List<string> OivTargets { get; set; } = new();
+
+    /// <summary>OivPackage: dlclist.xml'e eklenecek paket adları.</summary>
+    public List<string> OivDlclistEntries { get; set; } = new();
+
+    /// <summary>OivPackage: güvenlik için uygulanmayacak işlem sayısı.</summary>
+    public int OivUnsupportedCount { get; set; }
 
     /// <summary>Sunucu tarafında mod yöneticisi için benzersiz anahtar: "Tür:Id".</summary>
     [JsonIgnore]
@@ -89,6 +104,15 @@ public sealed class InstalledAddon
 
     /// <summary>Oyun köküne göre kurulan dosyaların listesi.</summary>
     public List<string> InstalledPaths { get; set; } = new();
+
+    /// <summary>
+    /// Kurulan dosyaların SHA-256 değerleri. Kaldırırken dosya kullanıcı tarafından
+    /// değiştirildiyse silinmez; yalnızca bizim yazdığımız içerik kaldırılır.
+    /// </summary>
+    public Dictionary<string, string> InstalledHashes { get; set; } = new();
+
+    /// <summary>OivPackage: bu paket tarafından eklenen dlclist girdileri.</summary>
+    public List<string> DlclistEntries { get; set; } = new();
 }
 
 /// <summary>Bir sunucudan yapılan kurulumun durumu.</summary>
