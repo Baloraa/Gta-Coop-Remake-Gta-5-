@@ -20,7 +20,7 @@ Use this as the GitHub Release body:
 >
 > This release adds a live status column to the **Servers** tab. While the tab is visible, the launcher probes each server's sync port every five seconds with a 1.4-second timeout and shows **Online (ms)**, **Offline**, or **Unknown**. Direct addresses are tried first, then relay endpoints. No probes run while the tab is hidden. Short-code entries whose relay data looks stale are refreshed quietly at most every 30 seconds.
 >
-> The **About** tab now credits the first tester, `zaza specialist`.
+> The **About** tab now credits the first tester, `zaza specialist (Discord)`.
 >
 > The 2.3.4 foundation is unchanged: UPnP port mapping, custom relay servers, the diagnostic copy, and the session cleanup watcher. The 2.3.3 download path is also unchanged: parallel HTTP Range downloads with resume, SHA-256 verification, and single-connection fallback.
 >

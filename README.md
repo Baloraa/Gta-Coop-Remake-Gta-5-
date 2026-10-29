@@ -290,7 +290,7 @@ The main addition is the **Status** column on the Servers tab:
 - No background probing when the tab is hidden.
 - Short-code records with stale relay data are refreshed quietly at most every 30 seconds.
 
-The release also updates the About tab to credit the first tester, `zaza specialist`.
+The release also updates the About tab to credit the first tester, `zaza specialist (Discord)`.
 
 The 2.3.4 release added UPnP mapping, custom relay servers, and the diagnostic copy. The 2.3.3 release added parallel Range downloads and the resume/stall handling described above. Those features are all present in 2.3.5.
 
@@ -327,7 +327,7 @@ The repository has no CI workflow yet. A reproducible test harness for the sync 
 - X: [@imp_loyal38310](https://x.com/imp_loyal38310)
 - gta5-mods: [Turkish Mods](https://www.gta5-mods.com/users/Turkish%20Mods)
 
-**First tester:** zaza specialist
+**First tester:** zaza specialist (Discord)
 
 **Upstream GTA Coop:** original code © 2016 Guad; modifications © 2016 Bluscream and wolfmitchell; maintained by [oldnapalm](https://github.com/oldnapalm) and contributors. The upstream project is licensed under GPL-3.0.
 

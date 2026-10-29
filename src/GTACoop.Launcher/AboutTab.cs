@@ -103,15 +103,18 @@ public sealed class AboutTab : UserControl
             Margin = new Padding(4, 0, 2, 4)
         });
 
-        // ---- İlk test eden: fotoğraf + Discord bilgileri
-        var testerRow = new FlowLayoutPanel
+        // ---- İlk test eden: fotoğraf + test eden bilgisi
+        var testerRow = new TableLayoutPanel
         {
             AutoSize = true,
             AutoSizeMode = AutoSizeMode.GrowAndShrink,
-            FlowDirection = FlowDirection.LeftToRight,
-            WrapContents = false,
+            ColumnCount = 2,
+            RowCount = 1,
             Margin = new Padding(2, 2, 2, 6)
         };
+        testerRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 76));
+        testerRow.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        testerRow.RowStyles.Add(new RowStyle(SizeType.Absolute, 64));
 
         var testerPhoto = new PictureBox
         {
@@ -121,32 +124,19 @@ public sealed class AboutTab : UserControl
             BorderStyle = BorderStyle.FixedSingle,
             Margin = new Padding(2, 0, 10, 0)
         };
-        _tips.SetToolTip(testerPhoto, T("zaza specialist — ilk test eden"));
+        _tips.SetToolTip(testerPhoto, T("zaza specialist (Discord) - ilk test eden"));
 
-        var testerInfo = new FlowLayoutPanel
+        var testerName = new Label
         {
-            AutoSize = true,
-            AutoSizeMode = AutoSizeMode.GrowAndShrink,
-            FlowDirection = FlowDirection.TopDown,
-            WrapContents = false,
-            Margin = new Padding(0)
-        };
-        testerInfo.Controls.Add(new Label
-        {
-            Text = T("İlk test eden: zaza specialist"),
+            Text = T("İlk test eden: zaza specialist (Discord)"),
             Font = new Font("Segoe UI", 10f, FontStyle.Bold),
             AutoSize = true,
-            Margin = new Padding(0, 2, 0, 3)
-        });
-        testerInfo.Controls.Add(new Label
-        {
-            Text = T("Arkadaşlık kodu: za_za"),
-            AutoSize = true,
-            Margin = new Padding(0, 1, 0, 1)
-        });
+            Anchor = AnchorStyles.Left,
+            Margin = new Padding(0)
+        };
 
-        testerRow.Controls.Add(testerPhoto);
-        testerRow.Controls.Add(testerInfo);
+        testerRow.Controls.Add(testerPhoto, 0, 0);
+        testerRow.Controls.Add(testerName, 1, 0);
         who.Controls.Add(testerRow);
 
         who.Controls.Add(new Label
