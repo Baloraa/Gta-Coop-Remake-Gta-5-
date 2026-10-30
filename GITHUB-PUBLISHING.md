@@ -93,6 +93,8 @@ powershell -ExecutionPolicy Bypass -File paylas.ps1
 
 The share ZIP is written to `dist\GTACoop-Remake-Share-<version>.zip`. Upload that file to the GitHub Release. Do not add it to the repository.
 
+**Every release must also run `kur.ps1`.** It copies the fresh `dist\GTACoopRemake` build over the locally installed app at `%LOCALAPPDATA%\Programs\GTACoop Remake` and refreshes the desktop/Start-menu shortcuts. Do not skip this step: building `dist` and the ZIP alone leaves the user's installed EXE on the old version.
+
 Before uploading, check:
 
 - The ZIP contains the launcher, `Distribution\SyncServer`, the docs, the GPL notice, and `Distribution\Components\OpenIV.asi`.
