@@ -12,25 +12,23 @@ Suggested topics:
 
 `gta-v` `gtacoop` `gta-coop` `multiplayer` `coop` `launcher` `winforms` `dotnet` `csharp` `mod-manager` `relay` `story-mode`
 
-## Release 2.4.1 description
+## Release 2.5.0 description
 
 Use this as the GitHub Release body:
 
-> **GTACoop Remake 2.4.1 — in-game F9 server browser fix**
+> **GTACoop Remake 2.5.0 — teleport to players from the F9 menu**
 >
-> The in-game F9 server browser now works when GTA V is launched normally, without the launcher. The default master (`https://master.gtacoop.com`) currently answers HTTP 526, and the old client blocked on it while the menu froze. This release makes discovery asynchronous and resilient.
+> `F9 > Teleport to Player` now lists every player connected to the server and teleports you to the one you select.
 >
-> **Working list first.** When the configured primary master is the known dead host, the client tries the working backup list first and only then the primary, with a 5-second timeout per request. A "Searching..." row shows progress, and servers appear as discovery responses arrive instead of freezing the game.
+> **On foot:** you appear next to the selected player.
 >
-> **Shared server cache.** Found servers are written to `%LOCALAPPDATA%\cgmp\gtacoop\servers.json` and shown immediately the next time F9 is opened. The launcher writes the same cache after a successful scan, so the list stays populated even when in-game UDP discovery is restricted.
+> **In a vehicle:** you take the **first free passenger seat** of their vehicle, like MTA. The driver seat is never used. If the vehicle is full or has no passenger seat, you are teleported next to it instead.
 >
-> **Better local discovery.** Local peers are probed on ports 4499, 4498, and 44499, and every master endpoint is queried with its own error handling.
->
-> **Settings migration.** Existing `ClientSettings.xml` files that still use the dead `https://master.gtacoop.com` default are moved to the backup list. Custom master addresses are never changed.
+> **Far-away vehicles:** when the target's vehicle is still outside the streaming range, the client follows the player's latest position and enters the passenger seat as soon as the vehicle streams in. The list is rebuilt on every open, so players who joined or left are always current.
 >
 > **Upgrade:** replace the application folder with the new build, or run the installer as usual. Your `%LOCALAPPDATA%\GTACoopRemake` settings, server list, and logs are kept in place. The share ZIP still excludes GTA V, ScriptHookV, ScriptHookVDotNet, and RageOpenV. The bundled `OpenIV.asi` is user-supplied.
 
-Attach `GTACoop-Remake-Share-2.4.1.zip`, `GTACoop.Launcher.exe`, and `GTACoop.Sync.dll` as release assets. Do not commit them to the repository.
+Attach `GTACoop-Remake-Share-2.5.0.zip`, `GTACoop.Launcher.exe`, and `GTACoop.Sync.dll` as release assets. Do not commit them to the repository.
 
 ## Before you make the repository public
 
@@ -120,6 +118,6 @@ Before uploading, check:
 
 ## A note on the current repository state
 
-The working tree has uncommitted changes for 2.4.1, including the asynchronous F9 server browser, the shared server cache, and the dead-master settings migration. Review `git status`, commit them in logical chunks, and tag the release only after the build and ZIP verification pass.
+The working tree has uncommitted changes for 2.5.0, including the F9 teleport menu, opponent host IDs, and the updated documentation. Review `git status`, commit them in logical chunks, and tag the release only after the build and ZIP verification pass.
 
 The GitHub remote is configured. Push `main`, then create the release from the tag. The English README is already the default; keep the language links intact when you make further edits.

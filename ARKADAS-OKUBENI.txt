@@ -1,5 +1,5 @@
 ==========================================================
- GTACoop Remake - Arkadaş Sürümü (Türkçe, v2.4.1)
+ GTACoop Remake - Arkadaş Sürümü (Türkçe, v2.5.0)
 ==========================================================
 
 Bu bir GTA V (Hikaye Modu) arkadaş-arası co-op aracıdır.
@@ -81,6 +81,9 @@ KURULUM
 
 5) Oyunda:
    - F9  : GTA Coop menüsü
+   - F9 > Teleport to Player: listeden bir oyuncuya ışınlan.
+     Oyuncu araç sürüyorsa aracın ilk boş yan koltuğuna geçersin;
+     araç doluysa yanına ışınlanırsın.
    - T   : sohbet
    - Z   : oyuncu listesi
    - N   : sesli sohbet (bas-konuş; F9 > Ayarlar'dan değiştirilebilir)

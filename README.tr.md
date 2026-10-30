@@ -2,17 +2,28 @@
 
 **Türkçe** | [English](README.md)
 
-2.4.1 sürümü - kendi sunucu yönetimi, otomatik mod indirme, **oturum modu**,
+2.5.0 sürümü - kendi sunucu yönetimi, otomatik mod indirme, **oturum modu**,
 **kısa kod** (ör. `Gel.com`) ile internetten sunucu bulma, **otomatik relay**,
 **UPnP doğrudan bağlantı**, **özel relay sunucusu**, **tanılama kopyalama**,
 **canlı sunucu durumu**, **Sunucu Tarayıcı** sekmesi, **OpenIV (.oiv) paket desteği**,
-**mods klasöründeki RPF arşivlerine yerinde ekleme/değiştirme** ve **Bileşenler** sekmesinden
-ScriptHookV / ScriptHookVDotNet / OpenIV.asi / RageOpenV kurulumu:
+**mods klasöründeki RPF arşivlerine yerinde ekleme/değiştirme**, **Bileşenler** sekmesinden
+ScriptHookV / ScriptHookVDotNet / OpenIV.asi / RageOpenV kurulumu ve **F9 oyuncuya ışınlanma**:
 port yönlendirme veya Radmin VPN olmadan da arkadaşlarınız bağlanabilir. Sunucu modları
 yalnızca oyun açıkken kurulu kalır, oyundan çıkınca otomatik kaldırılır.
 Oyun başlatma dosyası seçilebilir; varsayılan **PlayGTAV.exe**'dir (GTA5.exe de seçilebilir).
 **Sesli sohbet** (bas-konuş, `[MIC]` göstergesi) ve **host-led hikaye görevi koordinasyonu**
 bu sürümde eklendi; ayrıntılar aşağıda.
+
+### 2.5.0 — F9 oyuncuya ışınlanma
+
+- **F9 > Teleport to Player** menüsü sunucudaki tüm oyuncuları listeler.
+- Yürüyen bir oyuncuya tıklayınca yanına ışınlanırsınız.
+- Araç süren bir oyuncuya tıklayınca **aracın ilk boş yan koltuğuna** geçersiniz
+  (MTA'daki gibi). Sürücü koltuğu asla kullanılmaz.
+- Araç doluysa veya yan koltuk yoksa aracın yanına ışınlanırsınız.
+- Araç henüz görüş mesafesinde değilse istemci oyuncunun son konumunu takip eder
+  ve araç yüklenir yüklenmez yan koltuğa geçer.
+- Menü her açılışta yenilenir; yeni katılan veya ayrılan oyuncular anında yansır.
 
 ### 2.4.1 — F9 sunucu tarayıcısı düzeltmesi
 
@@ -270,7 +281,7 @@ Kurallar:
 - Bu betik uygulamayı `%LOCALAPPDATA%\Programs\GTACoop Remake` klasörüne kopyalar ve
   **masaüstü** + **Başlat menüsü** kısayollarını buraya bağlar. Hiçbir şey silinmez
   (eski `dist` klasörü olduğu yerde kalır).
-- Uygulama simgesi ve sürüm bilgisi (2.4.1) exe dosyasına işlenmiştir.
+- Uygulama simgesi ve sürüm bilgisi (2.5.0) exe dosyasına işlenmiştir.
 
 ---
 

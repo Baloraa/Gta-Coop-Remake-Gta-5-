@@ -1,5 +1,5 @@
 ==========================================================
- GTACoop Remake - Friend Edition (English, v2.4.1)
+ GTACoop Remake - Friend Edition (English, v2.5.0)
 ==========================================================
 
 This is a friend-to-friend co-op tool for GTA V (Story Mode).
@@ -84,6 +84,9 @@ INSTALLATION
 
 5) In game:
    - F9  : GTA Coop menu
+   - F9 > Teleport to Player: pick a player to teleport to. If that
+     player is driving, you take the first free passenger seat; if the
+     vehicle is full, you are teleported next to it instead.
    - T   : chat
    - Z   : player list
    - N   : voice chat (push-to-talk; change it in F9 > Settings)

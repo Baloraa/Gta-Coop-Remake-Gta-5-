@@ -8,7 +8,7 @@ GTACoop Remake is not a new multiplayer engine. It is the desktop layer around G
 
 GTACoop Remake is for private Story Mode co-op. It does not touch GTA Online, does not bypass anti-cheat, and does not inject into online sessions.
 
-**Current release:** 2.4.1  
+**Current release:** 2.5.0  
 **Platform:** Windows 10/11, x64  
 **UI:** Turkish, English, and Russian  
 **License:** GNU GPL v3
@@ -288,6 +288,17 @@ This is a tool for playing with friends, not a hardened anti-cheat or privacy sy
 - Server owners are responsible for the mods they distribute. The launcher automates delivery; it does not grant permission to redistribute someone else's work.
 
 ---
+
+## What is new in 2.5.0
+
+The main addition is a **teleport-to-player menu in F9**:
+
+- `F9 > Teleport to Player` lists every player connected to the server.
+- Selecting a player who is on foot teleports you next to them.
+- Selecting a player who is driving puts you in the **first free passenger seat** of their vehicle, like MTA. The driver seat is never used.
+- If the vehicle is full or has no passenger seat, you are teleported next to it instead of being dropped out of the menu.
+- If the vehicle is still outside the streaming range, the client follows the player's latest position and enters the passenger seat as soon as the vehicle streams in.
+- The list is rebuilt every time the menu opens, so players who joined or left are always current.
 
 ## What is new in 2.4.1
 

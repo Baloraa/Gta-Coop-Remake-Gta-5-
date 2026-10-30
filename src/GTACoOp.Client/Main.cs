@@ -37,7 +37,14 @@ namespace GTACoOp
         private readonly NativeMenu _mainMenu;
         public NativeMenu _serverBrowserMenu;
         private readonly NativeMenu _settingsMenu;
+        private readonly NativeMenu _teleportMenu;
         private readonly ObjectPool _menuPool;
+
+        // Pending teleport: the target's vehicle may not be streamed in yet.
+        private long _pendingTeleportHost;
+        private int _pendingTeleportExpires;
+        private int _pendingTeleportNextHop;
+        private int _pendingTeleportHops;
 
         private string _clientIp;
         private string _masterIP;
@@ -249,6 +256,19 @@ namespace GTACoOp
                 _serverBrowserMenu.Clear();
             };
 
+            _teleportMenu = new NativeMenu("GTA CooP", "Teleport to Player");
+            _teleportMenu.Width += 100;
+            _teleportMenu.MouseBehavior = LemonUI.Menus.MenuMouseBehavior.Disabled;
+            _teleportMenu.ItemCount = CountVisibility.Always;
+            _teleportMenu.Opening += (object sender, System.ComponentModel.CancelEventArgs e) =>
+            {
+                RebuildTeleportMenu();
+            };
+            _teleportMenu.Closing += (object sender, System.ComponentModel.CancelEventArgs e) =>
+            {
+                _teleportMenu.Clear();
+            };
+
             var listenItem = new NativeItem("Server IP");
             listenItem.AltTitle = PlayerSettings.LastIP;
             listenItem.Activated += (menu, item) =>
@@ -343,6 +363,7 @@ namespace GTACoOp
             _mainMenu.Add(listenItem);
             _mainMenu.Add(portItem);
             _mainMenu.Add(_passItem);
+            _mainMenu.AddSubMenu(_teleportMenu);
             _mainMenu.AddSubMenu(_settingsMenu);
             _mainMenu.Add(aboutItem);
 
@@ -562,6 +583,7 @@ namespace GTACoOp
 
             _menuPool.Add(_mainMenu);
             _menuPool.Add(_serverBrowserMenu);
+            _menuPool.Add(_teleportMenu);
             _menuPool.Add(_settingsMenu);
 
             _storyMissions = new StoryMissionCoop(_mainMenu, _menuPool);
@@ -580,6 +602,219 @@ namespace GTACoOp
             }
 
             _playerList = new PlayerList();
+        }
+
+        private static string DisplayNameOf(SyncPed ped)
+        {
+            if (ped == null || string.IsNullOrWhiteSpace(ped.Name)) return "Player";
+            return ped.Name.Trim();
+        }
+
+        private void RebuildTeleportMenu()
+        {
+            _teleportMenu.Clear();
+
+            if (!IsOnServer())
+            {
+                var offline = new NativeItem("Not connected", "Connect to a server first.");
+                offline.Enabled = false;
+                _teleportMenu.Add(offline);
+                return;
+            }
+
+            var players = new List<KeyValuePair<long, SyncPed>>();
+            lock (Opponents)
+            {
+                foreach (var pair in Opponents)
+                {
+                    var ped = pair.Value;
+                    if (ped == null || pair.Key == LocalId) continue;
+                    if (Game.GameTime - ped.LastUpdateReceived > 15000) continue;
+                    players.Add(pair);
+                }
+            }
+
+            players.Sort((a, b) => string.Compare(DisplayNameOf(a.Value), DisplayNameOf(b.Value), StringComparison.OrdinalIgnoreCase));
+
+            if (players.Count == 0)
+            {
+                var empty = new NativeItem("No players connected", "Join a server to teleport to another player.");
+                empty.Enabled = false;
+                _teleportMenu.Add(empty);
+                return;
+            }
+
+            foreach (var pair in players)
+            {
+                long host = pair.Key;
+                var target = pair.Value;
+                string subtitle = target.IsInVehicle
+                    ? "In a vehicle - you will take a passenger seat"
+                    : "On foot";
+                var item = new NativeItem(DisplayNameOf(target), subtitle);
+                item.Activated += (menu, selected) => TeleportToPlayer(host);
+                _teleportMenu.Add(item);
+            }
+        }
+
+        private void ClearPendingTeleport()
+        {
+            _pendingTeleportHost = 0;
+            _pendingTeleportExpires = 0;
+            _pendingTeleportNextHop = 0;
+            _pendingTeleportHops = 0;
+        }
+
+        private void TeleportToPlayer(long host)
+        {
+            var player = Game.Player.Character;
+            if (player == null || !player.Exists()) return;
+
+            _menuPool.HideAll();
+
+            if (!IsOnServer())
+            {
+                Notification.Show("~r~You are not connected to a server.");
+                return;
+            }
+
+            if (player.IsDead)
+            {
+                Notification.Show("~r~You cannot teleport while dead.");
+                return;
+            }
+
+            SyncPed target = null;
+            lock (Opponents) Opponents.TryGetValue(host, out target);
+            if (target == null)
+            {
+                Notification.Show("~r~That player is no longer available.");
+                return;
+            }
+
+            string name = DisplayNameOf(target);
+            ClearPendingTeleport();
+
+            if (target.IsInVehicle)
+            {
+                var vehicle = target.MainVehicle;
+                if (vehicle != null && vehicle.Exists())
+                {
+                    if (TryEnterPassengerSeat(vehicle))
+                    {
+                        Notification.Show("~g~You joined " + name + "'s vehicle.");
+                        return;
+                    }
+
+                    TeleportNear(target.VehiclePosition, 2.5f);
+                    Notification.Show("~y~" + name + "'s vehicle is full. Teleported nearby.");
+                    return;
+                }
+
+                TeleportNear(target.VehiclePosition, 2.5f);
+                _pendingTeleportHost = host;
+                _pendingTeleportExpires = Game.GameTime + 10000;
+                _pendingTeleportNextHop = Game.GameTime + 500;
+                _pendingTeleportHops = 0;
+                Notification.Show("~g~Teleported near " + name + ". Waiting for the vehicle...");
+                return;
+            }
+
+            TeleportNear(target.Position, 1.0f);
+            Notification.Show("~g~Teleported to " + name + ".");
+        }
+
+        private void ProcessPendingTeleport()
+        {
+            if (_pendingTeleportHost == 0) return;
+
+            var player = Game.Player.Character;
+            if (!IsOnServer() || player == null || !player.Exists() || player.IsDead)
+            {
+                ClearPendingTeleport();
+                return;
+            }
+
+            if (Game.GameTime > _pendingTeleportExpires)
+            {
+                ClearPendingTeleport();
+                Notification.Show("~y~Could not reach that player's vehicle in time.");
+                return;
+            }
+
+            SyncPed target = null;
+            lock (Opponents) Opponents.TryGetValue(_pendingTeleportHost, out target);
+            if (target == null || Game.GameTime - target.LastUpdateReceived > 15000)
+            {
+                ClearPendingTeleport();
+                return;
+            }
+
+            string name = DisplayNameOf(target);
+
+            if (!target.IsInVehicle)
+            {
+                ClearPendingTeleport();
+                TeleportNear(target.Position, 1.0f);
+                Notification.Show("~g~Teleported to " + name + ".");
+                return;
+            }
+
+            var vehicle = target.MainVehicle;
+            if (vehicle != null && vehicle.Exists())
+            {
+                ClearPendingTeleport();
+                if (TryEnterPassengerSeat(vehicle))
+                {
+                    Notification.Show("~g~You joined " + name + "'s vehicle.");
+                }
+                else
+                {
+                    TeleportNear(target.VehiclePosition, 2.5f);
+                    Notification.Show("~y~" + name + "'s vehicle is full. Teleported nearby.");
+                }
+                return;
+            }
+
+            // The target is driving and their vehicle is not streamed in yet.
+            // Hop to the latest known position until the vehicle appears.
+            if (Game.GameTime >= _pendingTeleportNextHop && _pendingTeleportHops < 8)
+            {
+                _pendingTeleportHops++;
+                _pendingTeleportNextHop = Game.GameTime + 700;
+                TeleportNear(target.VehiclePosition, 2.5f);
+            }
+        }
+
+        private static void TeleportNear(Vector3 position, float distance)
+        {
+            var player = Game.Player.Character;
+            if (player == null || !player.Exists()) return;
+
+            if (player.IsInVehicle())
+                player.Task.LeaveVehicle(player.CurrentVehicle, true);
+
+            player.Task.ClearAll();
+            player.PositionNoOffset = position + new Vector3(distance, distance, 0f);
+        }
+
+        private static bool TryEnterPassengerSeat(Vehicle vehicle)
+        {
+            if (vehicle == null || !vehicle.Exists()) return false;
+
+            var player = Game.Player.Character;
+            if (player == null || !player.Exists() || player.IsDead) return false;
+
+            if (player.IsInVehicle() && player.CurrentVehicle != null &&
+                player.CurrentVehicle.Handle == vehicle.Handle)
+                return true;
+
+            int seat = Util.GetFreePassengerSeat(vehicle);
+            if (seat < 0) return false;
+
+            player.Task.ClearAll();
+            player.SetIntoVehicle(vehicle, (VehicleSeat)seat);
+            return player.IsInVehicle(vehicle);
         }
 
         private string ServerBrowserCachePath
@@ -1384,6 +1619,7 @@ namespace GTACoOp
                     Debug();
                 }
                 ProcessMessages();
+                ProcessPendingTeleport();
                 DebugLogger.Tick();
 
                 if (Opponents != null)
@@ -1732,6 +1968,7 @@ namespace GTACoOp
                                         Opponents.Add(data.Id, repr);
 
                                         Opponents[data.Id].Name = data.Name;
+                                        Opponents[data.Id].Host = data.Id;
                                         Opponents[data.Id].Latency = data.Latency;
 
                                         _playerList.Update(Opponents);
@@ -1789,6 +2026,7 @@ namespace GTACoOp
                                         Opponents.Add(data.Id, repr);
 
                                         Opponents[data.Id].Name = data.Name;
+                                        Opponents[data.Id].Host = data.Id;
                                         Opponents[data.Id].Latency = data.Latency;
 
                                         _playerList.Update(Opponents);
