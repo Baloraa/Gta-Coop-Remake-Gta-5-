@@ -28,6 +28,7 @@ public static class ClientSettingsEditor
     public static void Apply(
         string gameFolder, string username, string host, int port,
         string password, bool autoConnect, bool lowDesync = false,
+        string? fallbackHost = null, int fallbackPort = 0,
         Action<string>? log = null)
     {
         var path = SettingsPath(gameFolder);
@@ -77,6 +78,10 @@ public static class ClientSettingsEditor
         Set(root, "Username", username);
         Set(root, "LastIP", host);
         Set(root, "LastPort", port.ToString());
+        // Doğrudan oyun bağlantısı kurulamazsa istemcinin döneceği yerel
+        // relay uç noktası. Relay kullanılmıyorsa temizlenir.
+        Set(root, "FallbackIP", fallbackHost ?? "");
+        Set(root, "FallbackPort", fallbackPort > 0 ? fallbackPort.ToString() : "0");
         Set(root, "LastPassword", password);
         Set(root, "AutoConnect", autoConnect ? "true" : "false");
         Set(root, "SyncWorld", "true");
@@ -212,6 +217,8 @@ public static class ClientSettingsEditor
             new XElement("Username", "Player"),
             new XElement("LastIP", "127.0.0.1"),
             new XElement("LastPort", "4499"),
+            new XElement("FallbackIP", ""),
+            new XElement("FallbackPort", "0"),
             new XElement("LastPassword", ""),
             new XElement("SyncWorld", "true"),
             new XElement("DisableTraffic", "false"),

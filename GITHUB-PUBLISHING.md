@@ -12,23 +12,25 @@ Suggested topics:
 
 `gta-v` `gtacoop` `gta-coop` `multiplayer` `coop` `launcher` `winforms` `dotnet` `csharp` `mod-manager` `relay` `story-mode`
 
-## Release 2.5.0 description
+## Release 2.5.1 description
 
 Use this as the GitHub Release body:
 
-> **GTACoop Remake 2.5.0 — teleport to players from the F9 menu**
+> **GTACoop Remake 2.5.1 — lower latency, fewer stutters**
 >
-> `F9 > Teleport to Player` now lists every player connected to the server and teleports you to the one you select.
+> This release fixes the heavy latency and the intermittent stutter reported in 2.5.0. The network protocol is unchanged (`VERSION_0_9_4`), so 2.5.1 and 2.5.0 clients can still play on the same server.
 >
-> **On foot:** you appear next to the selected player.
+> **Direct game connection first.** When the server is directly reachable (same network, Radmin/Tailscale, forwarded port, UPnP), the game now connects straight to the server instead of through the relay. The launcher still starts the relay in the background and the client switches to it automatically within 6 seconds if the direct path cannot be established, so connection reliability is unchanged.
 >
-> **In a vehicle:** you take the **first free passenger seat** of their vehicle, like MTA. The driver seat is never used. If the vehicle is full or has no passenger seat, you are teleported next to it instead.
+> **NPC sync is capped at 10 Hz** per NPC and scanned four times per second instead of every frame. Nothing is scanned while you are alone on the server. Dense traffic no longer floods the uplink or the frame loop.
 >
-> **Far-away vehicles:** when the target's vehicle is still outside the streaming range, the client follows the player's latest position and enters the passenger seat as soon as the vehicle streams in. The list is rebuilt on every open, so players who joined or left are always current.
+> **Voice is sent only while you actually speak.** Holding push-to-talk in silence no longer streams empty audio, and the playback buffer is capped at 500 ms, so speech latency no longer grows the longer you play.
+>
+> **Cheaper per-frame work:** vehicle radio and mod details are applied once per second, the radio station list is cached, remote peds share one relationship group, stale opponent/NPC cleanup runs once per second, and Lidgren message recycling is enabled.
 >
 > **Upgrade:** replace the application folder with the new build, or run the installer as usual. Your `%LOCALAPPDATA%\GTACoopRemake` settings, server list, and logs are kept in place. The share ZIP still excludes GTA V, ScriptHookV, ScriptHookVDotNet, and RageOpenV. The bundled `OpenIV.asi` is user-supplied.
 
-Attach `GTACoop-Remake-Share-2.5.0.zip`, `GTACoop.Launcher.exe`, and `GTACoop.Sync.dll` as release assets. Do not commit them to the repository.
+Attach `GTACoop-Remake-Share-2.5.1.zip`, `GTACoop.Launcher.exe`, and `GTACoop.Sync.dll` as release assets. Do not commit them to the repository.
 
 ## Before you make the repository public
 
@@ -118,6 +120,6 @@ Before uploading, check:
 
 ## A note on the current repository state
 
-The working tree has uncommitted changes for 2.5.0, including the F9 teleport menu, opponent host IDs, and the updated documentation. Review `git status`, commit them in logical chunks, and tag the release only after the build and ZIP verification pass.
+The working tree has the 2.5.1 changes, including the lag fixes and the updated documentation. Review `git status`, commit them in logical chunks, and tag the release only after the build and ZIP verification pass.
 
 The GitHub remote is configured. Push `main`, then create the release from the tag. The English README is already the default; keep the language links intact when you make further edits.

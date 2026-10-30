@@ -30,9 +30,13 @@ namespace GTACoOp
             return Function.Call<string>(Hash.GET_RADIO_STATION_NAME, id);
         }
 
+        private static string[] _radioStations;
+
         public static string[] GetRadioStations()
         {
-            return (string[]) typeof(Game).GetProperty("radioNames")?.GetValue(typeof(Game));
+            // Yansıma her karede her uzak araç için çalıştırılıyordu; bir kez
+            // önbelleğe almak kare süresini kısaltır.
+            return _radioStations ??= (string[])typeof(Game).GetProperty("radioNames")?.GetValue(typeof(Game));
         }
 
         public static int GetTrackId()

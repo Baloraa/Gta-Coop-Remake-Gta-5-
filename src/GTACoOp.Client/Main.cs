@@ -84,6 +84,13 @@ namespace GTACoOp
         private static int _messagesReceived = 0;
         private string _lastIP = "";
         private int _lastPort = 4499;
+
+        // Doğrudan oyun bağlantısı kurulamazsa launcher'ın açtığı yerel
+        // relay'e otomatik dönüş için.
+        private static string _fallbackIp = "";
+        private static int _fallbackPort;
+        private static int _connectStartedAt;
+        private static bool _fallbackTried;
         //
 
         private bool debug;
@@ -129,6 +136,9 @@ namespace GTACoOp
         private static BufferedWaveProvider _playBuffer;
 
         private static bool _isTalking = false;
+        // Kısa sessizliklerde paket göndermeyi sürdürerek sesin kesilmesini
+        // önleyen tampon sayacı (yaklaşık 120 ms).
+        private static int _voiceHangover;
 #endif
 
         private enum NativeType
@@ -172,6 +182,10 @@ namespace GTACoOp
             _waveWriter = new WaveFileWriter(voiceStream, _waveInput.WaveFormat);
 
             _playBuffer = new BufferedWaveProvider(_waveInput.WaveFormat);
+            // Canlı ses için kısa tampon: tampon dolduğunda en eski ses
+            // atılır. Aksi halde konuşma gecikmesi saniyelerce birikir.
+            _playBuffer.BufferDuration = TimeSpan.FromMilliseconds(500);
+            _playBuffer.DiscardOnBufferOverflow = true;
 
             _waveOutput.Init(_playBuffer);
             _waveOutput.Play();
@@ -235,6 +249,9 @@ namespace GTACoOp
             _config = new NetPeerConfiguration("GTAVOnlineRaces");
             _config.Port = 8888;
             _config.EnableMessageType(NetIncomingMessageType.ConnectionLatencyUpdated);
+            // Lidgren'in mesaj geri dönüşümü GC baskısını azaltır; kalabalık
+            // sunucularda kare atlamalarının bir kısmını engeller.
+            _config.UseMessageRecycling = true;
 
             #region Menu Set up
             // #warning Affects performance when open, drops from 80~100 on a GTX 980 to high 30s ~ 60
@@ -1315,6 +1332,13 @@ namespace GTACoOp
         private static int _tickRate = 60;
         private static int _lastFullDataSend;
 
+        // NPC senkronu: her NPC en fazla 10 kez/sn gönderilir. Önceden her
+        // NPC her karede gönderiliyordu; 10 NPC'de saniyede 600 paket ve
+        // ciddi CPU/GC yükü oluşuyordu.
+        private const int NpcSendInterval = 100;
+        private static readonly Dictionary<int, int> _npcSendTimes = new Dictionary<int, int>();
+        private static int _lastNpcSendPrune;
+
         public static void SendPlayerData()
         {
             if (Game.GameTime - _lastDataSend < 1000 / _tickRate) return;
@@ -1440,6 +1464,33 @@ namespace GTACoOp
 
         public static void SendPedData(Ped ped)
         {
+            if (ped == null || !ped.Exists()) return;
+            if (!IsOnServer() || !HasOpponents) return;
+
+            int now = Game.GameTime;
+
+            if (_npcSendTimes.TryGetValue(ped.Handle, out var lastSent) &&
+                now - lastSent < NpcSendInterval)
+                return;
+
+            if (now - _lastNpcSendPrune >= 5000)
+            {
+                _lastNpcSendPrune = now;
+
+                List<int> stale = null;
+                foreach (var pair in _npcSendTimes)
+                {
+                    if (now - pair.Value <= 5000) continue;
+                    stale ??= new List<int>();
+                    stale.Add(pair.Key);
+                }
+
+                if (stale != null)
+                    foreach (var handle in stale) _npcSendTimes.Remove(handle);
+            }
+
+            _npcSendTimes[ped.Handle] = now;
+
             if (ped.IsInVehicle())
             {
                 var veh = ped.CurrentVehicle;
@@ -1536,20 +1587,55 @@ namespace GTACoOp
 #if VOICE
         void SendVoiceData(object sender, WaveInEventArgs e)
         {
-            if (!IsOnServer())
+            if (!IsOnServer() || !HasOpponents)
                 return;
 
-            if (_isTalking)
+            if (_isTalking && HasVoiceSignal(e.Buffer, e.BytesRecorded))
             {
                 var msg = _client.CreateMessage();
 
                 msg.Write((int) PacketType.VoiceChatData);
 
-                msg.Write(e.Buffer.Length);
-                msg.Write(e.Buffer);
+                // Yalnızca gerçekten kaydedilen baytları gönder; tamponun
+                // kullanılmayan kuyruğu eskiden boşuna gönderiliyordu.
+                msg.Write(e.BytesRecorded);
+                msg.Write(e.Buffer, 0, e.BytesRecorded);
 
                 _client.SendMessage(msg, NetDeliveryMethod.Unreliable, _channel);
             }
+        }
+
+        // Bas-konuş açıkken bile sessiz aralıklarda paket göndermeyi durdurur.
+        // Böylece ses, bant genişliğinin yalnızca konuşma sırasında kullanır.
+        private static bool HasVoiceSignal(byte[] buffer, int bytesRecorded)
+        {
+            const int threshold = 350;
+            int peak = 0;
+
+            for (int i = 0; i + 1 < bytesRecorded; i += 2)
+            {
+                short sample = (short)(buffer[i] | (buffer[i + 1] << 8));
+                int abs = sample < 0 ? -sample : sample;
+                if (abs > peak)
+                {
+                    peak = abs;
+                    if (peak >= threshold) break;
+                }
+            }
+
+            if (peak >= threshold)
+            {
+                _voiceHangover = 8;
+                return true;
+            }
+
+            if (_voiceHangover > 0)
+            {
+                _voiceHangover--;
+                return true;
+            }
+
+            return false;
         }
 
         private static void SendVoiceState(bool talking)
@@ -1633,6 +1719,8 @@ namespace GTACoOp
                         }
                     }
                 }
+
+                TryRelayFallback();
 
                 if (_client == null || _client.ConnectionStatus == NetConnectionStatus.Disconnected ||
                     _client.ConnectionStatus == NetConnectionStatus.None) return;
@@ -1746,6 +1834,15 @@ namespace GTACoOp
         public static int PlayerCount
         {
             get { return (Opponents != null ? Opponents.Count : 0) + 1; }
+        }
+
+        public static bool HasOpponents
+        {
+            get
+            {
+                if (Opponents == null) return false;
+                lock (Opponents) return Opponents.Count > 0;
+            }
         }
 
         public static string LocalDisplayName
@@ -1879,6 +1976,21 @@ namespace GTACoOp
 
             _chat.Init();
 
+            int effectivePort = port == 0 ? Port : port;
+
+            // Yalnızca launcher'ın yazdığı sunucu için relay yedeği kullan.
+            // F9'dan elle başka bir sunucuya bağlanırken eski relay portuna
+            // düşmemek için adres ve port eşleşmelidir.
+            bool launcherEndpoint =
+                string.Equals((ip ?? "").Trim(), (PlayerSettings.LastIP ?? "").Trim(),
+                    StringComparison.OrdinalIgnoreCase) &&
+                effectivePort == PlayerSettings.LastPort;
+
+            _fallbackIp = launcherEndpoint ? (PlayerSettings.FallbackIP ?? "").Trim() : "";
+            _fallbackPort = launcherEndpoint ? PlayerSettings.FallbackPort : 0;
+            _fallbackTried = false;
+            _connectStartedAt = Game.GameTime;
+
             if (_client == null)
             {
                 var cport = GetOpenUdpPort();
@@ -1898,7 +2010,23 @@ namespace GTACoOp
             lock (Npcs) Npcs = new Dictionary<string, SyncPed>();
             lock (_tickNatives) _tickNatives = new Dictionary<string, NativeData>();
 
-            var msg = _client.CreateMessage();
+            SendConnectionRequest(_client, ip, effectivePort);
+
+            var pos = Game.Player.Character.Position;
+            if (PlayerSettings.DisableTraffic)
+                Function.Call(Hash.CLEAR_AREA_OF_VEHICLES, pos.X, pos.Y, pos.Z, 1000f, 0);
+            if (PlayerSettings.DisablePeds)
+                Function.Call(Hash.CLEAR_AREA_OF_PEDS, pos.X, pos.Y, pos.Z, 1000f, 0);
+
+            Function.Call(Hash.SET_GARBAGE_TRUCKS, 0);
+            Function.Call(Hash.SET_RANDOM_BOATS, 0);
+            Function.Call(Hash.SET_RANDOM_TRAINS, 0);
+            _lastIP = ip; _lastPort = effectivePort;
+        }
+
+        private void SendConnectionRequest(NetClient client, string ip, int port)
+        {
+            var msg = client.CreateMessage();
 
             var obj = new ConnectionRequest();
             obj.Name = string.IsNullOrWhiteSpace(Game.Player.Name) ? "Player" : Game.Player.Name; // To be used as identifiers in server files
@@ -1913,18 +2041,69 @@ namespace GTACoOp
             msg.Write(bin.Length);
             msg.Write(bin);
 
-            _client.Connect(ip, port == 0 ? Port : port, msg);
+            client.Connect(ip, port == 0 ? Port : port, msg);
+        }
 
-            var pos = Game.Player.Character.Position;
-            if (PlayerSettings.DisableTraffic)
-                Function.Call(Hash.CLEAR_AREA_OF_VEHICLES, pos.X, pos.Y, pos.Z, 1000f, 0);
-            if (PlayerSettings.DisablePeds)
-                Function.Call(Hash.CLEAR_AREA_OF_PEDS, pos.X, pos.Y, pos.Z, 1000f, 0);
+        /// <summary>
+        /// Lidgren'de bağlantı kurulurken görülen ara durumlar. Bu durumlardan
+        /// biri 6 saniyeden uzun sürerse doğrudan yolun kapalı olduğu kabul
+        /// edilir ve relay yedeğine geçilir.
+        /// </summary>
+        private static bool IsConnectionPending(NetConnectionStatus status)
+        {
+            switch (status)
+            {
+                case NetConnectionStatus.InitiatedConnect:
+                case NetConnectionStatus.ReceivedInitiation:
+                case NetConnectionStatus.RespondedAwaitingApproval:
+                case NetConnectionStatus.RespondedConnect:
+                    return true;
+                default:
+                    return false;
+            }
+        }
 
-            Function.Call(Hash.SET_GARBAGE_TRUCKS, 0);
-            Function.Call(Hash.SET_RANDOM_BOATS, 0);
-            Function.Call(Hash.SET_RANDOM_TRAINS, 0);
-            _lastIP = ip; _lastPort = port;
+        /// <summary>
+        /// Doğrudan oyun bağlantısı 6 saniye içinde kurulamazsa launcher'ın
+        /// açtığı yerel relay tüneline geçer. Böylece doğrudan UDP yolu
+        /// kullanılabilir olduğunda düşük gecikmeyle oynanır; kapalıysa
+        /// bağlantı eskisi gibi relay üzerinden tamamlanır.
+        /// </summary>
+        private void TryRelayFallback()
+        {
+            if (_client == null || !IsConnectionPending(_client.ConnectionStatus))
+                return;
+
+            if (_fallbackTried || _fallbackPort <= 0 || string.IsNullOrWhiteSpace(_fallbackIp))
+                return;
+
+            if (Game.GameTime - _connectStartedAt < 6000)
+                return;
+
+            _fallbackTried = true;
+
+            try { _client.Shutdown("Direct connection timed out"); }
+            catch { }
+
+            var cport = GetOpenUdpPort();
+            if (cport == 0) return;
+
+            var config = new NetPeerConfiguration("GTAVOnlineRaces");
+            config.Port = cport;
+            config.EnableMessageType(NetIncomingMessageType.ConnectionLatencyUpdated);
+            config.UseMessageRecycling = true;
+
+            _client = new NetClient(config);
+            _client.Start();
+            DebugLogger.NetClient = _client;
+
+            SendConnectionRequest(_client, _fallbackIp, _fallbackPort);
+            _lastIP = _fallbackIp;
+            _lastPort = _fallbackPort;
+            _connectStartedAt = Game.GameTime;
+
+            _logger.WriteLine("Direct game connection timed out; switching to the local relay.");
+            Notification.Show("~y~Direct connection timed out. Using the relay...");
         }
 
         public void ProcessMessages()

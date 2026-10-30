@@ -1,4 +1,4 @@
-ï»¿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
@@ -11,14 +11,14 @@
     <NoWarn>$(NoWarn);CA1416</NoWarn>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
     <ApplicationIcon>Assets\app.ico</ApplicationIcon>
-    <Version>2.5.0</Version>
-    <AssemblyVersion>2.5.0.0</AssemblyVersion>
-    <FileVersion>2.5.0.0</FileVersion>
+    <Version>2.5.1</Version>
+    <AssemblyVersion>2.5.1.0</AssemblyVersion>
+    <FileVersion>2.5.1.0</FileVersion>
     <AssemblyTitle>GTACoop Remake</AssemblyTitle>
     <Product>GTACoop Remake</Product>
-    <Description>GTA V mod ve sunucu yÃ¶neticisi (GTACoOp) - TÃ¼rkÃ§e/Ä°ngilizce/RusÃ§a</Description>
+    <Description>GTA V mod ve sunucu yöneticisi (GTACoOp) - Türkçe/Ýngilizce/Rusça</Description>
     <Company>GTACoop Remake</Company>
-    <Copyright>Â© 2026 GTACoop Remake</Copyright>
+    <Copyright>© 2026 GTACoop Remake</Copyright>
   </PropertyGroup>
 
   <ItemGroup>
@@ -26,7 +26,7 @@
     <ProjectReference Include="..\GTACoop.SyncServer\GTACoop.SyncServer.csproj" ReferenceOutputAssembly="false" />
   </ItemGroup>
 
-  <!-- Sunucu TarayÄ±cÄ±: GTACoOp ile aynÄ± Lidgren discovery protokolÃ¼ -->
+  <!-- Sunucu Tarayýcý: GTACoOp ile ayný Lidgren discovery protokolü -->
   <ItemGroup>
     <Reference Include="Lidgren.Network.MultiTarget">
       <HintPath>..\..\vendor\Distribution\Scripts\Lidgren.Network.MultiTarget.dll</HintPath>
@@ -34,7 +34,7 @@
     </Reference>
   </ItemGroup>
 
-  <!-- Avatar (HakkÄ±nda sekmesi) uygulamanÄ±n iÃ§ine gÃ¶mÃ¼lÃ¼r -->
+  <!-- Avatar (Hakkýnda sekmesi) uygulamanýn içine gömülür -->
   <ItemGroup>
     <None Remove="Assets\avatar.png" />
     <EmbeddedResource Include="Assets\avatar.png" />
@@ -42,7 +42,7 @@
     <EmbeddedResource Include="Assets\tester.png" />
   </ItemGroup>
 
-  <!-- DaÄŸÄ±tÄ±m dosyalarÄ±nÄ± (GTACoOp sunucu/istemci + SyncServer) Ã§Ä±ktÄ± klasÃ¶rÃ¼ne kopyala -->
+  <!-- Daðýtým dosyalarýný (GTACoOp sunucu/istemci + SyncServer) çýktý klasörüne kopyala -->
   <Target Name="CopyDistribution" AfterTargets="Build">
     <ItemGroup>
       <DistServerFiles Include="$(MSBuildThisFileDirectory)..\..\vendor\Distribution\Server\**\*" />

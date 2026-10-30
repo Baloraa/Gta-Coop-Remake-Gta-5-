@@ -2,7 +2,7 @@
 
 **Türkçe** | [English](README.md)
 
-2.5.0 sürümü - kendi sunucu yönetimi, otomatik mod indirme, **oturum modu**,
+2.5.1 sürümü - kendi sunucu yönetimi, otomatik mod indirme, **oturum modu**,
 **kısa kod** (ör. `Gel.com`) ile internetten sunucu bulma, **otomatik relay**,
 **UPnP doğrudan bağlantı**, **özel relay sunucusu**, **tanılama kopyalama**,
 **canlı sunucu durumu**, **Sunucu Tarayıcı** sekmesi, **OpenIV (.oiv) paket desteği**,
@@ -13,6 +13,26 @@ yalnızca oyun açıkken kurulu kalır, oyundan çıkınca otomatik kaldırılı
 Oyun başlatma dosyası seçilebilir; varsayılan **PlayGTAV.exe**'dir (GTA5.exe de seçilebilir).
 **Sesli sohbet** (bas-konuş, `[MIC]` göstergesi) ve **host-led hikaye görevi koordinasyonu**
 bu sürümde eklendi; ayrıntılar aşağıda.
+
+### 2.5.1 — Gecikme ve takılma düzeltmeleri
+
+- **Önce doğrudan oyun bağlantısı.** Sunucuya doğrudan erişilebiliyorsa (aynı ağ,
+  Radmin/Tailscale, port yönlendirme, UPnP) oyun artık relay yerine doğrudan sunucuya
+  bağlanır. Launcher relay'i arka planda yine açar; doğrudan yol kurulamazsa istemci
+  6 saniye içinde otomatik olarak relay'e döner. Bağlantı güvenilirliği aynı kalır.
+- **NPC senkronu NPC başına saniyede 10 kez** gönderilir ve saniyede 4 kez taranır
+  (önce her karede). Sunucuda yalnızken hiç taranmaz. Yoğun trafik artık bağlantıyı
+  ve kare döngüsünü boğmaz.
+- **Ses yalnızca gerçekten konuşurken gönderilir.** Bas-konuş basılı ama sessizken boş
+  ses akmaz; oynatma tamponu 500 ms ile sınırlandığı için konuşma gecikmesi zamanla
+  birikmez.
+- **Kare başına daha az iş:** araç radyosu ve mod listesi her karede değil saniyede bir
+  uygulanır, radyo istasyonu listesi önbelleğe alınır, uzak pedler tek bir ilişki
+  grubunu paylaşır, eski oyuncu/NPC temizliği saniyede bir çalışır ve Lidgren mesaj
+  geri dönüşümü açıktır.
+
+Ağ protokolü değişmedi (`VERSION_0_9_4`); 2.5.1 istemciler 2.5.0 istemcilerle aynı
+sunucuda oynayabilir.
 
 ### 2.5.0 — F9 oyuncuya ışınlanma
 
@@ -281,7 +301,7 @@ Kurallar:
 - Bu betik uygulamayı `%LOCALAPPDATA%\Programs\GTACoop Remake` klasörüne kopyalar ve
   **masaüstü** + **Başlat menüsü** kısayollarını buraya bağlar. Hiçbir şey silinmez
   (eski `dist` klasörü olduğu yerde kalır).
-- Uygulama simgesi ve sürüm bilgisi (2.5.0) exe dosyasına işlenmiştir.
+- Uygulama simgesi ve sürüm bilgisi (2.5.1) exe dosyasına işlenmiştir.
 
 ---
 

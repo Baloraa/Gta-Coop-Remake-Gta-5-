@@ -7,6 +7,8 @@ namespace GTACoOp
         public string Username { get; set; }
         public string LastIP { get; set; }
         public int LastPort { get; set; }
+        public string FallbackIP { get; set; }
+        public int FallbackPort { get; set; }
         public string LastPassword { get; set; }
         public bool SyncWorld { get; set; }
         //public TrafficMode SyncTraffic { get; set; }

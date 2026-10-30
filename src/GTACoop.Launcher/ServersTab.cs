@@ -711,6 +711,8 @@ public sealed class ServersTab : UserControl
             var gamePort = sel.GamePort;
             var syncViaRelay = false;
             var gameViaRelay = false;
+            var fallbackHost = "";
+            var fallbackPort = 0;
 
             AppEnv.Log($"Bağlantı hazırlanıyor: {sel.Name} ({sel.Host}:{sel.GamePort}, sync {sel.SyncPort})");
 
@@ -754,16 +756,22 @@ public sealed class ServersTab : UserControl
                     gameViaRelay = true;
 
                     // Sync için doğrudan TCP erişimi varsa (port yönlendirme,
-                    // UPnP, Radmin/Tailscale, genel IP) büyük dosyaları relay
-                    // üzerinden taşımaya gerek yok. Oyun UDP'si yine relay'de
-                    // kalabilir; iki taşıma birbirinden bağımsızdır.
+                    // UPnP, Radmin/Tailscale, genel IP) oyun trafiğini de
+                    // doğrudan kullan. Relay yalnızca yedek kalır: doğrudan
+                    // UDP 6 saniyede kurulamazsa istemci yerel relay'e döner.
                     var directSync = CanTryDirect(sel) && await ProbeDirectSyncAsync(sel, ct);
                     if (directSync)
                     {
                         syncHost = sel.Host;
                         syncPort = sel.SyncPort;
-                        AppEnv.Log($"Sync doğrudan: {sel.Host}:{sel.SyncPort}; " +
-                                   $"oyun relay: {sel.RelayHost}:{sel.RelayGamePort} -> yerel {relay.GamePort}");
+                        gameHost = sel.Host;
+                        gamePort = sel.GamePort;
+                        gameViaRelay = false;
+                        fallbackHost = "127.0.0.1";
+                        fallbackPort = relay.GamePort;
+                        AppEnv.Log($"Doğrudan bağlantı: sync {sel.Host}:{sel.SyncPort}, " +
+                                   $"oyun {sel.Host}:{sel.GamePort}; relay yedek " +
+                                   $"127.0.0.1:{relay.GamePort}");
                     }
                     else
                     {
@@ -888,7 +896,8 @@ public sealed class ServersTab : UserControl
             // "Bağlan ve Oyna" açıkça bağlanma isteğidir; AutoConnect her zaman açılır.
             ClientSettingsEditor.Apply(gameFolder, AppEnv.Settings.Username, gameHost,
                 gamePort, sel.Password, autoConnect: true,
-                lowDesync: AppEnv.Settings.LowDesyncProfile, log: AppEnv.Log);
+                lowDesync: AppEnv.Settings.LowDesyncProfile,
+                fallbackHost: fallbackHost, fallbackPort: fallbackPort, log: AppEnv.Log);
 
             if (launch)
             {
@@ -1002,6 +1011,8 @@ public sealed class ServersTab : UserControl
 
             var gameHost = sel.Host;
             var gamePort = sel.GamePort;
+            var fallbackHost = "";
+            var fallbackPort = 0;
 
             if (!string.IsNullOrWhiteSpace(sel.ShortCode))
                 await RefreshRelayInfoAsync(sel, ct);
@@ -1021,10 +1032,25 @@ public sealed class ServersTab : UserControl
                 relay = await TryStartRelayAsync(sel, ct, requireSync: false);
                 if (relay != null)
                 {
-                    gameHost = "127.0.0.1";
-                    gamePort = relay.GamePort;
-                    AppEnv.Log($"Modsuz bağlantı relay üzerinden: {sel.RelayHost} " +
-                               $"(oyun {sel.RelayGamePort} -> yerel {relay.GamePort})");
+                    // Doğrudan sync erişimi varsa oyunu da doğrudan dene;
+                    // UDP engelliyse istemci 6 saniyede relay'e döner.
+                    var directSync = CanTryDirect(sel, requireSync: false) && await ProbeDirectSyncAsync(sel, ct);
+                    if (directSync)
+                    {
+                        gameHost = sel.Host;
+                        gamePort = sel.GamePort;
+                        fallbackHost = "127.0.0.1";
+                        fallbackPort = relay.GamePort;
+                        AppEnv.Log($"Modsuz bağlantı doğrudan: {sel.Host}:{sel.GamePort}; " +
+                                   $"relay yedek 127.0.0.1:{relay.GamePort}");
+                    }
+                    else
+                    {
+                        gameHost = "127.0.0.1";
+                        gamePort = relay.GamePort;
+                        AppEnv.Log($"Modsuz bağlantı relay üzerinden: {sel.RelayHost} " +
+                                   $"(oyun {sel.RelayGamePort} -> yerel {relay.GamePort})");
+                    }
                 }
                 else if (!CanTryDirect(sel, requireSync: false))
                 {
@@ -1054,7 +1080,8 @@ public sealed class ServersTab : UserControl
 
             ClientSettingsEditor.Apply(gameFolder, AppEnv.Settings.Username, gameHost,
                 gamePort, sel.Password, autoConnect: true,
-                lowDesync: AppEnv.Settings.LowDesyncProfile, log: AppEnv.Log);
+                lowDesync: AppEnv.Settings.LowDesyncProfile,
+                fallbackHost: fallbackHost, fallbackPort: fallbackPort, log: AppEnv.Log);
 
             if (relay != null)
             {

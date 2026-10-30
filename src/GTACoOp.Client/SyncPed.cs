@@ -61,6 +61,7 @@ namespace GTACoOp
         public int RadioStation;
         private int _stopTime;
         private bool _lastBurnout;
+        private int _lastVehicleDetailsTick;
 
         public float Speed
         {
@@ -159,7 +160,8 @@ namespace GTACoOp
         private bool _blip;
         private bool _justEnteredVeh;
         private DateTime _lastHornPress = DateTime.Now;
-        private RelationshipGroup _relGroup;
+        private static RelationshipGroup _sharedRelGroup;
+        private static bool _sharedRelGroupReady;
         private DateTime _enterVehicleStarted;
         private Vector3 _vehiclePosition;
         private Dictionary<int, int> _vehicleMods;
@@ -182,8 +184,23 @@ namespace GTACoOp
 
             _latencyAverager = new Queue<double>();
 
-            _relGroup = World.AddRelationshipGroup("SYNCPED");
-            Game.Player.Character.RelationshipGroup.SetRelationshipBetweenGroups(_relGroup, Relationship.Neutral, true);
+            GetSharedRelationshipGroup();
+        }
+
+        /// <summary>
+        /// Tüm uzak pedler aynı ilişki grubunu paylaşır. Önceden her yeni
+        /// SyncPed kendi grubunu oluşturuyordu; NPC handle'ları değiştikçe
+        /// yüzlerce grup birikip oyunu yavaşlatabiliyordu.
+        /// </summary>
+        private static RelationshipGroup GetSharedRelationshipGroup()
+        {
+            if (_sharedRelGroupReady) return _sharedRelGroup;
+
+            _sharedRelGroupReady = true;
+            _sharedRelGroup = World.AddRelationshipGroup("SYNCPED");
+            Game.Player.Character.RelationshipGroup.SetRelationshipBetweenGroups(
+                _sharedRelGroup, Relationship.Neutral, true);
+            return _sharedRelGroup;
         }
 
         public void SetBlipName(Blip blip, string text)
@@ -246,7 +263,7 @@ namespace GTACoOp
                     Character.BlockPermanentEvents = true;
                     Character.IsInvincible = true;
                     Character.CanRagdoll = false;
-                    Character.RelationshipGroup = _relGroup;
+                    Character.RelationshipGroup = GetSharedRelationshipGroup();
                     if (_blip)
                     {
                         Character.AddBlip();
@@ -395,22 +412,29 @@ namespace GTACoOp
                             MainVehicle.Mods.LicensePlate = Plate;
                         }
 
-                        var radioStations = Util.GetRadioStations();
-
-                        if (radioStations?.ElementAtOrDefault(RadioStation) != null)
+                        // Radyo ve mod listesi her karede değil, saniyede bir
+                        // uygulanır; bu bölüm onlarca native çağrısı yapar.
+                        if (Game.GameTime - _lastVehicleDetailsTick >= 1000)
                         {
-                            Function.Call(Hash.SET_VEH_RADIO_STATION, radioStations[RadioStation]);
-                        }
+                            _lastVehicleDetailsTick = Game.GameTime;
 
-                        if (VehicleMods != null && Game.Player.Character.IsInRange(VehiclePosition, 30f))
-                        {
-                            foreach (KeyValuePair<int, int> mod in VehicleMods)
+                            var radioStations = Util.GetRadioStations();
+
+                            if (radioStations?.ElementAtOrDefault(RadioStation) != null)
                             {
-                                if (MainVehicle.Mods[(VehicleModType)mod.Key].Index != mod.Value)
+                                Function.Call(Hash.SET_VEH_RADIO_STATION, radioStations[RadioStation]);
+                            }
+
+                            if (VehicleMods != null && Game.Player.Character.IsInRange(VehiclePosition, 30f))
+                            {
+                                foreach (KeyValuePair<int, int> mod in VehicleMods)
                                 {
-                                    Function.Call(Hash.SET_VEHICLE_MOD_KIT, MainVehicle.Handle, 0);
-                                    MainVehicle.Mods[(VehicleModType)mod.Key].Index = mod.Value;
-                                    Function.Call(Hash.RELEASE_PRELOAD_MODS, mod.Key);
+                                    if (MainVehicle.Mods[(VehicleModType)mod.Key].Index != mod.Value)
+                                    {
+                                        Function.Call(Hash.SET_VEHICLE_MOD_KIT, MainVehicle.Handle, 0);
+                                        MainVehicle.Mods[(VehicleModType)mod.Key].Index = mod.Value;
+                                        Function.Call(Hash.RELEASE_PRELOAD_MODS, mod.Key);
+                                    }
                                 }
                             }
                         }
