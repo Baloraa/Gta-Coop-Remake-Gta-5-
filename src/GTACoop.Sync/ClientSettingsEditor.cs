@@ -59,6 +59,21 @@ public static class ClientSettingsEditor
         }
 
         var root = doc.Root ?? throw new SyncException("ClientSettings.xml kökü okunamadı.");
+
+        // Eski sürümlerdeki master.gtacoop.com artık HTTP 526 döndürüyor.
+        // Yalnızca bu bilinen ölü adresi, çalışan yedek listeyle değiştir;
+        // kullanıcının özel master adresine dokunma.
+        var master = Get(root, "MasterServerAddress").Trim();
+        if (string.Equals(master.TrimEnd('/'), "https://master.gtacoop.com",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            var backup = Get(root, "BackupMasterServerAddress").Trim();
+            if (string.IsNullOrWhiteSpace(backup))
+                backup = "http://clan-banderos.de/gta/";
+            Set(root, "MasterServerAddress", backup);
+            Set(root, "BackupMasterServerAddress", "https://master.gtacoop.com");
+        }
+
         Set(root, "Username", username);
         Set(root, "LastIP", host);
         Set(root, "LastPort", port.ToString());
@@ -204,8 +219,8 @@ public static class ClientSettingsEditor
             new XElement("Logging", "false"),
             new XElement("ChatLog", "false"),
             new XElement("MaxStreamedNpcs", "10"),
-            new XElement("MasterServerAddress", "https://master.gtacoop.com"),
-            new XElement("BackupMasterServerAddress", ""),
+            new XElement("MasterServerAddress", "http://clan-banderos.de/gta/"),
+            new XElement("BackupMasterServerAddress", "https://master.gtacoop.com"),
             new XElement("ActivationKey", "F9"),
             new XElement("VoiceEnabled", "true"),
             new XElement("VoiceKey", "N"),

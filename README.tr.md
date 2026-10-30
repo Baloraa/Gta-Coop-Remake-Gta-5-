@@ -2,7 +2,7 @@
 
 **Türkçe** | [English](README.md)
 
-2.4.0 sürümü - kendi sunucu yönetimi, otomatik mod indirme, **oturum modu**,
+2.4.1 sürümü - kendi sunucu yönetimi, otomatik mod indirme, **oturum modu**,
 **kısa kod** (ör. `Gel.com`) ile internetten sunucu bulma, **otomatik relay**,
 **UPnP doğrudan bağlantı**, **özel relay sunucusu**, **tanılama kopyalama**,
 **canlı sunucu durumu**, **Sunucu Tarayıcı** sekmesi, **OpenIV (.oiv) paket desteği**,
@@ -13,6 +13,21 @@ yalnızca oyun açıkken kurulu kalır, oyundan çıkınca otomatik kaldırılı
 Oyun başlatma dosyası seçilebilir; varsayılan **PlayGTAV.exe**'dir (GTA5.exe de seçilebilir).
 **Sesli sohbet** (bas-konuş, `[MIC]` göstergesi) ve **host-led hikaye görevi koordinasyonu**
 bu sürümde eklendi; ayrıntılar aşağıda.
+
+### 2.4.1 — F9 sunucu tarayıcısı düzeltmesi
+
+- Oyun **launcher olmadan normal başlatıldığında** da F9 sunucu tarayıcısı çalışır.
+  Varsayılan master (`master.gtacoop.com`) HTTP 526 döndürdüğü için istemci artık önce
+  çalışan yedek listeyi dener; ölü sunucuda takılıp kalmaz.
+- Master listesi arka planda, 5 saniye zaman aşımıyla çekilir; F9 açılırken oyun donmaz.
+  "Searching..." satırı tarama durumunu gösterir, bulunan sunucular geldikçe listeye eklenir.
+- Bulunan sunucular `%LOCALAPPDATA%\cgmp\gtacoop\servers.json` dosyasına yazılır ve
+  sonraki F9 açılışında anında gösterilir. Launcher da başarılı taramadan sonra aynı
+  önbelleği yazar; böylece oyun içi UDP keşfi kısıtlı olsa bile liste dolu gelir.
+- Yerel keşif 4499, 4498 ve 44499 portlarını dener; her master uç noktası ayrı hata
+  yönetimiyle sorgulanır.
+- Hâlâ ölü `https://master.gtacoop.com` adresini kullanan mevcut `ClientSettings.xml`
+  dosyaları yedek listeye taşınır. Kullanıcının özel master adresine dokunulmaz.
 
 ### 2.4.0 — mods klasöründeki RPF arşivleri
 
@@ -255,7 +270,7 @@ Kurallar:
 - Bu betik uygulamayı `%LOCALAPPDATA%\Programs\GTACoop Remake` klasörüne kopyalar ve
   **masaüstü** + **Başlat menüsü** kısayollarını buraya bağlar. Hiçbir şey silinmez
   (eski `dist` klasörü olduğu yerde kalır).
-- Uygulama simgesi ve sürüm bilgisi (2.4.0) exe dosyasına işlenmiştir.
+- Uygulama simgesi ve sürüm bilgisi (2.4.1) exe dosyasına işlenmiştir.
 
 ---
 

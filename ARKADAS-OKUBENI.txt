@@ -1,5 +1,5 @@
 ==========================================================
- GTACoop Remake - Arkadaş Sürümü (Türkçe, v2.4.0)
+ GTACoop Remake - Arkadaş Sürümü (Türkçe, v2.4.1)
 ==========================================================
 
 Bu bir GTA V (Hikaye Modu) arkadaş-arası co-op aracıdır.
@@ -62,6 +62,8 @@ KURULUM
      listesini, LAN'ı veya doğrudan IP:port'u tarayın. Sunucu adı,
      oyuncu sayısı, mod, şifre, ping ve sürüm (güncel/eski) görünür.
      Sync sunucusu yoksa oyun modsuz bağlanır.
+   - Oyun içinde F9 > Server Browser da aynı listeyi gösterir;
+     oyunu launcher olmadan normal başlatsanız bile çalışır.
    - Sunucu sahibi oyuna tamamen girdikten sonra bağlanın;
      GTACoOp oturumu host oyuna girince aktifleşir.
 

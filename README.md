@@ -8,7 +8,7 @@ GTACoop Remake is not a new multiplayer engine. It is the desktop layer around G
 
 GTACoop Remake is for private Story Mode co-op. It does not touch GTA Online, does not bypass anti-cheat, and does not inject into online sessions.
 
-**Current release:** 2.4.0  
+**Current release:** 2.4.1  
 **Platform:** Windows 10/11, x64  
 **UI:** Turkish, English, and Russian  
 **License:** GNU GPL v3
@@ -288,6 +288,17 @@ This is a tool for playing with friends, not a hardened anti-cheat or privacy sy
 - Server owners are responsible for the mods they distribute. The launcher automates delivery; it does not grant permission to redistribute someone else's work.
 
 ---
+
+## What is new in 2.4.1
+
+This release fixes the **in-game F9 server browser when GTA V is launched normally**, without the launcher:
+
+- The default master (`master.gtacoop.com`) currently answers HTTP 526. The client now tries the working backup list first and only then the configured master, instead of blocking on the dead host.
+- The master list is fetched on a worker thread with a 5-second timeout, so opening F9 no longer freezes the game while a host is unreachable.
+- A "Searching..." row shows scan progress; results appear as discovery responses arrive.
+- Found servers are cached in `%LOCALAPPDATA%\cgmp\gtacoop\servers.json` and shown immediately on the next F9 open. The launcher writes the same cache after a successful scan, so the list is populated even when in-game UDP discovery is restricted.
+- Local discovery now probes ports 4499, 4498, and 44499, and each master endpoint is queried with its own error handling.
+- Existing `ClientSettings.xml` files that still point at the dead `https://master.gtacoop.com` default are migrated to the backup list. Custom master addresses are left alone.
 
 ## What is new in 2.4.0
 

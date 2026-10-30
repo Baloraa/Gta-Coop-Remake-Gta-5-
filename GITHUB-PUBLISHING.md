@@ -12,25 +12,25 @@ Suggested topics:
 
 `gta-v` `gtacoop` `gta-coop` `multiplayer` `coop` `launcher` `winforms` `dotnet` `csharp` `mod-manager` `relay` `story-mode`
 
-## Release 2.4.0 description
+## Release 2.4.1 description
 
 Use this as the GitHub Release body:
 
-> **GTACoop Remake 2.4.0 — OIV archive edits for the mods folder**
+> **GTACoop Remake 2.4.1 — in-game F9 server browser fix**
 >
-> This release makes OpenIV `.oiv` `<archive>` `add` and `replace` operations work on the RPF archives that already exist under `mods\`, not only on DLC packs. Supported targets include `x64a.rpf`, `common.rpf`, `update\update.rpf`, `update\update2.rpf`, `update\x64\dlcpacks\...\dlc.rpf`, and nested archives such as `x64\audio\sfx\...rpf`. Root game archives are never opened for writing.
+> The in-game F9 server browser now works when GTA V is launched normally, without the launcher. The default master (`https://master.gtacoop.com`) currently answers HTTP 526, and the old client blocked on it while the menu froze. This release makes discovery asynchronous and resilient.
 >
-> **No whole-archive copies.** Only the changed entry's data and the small TOC/name header are written. When a new entry makes the header outgrow the existing gap, only the first small data block (or blocks) that overlap the new header is moved to the end of the archive. Its raw encrypted/compressed bytes are preserved and the TOC offset is patched, so the rest of the archive is not rewritten.
+> **Working list first.** When the configured primary master is the known dead host, the client tries the working backup list first and only then the primary, with a 5-second timeout per request. A "Searching..." row shows progress, and servers appear as discovery responses arrive instead of freezing the game.
 >
-> **Safer writes and rollback.** Header space is checked before writing. If room still cannot be made, installation stops with a clear message instead of risking the archive. Rollback restores the original TOC and offsets; files you edited yourself are detected by SHA-256 and left untouched.
+> **Shared server cache.** Found servers are written to `%LOCALAPPDATA%\cgmp\gtacoop\servers.json` and shown immediately the next time F9 is opened. The launcher writes the same cache after a successful scan, so the list stays populated even when in-game UDP discovery is restricted.
 >
-> **Resources and encrypted entries.** RSC7 resources (`ytd`, `yft`, `ymap`, ...) and encrypted binary entries can be replaced or added. Opaque encrypted blocks are not re-encrypted: new plaintext data is appended and the entry flag is cleared, while the old block stays available for rollback.
+> **Better local discovery.** Local peers are probed on ports 4499, 4498, and 44499, and every master endpoint is queried with its own error handling.
 >
-> Missing `mods\` archives, nested archive edits, `delete` operations, and non-dlclist XML/text changes are skipped with a warning in the log.
+> **Settings migration.** Existing `ClientSettings.xml` files that still use the dead `https://master.gtacoop.com` default are moved to the backup list. Custom master addresses are never changed.
 >
-> **Upgrade:** replace the application folder with the new build. Your `%LOCALAPPDATA%\GTACoopRemake` settings, server cache, and logs are not part of the ZIP and are left in place. The share ZIP still excludes GTA V, ScriptHookV, ScriptHookVDotNet, and RageOpenV. The bundled `OpenIV.asi` is user-supplied.
+> **Upgrade:** replace the application folder with the new build, or run the installer as usual. Your `%LOCALAPPDATA%\GTACoopRemake` settings, server list, and logs are kept in place. The share ZIP still excludes GTA V, ScriptHookV, ScriptHookVDotNet, and RageOpenV. The bundled `OpenIV.asi` is user-supplied.
 
-Attach `GTACoop-Remake-Share-2.4.0.zip` and the built launcher EXE as release assets. Do not commit them to the repository.
+Attach `GTACoop-Remake-Share-2.4.1.zip`, `GTACoop.Launcher.exe`, and `GTACoop.Sync.dll` as release assets. Do not commit them to the repository.
 
 ## Before you make the repository public
 
@@ -120,6 +120,6 @@ Before uploading, check:
 
 ## A note on the current repository state
 
-The working tree has uncommitted changes for 2.4.0, including the RPF header relocation, OIV archive mapping, and the finalized README files. Review `git status`, commit them in logical chunks, and tag the release only after the build and ZIP verification pass.
+The working tree has uncommitted changes for 2.4.1, including the asynchronous F9 server browser, the shared server cache, and the dead-master settings migration. Review `git status`, commit them in logical chunks, and tag the release only after the build and ZIP verification pass.
 
 The GitHub remote is configured. Push `main`, then create the release from the tag. The English README is already the default; keep the language links intact when you make further edits.

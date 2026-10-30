@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.Json;
 using System.Windows.Forms;
 using GTACoop.Sync;
 
@@ -248,6 +249,11 @@ public sealed class ServerBrowserTab : UserControl
             foreach (var error in result.Errors)
                 AppEnv.Log("Sunucu Tarayıcı: " + error);
 
+            // Oyun içi F9 tarayıcısı launcher kapalıyken de bu listeyi
+            // gösterebilsin diye son başarılı taramayı önbelleğe yaz.
+            if (!lanOnly && result.Servers.Count > 0)
+                SaveClientServerCache(result.Servers);
+
             if (_list.Items.Count > 0)
             {
                 _list.Items[0].Selected = true;
@@ -422,6 +428,86 @@ public sealed class ServerBrowserTab : UserControl
         SyncPort = server.GamePort + 100,
         AutoConnect = true
     };
+
+    /// <summary>
+    /// Oyun içi GTACoOp sunucu tarayıcısının okuduğu önbelleği yazar.
+    /// Böylece launcher kapalıyken (normal başlatmada) F9 listesi boş kalmaz.
+    /// </summary>
+    private static void SaveClientServerCache(IReadOnlyList<DiscoveredServer> servers)
+    {
+        try
+        {
+            var path = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "cgmp", "gtacoop", "servers.json");
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+
+            var entries = new List<ClientServerCacheEntry>();
+            if (File.Exists(path))
+            {
+                try
+                {
+                    entries = JsonSerializer.Deserialize<List<ClientServerCacheEntry>>(
+                        File.ReadAllText(path)) ?? new List<ClientServerCacheEntry>();
+                }
+                catch
+                {
+                    entries = new List<ClientServerCacheEntry>();
+                }
+            }
+
+            foreach (var server in servers)
+            {
+                var entry = entries.FirstOrDefault(e =>
+                    string.Equals(e.Host, server.Host, StringComparison.OrdinalIgnoreCase) &&
+                    e.Port == server.GamePort);
+                if (entry == null)
+                {
+                    entry = new ClientServerCacheEntry();
+                    entries.Add(entry);
+                }
+
+                entry.Name = server.Name;
+                entry.Host = server.Host;
+                entry.Port = server.GamePort;
+                entry.PlayerCount = server.PlayerCount;
+                entry.MaxPlayers = server.MaxPlayers;
+                entry.PasswordProtected = server.PasswordProtected;
+                entry.Gamemode = server.Gamemode;
+                entry.ProtocolVersion = server.ProtocolVersion;
+                entry.Description = server.Source;
+                entry.LastSeenUtc = DateTime.UtcNow;
+            }
+
+            var ordered = entries
+                .OrderByDescending(e => e.LastSeenUtc)
+                .Take(300)
+                .ToList();
+
+            var tmp = path + ".tmp";
+            File.WriteAllText(tmp, JsonSerializer.Serialize(ordered,
+                new JsonSerializerOptions { WriteIndented = true }));
+            File.Move(tmp, path, overwrite: true);
+        }
+        catch (Exception ex)
+        {
+            AppEnv.Log("Sunucu Tarayıcı önbelleği yazılamadı: " + ex.Message);
+        }
+    }
+
+    private sealed class ClientServerCacheEntry
+    {
+        public string Name { get; set; } = "";
+        public string Host { get; set; } = "";
+        public int Port { get; set; }
+        public int PlayerCount { get; set; }
+        public int MaxPlayers { get; set; }
+        public bool PasswordProtected { get; set; }
+        public string Gamemode { get; set; } = "";
+        public int ProtocolVersion { get; set; }
+        public string Description { get; set; } = "";
+        public DateTime LastSeenUtc { get; set; }
+    }
 
     private string? ResolvePassword(DiscoveredServer server)
     {

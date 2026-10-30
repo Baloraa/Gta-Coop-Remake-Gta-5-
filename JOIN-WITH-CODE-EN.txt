@@ -1,5 +1,5 @@
 ==========================================================
- GTACoop Remake - Joining a Server (v2.4.0)
+ GTACoop Remake - Joining a Server (v2.4.1)
 ==========================================================
 
 There are two ways to join:
@@ -159,7 +159,7 @@ FAQ
   published only after the server starts. You can also try the
   long GTC1 code.
 - Short code found but no connection: make sure both you and the
-  server owner use v2.4.0 or newer. The server should show
+  server owner use v2.4.1 or newer. The server should show
   "Automatic relay: <server> ...". Wait a few seconds and click
   "Search Again".
 - Relay not working: bore.pub (or the custom relay chosen by the

@@ -32,8 +32,8 @@ namespace GTACoOp
         {
             Username = string.IsNullOrWhiteSpace(GTA.Game.Player.Name) ? "Player" : GTA.Game.Player.Name;
             MaxStreamedNpcs = 10;
-            MasterServerAddress = "https://master.gtacoop.com";
-            BackupMasterServerAddress = "http://clan-banderos.de/gta/";
+            MasterServerAddress = "http://clan-banderos.de/gta/";
+            BackupMasterServerAddress = "https://master.gtacoop.com";
             ActivationKey = Keys.F9;
             VoiceEnabled = true;
             VoiceKey = Keys.N;

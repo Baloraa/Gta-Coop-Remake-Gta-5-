@@ -1,8 +1,10 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net;
+using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using System.Windows.Forms;
@@ -47,6 +49,21 @@ namespace GTACoOp
         private static int _channel;
 
         private readonly Queue<Action> _threadJumping;
+
+        // Server browser: master list is fetched on a worker thread so the
+        // menu never freezes the game while a master server is unreachable.
+        private readonly Dictionary<string, ServerBrowserServer> _serverBrowserCache =
+            new Dictionary<string, ServerBrowserServer>(StringComparer.OrdinalIgnoreCase);
+        private readonly ConcurrentQueue<Action> _serverBrowserQueue = new ConcurrentQueue<Action>();
+        private readonly object _serverBrowserLock = new object();
+        private NativeItem _serverBrowserStatus;
+        private bool _serverBrowserCacheLoaded;
+        private bool _serverScanRunning;
+        private int _serverScanFound;
+        private int _serverScanGeneration;
+        private DateTime _serverScanEndsUtc;
+        private bool _geoIpErrorShown;
+
         private string _password;
         private bool _lastDead;
         private bool _wasTyping;
@@ -565,9 +582,20 @@ namespace GTACoOp
             _playerList = new PlayerList();
         }
 
+        private string ServerBrowserCachePath
+        {
+            get
+            {
+                return Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "cgmp", "gtacoop", "servers.json");
+            }
+        }
+
         private void RebuildServerBrowser()
         {
             _serverBrowserMenu.Clear();
+            _serverBrowserStatus = null;
 
             if (_client == null)
             {
@@ -579,82 +607,473 @@ namespace GTACoOp
                 }
                 _config.Port = port;
                 _client = new NetClient(_config);
-                _client.Start();
+                try
+                {
+                    _client.Start();
+                }
+                catch (Exception e)
+                {
+                    _client = null;
+                    _logger.WriteException("Server browser could not start", e);
+                    Notification.Show("Server browser could not start: " + e.Message);
+                    return;
+                }
 
                 DebugLogger.NetClient = _client;
             }
 
-            _client.DiscoverLocalPeers(4499);
+            LoadServerBrowserCache();
 
-            if (string.IsNullOrEmpty(PlayerSettings.MasterServerAddress))
-            {
-                Notification.Show("No master server has been configured.");
-                return;
-            }
+            // Show servers found earlier immediately. The menu is refreshed
+            // again as discovery responses arrive.
+            int cached = AddCachedServersToMenu();
 
-            string body = null;
+            _serverBrowserStatus = new NativeItem("Searching for GTACoop servers...");
+            _serverBrowserStatus.AltTitle = cached > 0 ? cached + " cached" : "";
+            _serverBrowserStatus.Enabled = false;
+            _serverBrowserMenu.Add(_serverBrowserStatus);
+
             try
             {
-                // WebClient? what year is this?
-                using(var wc = new WebClient())
-                {
-                    wc.Headers.Add("User-Agent", "Mozilla/5.0 (GTA Coop " + ReadableScriptVersion() + ")");
-                    body = wc.DownloadString(PlayerSettings.MasterServerAddress);
-                }
+                // A local GTACoop server may use one of the historical ports.
+                _client.DiscoverLocalPeers(4499);
+                _client.DiscoverLocalPeers(4498);
+                _client.DiscoverLocalPeers(44499);
             }
-            catch(Exception e)
+            catch (Exception e)
             {
-                Notification.Show("~r~Error: ~s~Failed to contact master server, please check your configured master server");
-                _logger.WriteException("Failed to connect to master " + PlayerSettings.MasterServerAddress, e);
+                _logger.WriteException("Failed to discover local servers", e);
+            }
 
-                // backup master server
+            StartServerBrowserScan();
+        }
+
+        private void StartServerBrowserScan()
+        {
+            if (_serverScanRunning) return;
+
+            _serverScanRunning = true;
+            _serverScanFound = 0;
+            // Failsafe only; ApplyMasterList shortens this once the fetch ends.
+            _serverScanEndsUtc = DateTime.UtcNow.AddSeconds(30);
+            int generation = ++_serverScanGeneration;
+
+            var urls = BuildMasterUrls();
+            ThreadPool.QueueUserWorkItem(state => FetchMasterList(urls, generation));
+        }
+
+        private List<string> BuildMasterUrls()
+        {
+            var urls = new List<string>();
+            var primary = (PlayerSettings.MasterServerAddress ?? "").Trim();
+            var backup = (PlayerSettings.BackupMasterServerAddress ?? "").Trim();
+
+            // master.gtacoop.com currently answers HTTP 526. Prefer the
+            // configured backup list instead of waiting on a dead host.
+            if (backup.Length > 0 &&
+                primary.IndexOf("master.gtacoop.com", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                AddMasterUrl(urls, backup);
+                AddMasterUrl(urls, primary);
+            }
+            else
+            {
+                AddMasterUrl(urls, primary);
+                AddMasterUrl(urls, backup);
+            }
+
+            if (urls.Count == 0)
+                AddMasterUrl(urls, "http://clan-banderos.de/gta/");
+
+            return urls;
+        }
+
+        private static void AddMasterUrl(List<string> urls, string raw)
+        {
+            foreach (var part in (raw ?? "").Split(new[] { ';', '\r', '\n' },
+                         StringSplitOptions.RemoveEmptyEntries))
+            {
+                var url = part.Trim();
+                if (url.Length == 0) continue;
+                if (!url.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
+                    !url.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+                    url = "http://" + url;
+                if (!urls.Contains(url, StringComparer.OrdinalIgnoreCase))
+                    urls.Add(url);
+            }
+        }
+
+        private void FetchMasterList(List<string> urls, int generation)
+        {
+            var errors = new List<string>();
+            var endpoints = new List<ServerBrowserEndpoint>();
+            string used = null;
+
+            foreach (var url in urls)
+            {
                 try
                 {
-                    using (var wc = new WebClient())
-                    {
-                        wc.Headers.Add("User-Agent", "Mozilla/5.0 (GTA Coop " + ReadableScriptVersion() + ")");
-                        body = wc.DownloadString(PlayerSettings.BackupMasterServerAddress);
+                    var body = DownloadMasterList(url);
+                    var parsed = ParseMasterList(body);
+                    if (parsed.Count == 0)
+                        throw new InvalidOperationException("Master list is empty.");
 
-                        Notification.Show("Backup master server is online, using that one.");
-                    }
+                    endpoints = parsed;
+                    used = url;
+                    break;
                 }
-                catch(Exception ex)
+                catch (Exception e)
                 {
-                    Notification.Show("~r~Error: ~s~Failed to contact backup master server.");
-                    _logger.WriteException("Failed to connect to master " + PlayerSettings.BackupMasterServerAddress, ex);
+                    errors.Add(url + ": " + e.Message);
                 }
             }
 
-            if (body == null)
-                return;
+            _serverBrowserQueue.Enqueue(() =>
+                ApplyMasterList(generation, endpoints, used, errors));
+        }
 
-            // deserialize master server response
+        private static string DownloadMasterList(string url)
+        {
+            var request = (HttpWebRequest)WebRequest.Create(url);
+            request.UserAgent = "Mozilla/5.0 (GTA Coop " + ReadableScriptVersion() + ")";
+            request.Timeout = 5000;
+            request.ReadWriteTimeout = 5000;
+            request.AutomaticDecompression =
+                DecompressionMethods.GZip | DecompressionMethods.Deflate;
 
-            MasterServerList response;
+            using (var response = (HttpWebResponse)request.GetResponse())
+            using (var stream = response.GetResponseStream())
+            using (var reader = new StreamReader(stream, Encoding.UTF8))
+            {
+                return reader.ReadToEnd();
+            }
+        }
+
+        private static List<ServerBrowserEndpoint> ParseMasterList(string body)
+        {
+            var result = new List<ServerBrowserEndpoint>();
+            List<string> list = null;
+
             try
             {
-                response = JsonConvert.DeserializeObject<MasterServerList>(body);
+                var response = JsonConvert.DeserializeObject<MasterServerList>(body);
+                if (response != null) list = response.List;
             }
-            catch(JsonException e)
+            catch (JsonException)
             {
-                Notification.Show("~r~Error: ~s~Master server returned unusual response. Check error log for details.");
-                _logger.WriteException("Failed to parse master server response", e);
+            }
 
+            if (list == null)
+            {
+                try
+                {
+                    list = JsonConvert.DeserializeObject<List<string>>(body);
+                }
+                catch (JsonException)
+                {
+                }
+            }
+
+            if (list == null) return result;
+
+            foreach (var server in list)
+            {
+                if (string.IsNullOrWhiteSpace(server)) continue;
+
+                string host;
+                int port;
+                if (!TryParseServerAddress(server, out host, out port)) continue;
+                if (result.Any(x => x.Host == host && x.Port == port)) continue;
+
+                result.Add(new ServerBrowserEndpoint { Host = host, Port = port });
+                if (result.Count >= 2000) break;
+            }
+
+            return result;
+        }
+
+        private static bool TryParseServerAddress(string text, out string host, out int port)
+        {
+            host = "";
+            port = 0;
+            text = (text ?? "").Trim();
+            if (text.Length == 0) return false;
+
+            // [::1]:4499
+            if (text.StartsWith("[", StringComparison.Ordinal))
+            {
+                int close = text.IndexOf(']');
+                if (close <= 1 || close + 1 >= text.Length || text[close + 1] != ':')
+                    return false;
+                host = text.Substring(1, close - 1);
+                return int.TryParse(text.Substring(close + 2), out port) &&
+                       port > 0 && port <= 65535;
+            }
+
+            int colon = text.LastIndexOf(':');
+            if (colon <= 0 || colon == text.Length - 1) return false;
+            host = text.Substring(0, colon).Trim();
+            return host.Length > 0 &&
+                   int.TryParse(text.Substring(colon + 1).Trim(), out port) &&
+                   port > 0 && port <= 65535;
+        }
+
+        private void ApplyMasterList(int generation, List<ServerBrowserEndpoint> endpoints,
+            string used, List<string> errors)
+        {
+            if (generation != _serverScanGeneration) return;
+
+            foreach (var error in errors)
+                _logger.WriteLine("Server browser: " + error);
+
+            if (endpoints.Count == 0)
+            {
+                _logger.WriteLine("Server browser: no master list could be fetched.");
+                if (_serverBrowserStatus != null)
+                    _serverBrowserStatus.AltTitle = "Master server unavailable";
+                _serverScanEndsUtc = DateTime.UtcNow.AddSeconds(1);
                 return;
             }
 
-            Console.WriteLine("Servers returned by master server: " + response.List.Count);
+            _logger.WriteLine("Server browser: " + endpoints.Count +
+                              " endpoints from " + used);
 
-            foreach (var server in response.List)
+            int sent = 0;
+            int failed = 0;
+            foreach (var endpoint in endpoints)
             {
-                var split = server.Split(':');
-
-                int port;
-                // take the last : since IPv6 addresses are like [::1]:4499
-                if (!int.TryParse(split[split.Length - 1], out port))
-                    continue;
-                _client.DiscoverKnownPeer(split[0], port);
+                try
+                {
+                    _client.DiscoverKnownPeer(endpoint.Host, endpoint.Port);
+                    sent++;
+                }
+                catch (Exception e)
+                {
+                    failed++;
+                    if (failed <= 3)
+                        _logger.WriteLine("Server browser: discovery failed for " +
+                                          endpoint.Host + ":" + endpoint.Port + " - " + e.Message);
+                }
             }
+
+            _logger.WriteLine("Server browser: discovery sent to " + sent +
+                              " server(s), " + failed + " failed.");
+            if (_serverBrowserStatus != null)
+                _serverBrowserStatus.AltTitle = "Searching... " + sent + " servers";
+
+            // Give the servers a few seconds to answer the discovery packet.
+            _serverScanEndsUtc = DateTime.UtcNow.AddSeconds(4);
+        }
+
+        private void ProcessServerBrowserQueue()
+        {
+            Action action;
+            while (_serverBrowserQueue.TryDequeue(out action))
+            {
+                try
+                {
+                    action();
+                }
+                catch (Exception e)
+                {
+                    _logger.WriteException("Server browser", e);
+                }
+            }
+        }
+
+        private void UpdateServerBrowserScan()
+        {
+            if (!_serverScanRunning || DateTime.UtcNow < _serverScanEndsUtc) return;
+
+            _serverScanRunning = false;
+
+            int cached;
+            lock (_serverBrowserLock) cached = _serverBrowserCache.Count;
+
+            if (_serverBrowserStatus != null)
+            {
+                if (_serverScanFound == 0)
+                {
+                    _serverBrowserStatus.AltTitle = cached > 0
+                        ? "No new servers; showing " + cached + " cached"
+                        : "No servers found";
+                    // Keep the reference: a late discovery response can still
+                    // remove this status row.
+                }
+                else
+                {
+                    try { _serverBrowserMenu.Remove(_serverBrowserStatus); } catch { }
+                    _serverBrowserStatus = null;
+                }
+            }
+
+            SaveServerBrowserCache();
+
+            _logger.WriteLine("Server browser: scan finished, " +
+                              _serverScanFound + " response(s).");
+
+            if (_serverScanFound == 0 && cached == 0)
+                Notification.Show("No GTACoop servers found. Check your connection or master server address.");
+        }
+
+        private void LoadServerBrowserCache()
+        {
+            if (_serverBrowserCacheLoaded) return;
+            _serverBrowserCacheLoaded = true;
+
+            try
+            {
+                var path = ServerBrowserCachePath;
+                if (!File.Exists(path)) return;
+
+                var list = JsonConvert.DeserializeObject<List<ServerBrowserServer>>(
+                    File.ReadAllText(path));
+                if (list == null) return;
+
+                lock (_serverBrowserLock)
+                {
+                    foreach (var server in list)
+                    {
+                        if (server == null || string.IsNullOrWhiteSpace(server.Host) ||
+                            server.Port <= 0 || server.Port > 65535) continue;
+                        _serverBrowserCache[server.Key] = server;
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                _logger.WriteLine("Server browser cache could not be read: " + e.Message);
+            }
+        }
+
+        private int AddCachedServersToMenu()
+        {
+            List<ServerBrowserServer> servers;
+            lock (_serverBrowserLock)
+            {
+                servers = _serverBrowserCache.Values
+                    .Where(s => (DateTime.UtcNow - s.LastSeenUtc.ToUniversalTime()).TotalDays <= 30)
+                    .OrderByDescending(s => s.PlayerCount)
+                    .ThenBy(s => s.Name, StringComparer.CurrentCultureIgnoreCase)
+                    .ToList();
+            }
+
+            foreach (var server in servers)
+                _serverBrowserMenu.Add(CreateServerMenuItem(server, true));
+
+            return servers.Count;
+        }
+
+        private bool AddServerToCache(ServerBrowserServer server)
+        {
+            lock (_serverBrowserLock)
+            {
+                bool isNew = !_serverBrowserCache.ContainsKey(server.Key);
+                _serverBrowserCache[server.Key] = server;
+                return isNew;
+            }
+        }
+
+        private void SaveServerBrowserCache()
+        {
+            try
+            {
+                List<ServerBrowserServer> servers;
+                lock (_serverBrowserLock)
+                {
+                    servers = _serverBrowserCache.Values
+                        .OrderByDescending(s => s.LastSeenUtc)
+                        .Take(300)
+                        .ToList();
+                }
+
+                var path = ServerBrowserCachePath;
+                Directory.CreateDirectory(Path.GetDirectoryName(path));
+                File.WriteAllText(path, JsonConvert.SerializeObject(servers, Formatting.Indented));
+            }
+            catch (Exception e)
+            {
+                _logger.WriteLine("Server browser cache could not be saved: " + e.Message);
+            }
+        }
+
+        private string BuildServerDescription(IPAddress address, int port)
+        {
+            string description = address + ":" + port;
+            var database = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "GeoLite2.mmdb");
+
+            try
+            {
+                using (var reader = new DatabaseReader(database))
+                {
+                    var country = reader.Country(address);
+                    description = $"[{country.Continent.Code}/{country.Country.IsoCode}] " + description;
+                }
+            }
+            catch (AddressNotFoundException)
+            {
+            }
+            catch (Exception e)
+            {
+                if (!_geoIpErrorShown)
+                {
+                    _geoIpErrorShown = true;
+                    Notification.Show("GeoIP2 failed, check error log for details.");
+                    _logger.WriteException("Failed GeoIP2", e);
+                }
+            }
+
+            return description;
+        }
+
+        private NativeItem CreateServerMenuItem(ServerBrowserServer data, bool cached)
+        {
+            var item = new NativeItem(string.IsNullOrWhiteSpace(data.Name)
+                ? data.Host + ":" + data.Port
+                : data.Name);
+
+            string gamemode = string.IsNullOrWhiteSpace(data.Gamemode)
+                ? "Unknown"
+                : new CultureInfo("en-US", false).TextInfo.ToTitleCase(data.Gamemode);
+
+            item.AltTitle = gamemode + " | " + data.PlayerCount + "/" + data.MaxPlayers +
+                            (cached ? " | cached" : "");
+            item.Description = (cached ? "[cached] " : "") + (data.Description ?? "");
+            if (data.PasswordProtected)
+                item.LeftBadge = new LemonUI.Elements.ScaledTexture("commonmenu", "shop_lock");
+
+            item.Activated += (sender, selectedItem) =>
+            {
+                if (IsOnServer())
+                {
+                    _client.Disconnect("Switching servers.");
+
+                    if (Opponents != null)
+                    {
+                        Opponents.ToList().ForEach(pair => pair.Value.Clear());
+                        Opponents.Clear();
+                    }
+
+                    if (Npcs != null)
+                    {
+                        Npcs.ToList().ForEach(pair => pair.Value.Clear());
+                        Npcs.Clear();
+                    }
+
+                    while (IsOnServer()) Script.Yield();
+                }
+
+                if (data.PasswordProtected)
+                {
+                    _password = Game.GetUserInput();
+                    _passItem.AltTitle = _password;
+                }
+
+                ConnectToServer(data.Host, data.Port);
+                _serverBrowserMenu.Visible = false;
+            };
+
+            return item;
         }
 
         private static int _lastDataSend;
@@ -911,6 +1330,8 @@ namespace GTACoOp
             try
             {
                 Ped player = Game.Player.Character;
+                ProcessServerBrowserQueue();
+                UpdateServerBrowserScan();
                 _menuPool.Process();
                 _chat.Tick();
                 _playerList.Tick(!_menuPool.AreAnyVisible);
@@ -1741,78 +2162,43 @@ namespace GTACoOp
                 }
                 else if (msg.MessageType == NetIncomingMessageType.DiscoveryResponse)
                 {
-                    var type = msg.ReadInt32();
+                    msg.ReadInt32();
                     var len = msg.ReadInt32();
+                    if (len <= 0 || len > 1024 * 1024) continue;
+
                     var bin = msg.ReadBytes(len);
+                    if (bin == null) continue;
+
                     var data = DeserializeBinary<DiscoveryResponse>(bin) as DiscoveryResponse;
+                    if (data == null) continue;
 
-                    if (data == null) return;
-
-                    var database = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "GeoLite2.mmdb");
-                    string description = msg.SenderEndPoint.Address.ToString() + ":" + data.Port;
-
-                    try
+                    var address = msg.SenderEndPoint.Address;
+                    var port = data.Port > 0 ? data.Port : msg.SenderEndPoint.Port;
+                    var server = new ServerBrowserServer
                     {
-                        using (var reader = new DatabaseReader(database))
-                        {
-                            var country = reader.Country(msg.SenderEndPoint.Address.ToString());
-                            description = $"[{country.Continent.Code}/{country.Country.IsoCode}] " + description;
-                        }
-                    }
-                    catch(AddressNotFoundException)
-                    {
-                    }
-                    catch (Exception e)
-                    {
-                        Notification.Show("GeoIP2 failed, check error log for details.");
-                        _logger.WriteException("Failed GeoIP2", e);
-                    }
-
-                    var item = new NativeItem(data.ServerName);
-
-                    TextInfo textinfo = new CultureInfo("en-US", false).TextInfo;
-                    string title = textinfo.ToTitleCase(data.Gamemode.ToString());
-
-                    var gamemode = data.Gamemode == null ? "Unknown" : title;
-
-                    item.AltTitle = gamemode + " | " + data.PlayerCount + "/" + data.MaxPlayers;
-                    item.Description = description;
-
-                    if (data.PasswordProtected)
-                        item.LeftBadge = new LemonUI.Elements.ScaledTexture("commonmenu", "shop_lock");
-
-                    var gMsg = msg;
-                    item.Activated += (sender, selectedItem) =>
-                    {
-                        if (IsOnServer())
-                        {
-                            _client.Disconnect("Switching servers.");
-
-                            if (Opponents != null)
-                            {
-                                Opponents.ToList().ForEach(pair => pair.Value.Clear());
-                                Opponents.Clear();
-                            }
-
-                            if (Npcs != null)
-                            {
-                                Npcs.ToList().ForEach(pair => pair.Value.Clear());
-                                Npcs.Clear();
-                            }
-
-                            while (IsOnServer()) Script.Yield();
-                        }
-
-                        if (data.PasswordProtected)
-                        {
-                            _password = Game.GetUserInput();
-                            _passItem.AltTitle = _password;
-                        }
-                        ConnectToServer(gMsg.SenderEndPoint.Address.ToString(), data.Port);
-                        _serverBrowserMenu.Visible = false;
+                        Name = data.ServerName,
+                        Host = address.ToString(),
+                        Port = port,
+                        PlayerCount = data.PlayerCount,
+                        MaxPlayers = data.MaxPlayers,
+                        PasswordProtected = data.PasswordProtected,
+                        Gamemode = data.Gamemode,
+                        ProtocolVersion = (int)data.Version,
+                        Description = BuildServerDescription(address, port),
+                        LastSeenUtc = DateTime.UtcNow
                     };
 
-                    _serverBrowserMenu.Add(item);
+                    bool isNew = AddServerToCache(server);
+                    _serverScanFound++;
+
+                    if (isNew)
+                        _serverBrowserMenu.Add(CreateServerMenuItem(server, false));
+
+                    if (_serverBrowserStatus != null)
+                    {
+                        try { _serverBrowserMenu.Remove(_serverBrowserStatus); } catch { }
+                        _serverBrowserStatus = null;
+                    }
                 }
             }
         }
@@ -2369,16 +2755,23 @@ namespace GTACoOp
 
         public int GetOpenUdpPort()
         {
-            var startingAtPort = 5000;
-            var maxNumberOfPortsToCheck = 500;
-            var range = Enumerable.Range(startingAtPort, maxNumberOfPortsToCheck);
-            var portsInUse =
-                from p in range
-                join used in System.Net.NetworkInformation.IPGlobalProperties.GetIPGlobalProperties().GetActiveUdpListeners()
-            on p equals used.Port
-                select p;
+            // GetActiveUdpListeners only reports bound *listeners*. Test the
+            // actual bind so a port used by a connected socket is not picked.
+            for (int port = 5000; port < 5500; port++)
+            {
+                try
+                {
+                    using (var udp = new UdpClient(new IPEndPoint(IPAddress.Any, port)))
+                    {
+                        return port;
+                    }
+                }
+                catch (SocketException)
+                {
+                }
+            }
 
-            return range.Except(portsInUse).FirstOrDefault();
+            return 0;
         }
 
 #if VOICE
@@ -2411,5 +2804,31 @@ namespace GTACoOp
     {
         [JsonProperty("list")]
         public List<string> List { get; set; }
+    }
+
+    public class ServerBrowserEndpoint
+    {
+        public string Host { get; set; }
+        public int Port { get; set; }
+    }
+
+    public class ServerBrowserServer
+    {
+        public string Name { get; set; }
+        public string Host { get; set; }
+        public int Port { get; set; }
+        public int PlayerCount { get; set; }
+        public int MaxPlayers { get; set; }
+        public bool PasswordProtected { get; set; }
+        public string Gamemode { get; set; }
+        public int ProtocolVersion { get; set; }
+        public string Description { get; set; }
+        public DateTime LastSeenUtc { get; set; }
+
+        [JsonIgnore]
+        public string Key
+        {
+            get { return (Host ?? "") + ":" + Port; }
+        }
     }
 }

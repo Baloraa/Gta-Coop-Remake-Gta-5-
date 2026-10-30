@@ -1,5 +1,5 @@
 ==========================================================
- GTACoop Remake - Friend Edition (English, v2.4.0)
+ GTACoop Remake - Friend Edition (English, v2.4.1)
 ==========================================================
 
 This is a friend-to-friend co-op tool for GTA V (Story Mode).
@@ -68,6 +68,8 @@ INSTALLATION
      master list, LAN, or a direct IP:port. Server name, player count,
      mode, password, ping, and version (current/old) are shown. If the
      server has no sync server, the game starts without mods.
+   - In-game F9 > Server Browser shows the same list and works even
+     when you launch GTA V normally, without the launcher.
 
    NOTE: if mods\update\update.rpf is near 3.9 GB or structurally
    damaged, DLC packs are skipped for safety; script/ASI mods still
