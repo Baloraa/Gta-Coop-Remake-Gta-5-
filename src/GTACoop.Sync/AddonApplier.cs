@@ -346,7 +346,8 @@ public sealed class AddonApplier
             case AddonType.OivPackage:
             {
                 var entries = InstalledDlclistEntries(inst);
-                if (inst.InstalledPaths.Count == 0 && entries.Count == 0) return false;
+                if (inst.InstalledPaths.Count == 0 && entries.Count == 0 &&
+                    inst.RpfEdits.Count == 0) return false;
                 foreach (var p in inst.InstalledPaths)
                 {
                     if (!File.Exists(Path.Combine(_gameFolder,
@@ -358,6 +359,7 @@ public sealed class AddonApplier
                 {
                     if (DlclistEntryExists(entry) == false) return false;
                 }
+                if (!RpfEditsIntact(inst.RpfEdits)) return false;
                 return true;
             }
             default:
@@ -689,6 +691,8 @@ public sealed class AddonApplier
         var moved = new List<(string Rel, string Backup)>();
         var copied = new List<(string Rel, string Hash)>();
         var addedEntries = new List<string>();
+        var rpfState = new RpfApplyState();
+        bool oldRpfRolledBack = false;
         int preserved = 0;
 
         try
@@ -718,6 +722,16 @@ public sealed class AddonApplier
                     MoveFileSafe(full, backup);
                     moved.Add((rel, backup));
                 }
+
+                // 1b) Eski sürümün RPF düzenlemelerini geri al. Kullanıcı
+                // tarafından değiştirilen girdiler korunur ve yeni sürümde
+                // aynı girdiye dokunulmaz.
+                if (old.RpfEdits.Count > 0)
+                {
+                    _log(SyncText.T("OIV: önceki sürümün arşiv düzenlemeleri geri alınıyor."));
+                    RollbackRpfEdits(old.RpfEdits, rpfState.Protected);
+                    oldRpfRolledBack = true;
+                }
             }
 
             // 2) Yeni dosyaları yaz. Var olan farklı dosyanın üzerine ASLA yazma.
@@ -737,6 +751,10 @@ public sealed class AddonApplier
                 var hash = pkg.CopyEntryTo(copy, full);
                 copied.Add((copy.Destination, hash));
             }
+
+            // 2b) mods klasöründeki mevcut RPF arşivlerine dosya ekle/değiştir.
+            if (pkg.ArchiveEdits.Count > 0)
+                ApplyRpfEdits(pkg, rpfState);
 
             // 3) dlclist girdilerini ekle (yalnızca eksik olanlar).
             foreach (var entry in pkg.DlclistEntries)
@@ -790,7 +808,8 @@ public sealed class AddonApplier
                 DlclistEntry = ownedEntries.FirstOrDefault() ?? "",
                 InstalledPaths = copied.Select(c => c.Rel).ToList(),
                 InstalledHashes = copied.ToDictionary(c => c.Rel, c => c.Hash,
-                    StringComparer.OrdinalIgnoreCase)
+                    StringComparer.OrdinalIgnoreCase),
+                RpfEdits = rpfState.Records
             };
         }
         catch
@@ -798,6 +817,9 @@ public sealed class AddonApplier
             // Yeni eklenenleri geri al; eski sürümü yerine koy.
             foreach (var entry in addedEntries)
                 TryRemoveDlclistEntry(entry);
+            RollbackRpfEdits(rpfState.Applied, null);
+            if (oldRpfRolledBack && old != null)
+                ReapplyOldRpfEdits(old, cacheDir);
             foreach (var (rel, hash) in copied)
             {
                 if (!TryGamePath(rel, out var full) || !File.Exists(full)) continue;
@@ -813,6 +835,390 @@ public sealed class AddonApplier
                 DeleteDirectoryWithRetry(backupRoot, _log);
             throw;
         }
+    }
+
+    // ------------------------------------------------------------------ RPF arşiv düzenlemeleri
+
+    /// <summary>
+    /// Tek bir OIV arşiv girdisinin bellekte tutulabilecek üst sınırı.
+    /// Daha büyük dosyalar kurulumu yarıda bırakmamak için baştan reddedilir.
+    /// </summary>
+    private const long MaxRpfEditBytes = 768L * 1024 * 1024;
+
+    private sealed class RpfApplyState
+    {
+        public List<RpfEditRecord> Records { get; } = new();
+        public List<RpfEditRecord> Applied { get; } = new();
+
+        /// <summary>Kullanıcı değiştirdiği için yeni sürümde dokunulmayacak girdiler.</summary>
+        public HashSet<string> Protected { get; } = new(StringComparer.OrdinalIgnoreCase);
+
+        public int Skipped { get; set; }
+        public int Preserved { get; set; }
+    }
+
+    /// <summary>
+    /// OIV paketindeki arşiv düzenlemelerini mods klasöründeki mevcut kopyalara
+    /// uygular. Yeni veri arşivin sonuna eklenir; eski blok korunur; yalnızca
+    /// küçük TOC/isim başlığı güncellenir. Hiçbir arşiv baştan kopyalanmaz.
+    /// </summary>
+    private void ApplyRpfEdits(OivPackage pkg, RpfApplyState state,
+        IReadOnlyList<RpfEditRecord>? forcedBase = null, bool quiet = false)
+    {
+        Dictionary<string, RpfEditRecord>? baseByKey = null;
+        if (forcedBase != null)
+        {
+            baseByKey = new Dictionary<string, RpfEditRecord>(StringComparer.OrdinalIgnoreCase);
+            foreach (var rec in forcedBase)
+                baseByKey[rec.Key] = rec;
+        }
+
+        foreach (var group in pkg.ArchiveEdits.GroupBy(
+                     e => e.Archive, StringComparer.OrdinalIgnoreCase))
+        {
+            if (!TryModsArchivePath(group.Key, out var archiveFull) ||
+                !File.Exists(archiveFull))
+            {
+                state.Skipped += group.Count();
+                _log(SyncText.T(
+                    "OIV: mods arşivi bulunamadı, arşiv düzenlemesi atlandı: {0}",
+                    group.Key));
+                continue;
+            }
+
+            lock (_rpfLock)
+            {
+                using var archive = RpfArchive.Open(archiveFull);
+                var health = archive.VerifyStructure(sampleReads: false);
+                if (!health.IsHealthy)
+                {
+                    throw new SyncException(SyncText.T(
+                        "OIV: arşiv yapısı sağlıklı değil, düzenleme yapılmadı: {0}", group.Key));
+                }
+
+                foreach (var edit in group)
+                {
+                    var key = RpfKey(edit.Archive, edit.EntryPath);
+                    if (state.Protected.Contains(key))
+                    {
+                        state.Preserved++;
+                        _log(SyncText.T(
+                            "OIV: kullanıcı değişikliği korundu (arşiv): {0} :: {1}",
+                            edit.Archive, edit.EntryPath));
+                        continue;
+                    }
+
+                    var entryPath = edit.EntryPath.Replace('/', '\\');
+                    var existing = archive.Find(entryPath);
+                    var content = pkg.ReadArchiveEntry(edit, MaxRpfEditBytes);
+                    bool isResource = RpfCrypto.HasResourceHeader(content);
+
+                    if (existing != null && isResource != (existing is RpfResourceFileEntry))
+                    {
+                        throw new SyncException(SyncText.T(
+                            "OIV: arşiv girdisi türü uyuşmuyor, güvenlik için kurulum durduruldu: " +
+                            "{0} :: {1}", edit.Archive, edit.EntryPath));
+                    }
+
+                    RpfEntryState original;
+                    if (baseByKey != null && baseByKey.TryGetValue(key, out var oldRec))
+                    {
+                        original = StateFromRecord(oldRec);
+                    }
+                    else if (existing != null)
+                    {
+                        original = archive.CaptureState(existing);
+                    }
+                    else
+                    {
+                        original = new RpfEntryState { Exists = false, IsResource = isResource };
+                    }
+
+                    archive.SetFile(entryPath, content, verify: true, appendOnly: true);
+                    var installedHash = isResource
+                        ? ResourcePayloadHash(content)
+                        : Sha256Hex(content);
+
+                    var record = new RpfEditRecord
+                    {
+                        Archive = edit.Archive.Replace('\\', '/'),
+                        EntryPath = edit.EntryPath.Replace('\\', '/'),
+                        WasPresent = original.Exists,
+                        IsResource = isResource,
+                        OriginalOffset = original.FileOffset,
+                        OriginalSize = original.FileSize,
+                        OriginalUncompressedSize = original.FileUncompressedSize,
+                        OriginalSystemFlags = original.SystemFlags,
+                        OriginalGraphicsFlags = original.GraphicsFlags,
+                        OriginalEncrypted = original.IsEncrypted,
+                        OriginalCompression = original.Compression,
+                        InstalledHash = installedHash
+                    };
+
+                    state.Records.Add(record);
+                    state.Applied.Add(record);
+                }
+            }
+        }
+
+        if (!quiet)
+        {
+            if (state.Records.Count > 0)
+                _log(SyncText.T("OIV: {0} arşiv dosyası eklendi/değiştirildi.",
+                    state.Records.Count));
+            if (state.Skipped > 0)
+                _log(SyncText.T("OIV: {0} arşiv düzenlemesi atlandı (eksik arşiv).",
+                    state.Skipped));
+        }
+    }
+
+    /// <summary>
+    /// Başarısız bir güncellemeden sonra eski sürümün arşiv düzenlemelerini
+    /// indirme önbelleğindeki .oiv paketinden yeniden uygular.
+    /// </summary>
+    private void ReapplyOldRpfEdits(InstalledAddon old, string newCacheDir)
+    {
+        try
+        {
+            if (old.RpfEdits.Count == 0) return;
+            var oldCache = OldOivCacheDir(old, newCacheDir);
+            if (oldCache == null || !Directory.Exists(oldCache))
+            {
+                _log(SyncText.T("UYARI: eski OIV arşiv önbelleği bulunamadı: {0}",
+                    old.Version));
+                return;
+            }
+
+            var oiv = Directory.EnumerateFiles(oldCache, "*.oiv",
+                SearchOption.AllDirectories).FirstOrDefault();
+            if (oiv == null)
+            {
+                _log(SyncText.T("UYARI: eski OIV paketi önbellekte yok: {0}", old.Id));
+                return;
+            }
+
+            using var pkg = OivPackage.Open(oiv, _log);
+            var state = new RpfApplyState();
+            ApplyRpfEdits(pkg, state, old.RpfEdits, quiet: true);
+            _log(SyncText.T("OIV: önceki sürümün arşiv düzenlemeleri geri getirildi."));
+        }
+        catch (Exception ex)
+        {
+            _log(SyncText.T("UYARI: önceki OIV arşiv düzenlemeleri geri getirilemedi: {0}",
+                ex.Message));
+        }
+    }
+
+    /// <summary>
+    /// Arşiv düzenlemelerini geri alır. Kullanıcı tarafından değiştirilmiş
+    /// girdiler asla zorla geri yazılmaz; yalnızca bizim yazdığımız içerik
+    /// (SHA-256 eşleşiyorsa) eski TOC durumuna döndürülür.
+    /// </summary>
+    private int RollbackRpfEdits(IEnumerable<RpfEditRecord> edits,
+        ISet<string>? protectedKeys)
+    {
+        int rolledBack = 0;
+        foreach (var rec in edits)
+        {
+            if (protectedKeys != null && protectedKeys.Contains(rec.Key)) continue;
+
+            var outcome = TryRollbackRpfEdit(rec, out var detail);
+            switch (outcome)
+            {
+                case RpfRollbackOutcome.RolledBack:
+                    rolledBack++;
+                    break;
+                case RpfRollbackOutcome.UserChanged:
+                    protectedKeys?.Add(rec.Key);
+                    _log(SyncText.T(
+                        "OIV: kullanıcı değiştirdiği için arşiv girdisi korundu: {0} :: {1}",
+                        rec.Archive, rec.EntryPath));
+                    break;
+                case RpfRollbackOutcome.Failed:
+                    protectedKeys?.Add(rec.Key);
+                    _log(SyncText.T(
+                        "UYARI: arşiv girdisi geri alınamadı, korundu: {0} :: {1} ({2})",
+                        rec.Archive, rec.EntryPath, detail));
+                    break;
+                default:
+                    _log(SyncText.T("OIV: arşiv girdisi zaten yok, atlandı: {0} :: {1}",
+                        rec.Archive, rec.EntryPath));
+                    break;
+            }
+        }
+        return rolledBack;
+    }
+
+    private enum RpfRollbackOutcome
+    {
+        RolledBack,
+        Missing,
+        UserChanged,
+        Failed
+    }
+
+    private RpfRollbackOutcome TryRollbackRpfEdit(RpfEditRecord rec, out string detail)
+    {
+        detail = "";
+        if (!TryModsArchivePath(rec.Archive, out var archiveFull))
+        {
+            detail = SyncText.T("geçersiz arşiv yolu");
+            return RpfRollbackOutcome.Missing;
+        }
+        if (!File.Exists(archiveFull))
+        {
+            detail = SyncText.T("arşiv bulunamadı");
+            return RpfRollbackOutcome.Missing;
+        }
+
+        try
+        {
+            lock (_rpfLock)
+            {
+                using var archive = RpfArchive.Open(archiveFull);
+                var entry = archive.Find(rec.EntryPath.Replace('/', '\\'));
+
+                if (!rec.WasPresent)
+                {
+                    if (entry == null) return RpfRollbackOutcome.RolledBack;
+
+                    var current = TryEntryHash(archive, entry, rec.IsResource);
+                    if (!HashMatches(current, rec.InstalledHash))
+                        return RpfRollbackOutcome.UserChanged;
+
+                    archive.RemoveFile(entry);
+                    return RpfRollbackOutcome.RolledBack;
+                }
+
+                if (entry == null)
+                    return RpfRollbackOutcome.Missing;
+
+                var hash = TryEntryHash(archive, entry, rec.IsResource);
+                if (!HashMatches(hash, rec.InstalledHash))
+                    return RpfRollbackOutcome.UserChanged;
+
+                archive.RestoreState(rec.EntryPath.Replace('/', '\\'), StateFromRecord(rec));
+                return RpfRollbackOutcome.RolledBack;
+            }
+        }
+        catch (Exception ex)
+        {
+            detail = ex.Message;
+            return RpfRollbackOutcome.Failed;
+        }
+    }
+
+    private bool TryModsArchivePath(string rel, out string full)
+    {
+        full = "";
+        var normalized = (rel ?? "").Replace('\\', '/').TrimStart('/');
+        if (!normalized.StartsWith("mods/", StringComparison.OrdinalIgnoreCase))
+            return false;
+        if (!normalized.EndsWith(".rpf", StringComparison.OrdinalIgnoreCase))
+            return false;
+        if (normalized.Contains(".rpf/", StringComparison.OrdinalIgnoreCase))
+            return false;
+        return TryGamePath(normalized, out full);
+    }
+
+    private static string? TryEntryHash(RpfArchive archive, RpfFileEntry entry,
+        bool isResource)
+    {
+        try
+        {
+            var bytes = archive.ReadFile(entry);
+            return isResource ? ResourcePayloadHash(bytes) : Sha256Hex(bytes);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Resource içeriğini sıkıştırma farkından bağımsız olarak özetler:
+    /// 16 baytlık başlığın bayrakları + açılmış yük. Böylece OpenIV/CodeWalker
+    /// farklı DEFLATE seviyesiyle yazsa bile kullanıcı değişikliği doğru ayırt edilir.
+    /// </summary>
+    private static string ResourcePayloadHash(byte[] raw)
+    {
+        ReadOnlySpan<byte> flags = raw.Length >= 16 ? raw.AsSpan(8, 8) : ReadOnlySpan<byte>.Empty;
+        var payload = raw.Length > 16 ? raw[16..] : Array.Empty<byte>();
+        if (RpfCrypto.TryInflateRaw(payload, out var inflated))
+            payload = inflated;
+
+        var data = new byte[flags.Length + payload.Length];
+        flags.CopyTo(data);
+        Buffer.BlockCopy(payload, 0, data, flags.Length, payload.Length);
+        return Sha256Hex(data);
+    }
+
+    private static bool HashMatches(string? current, string expected) =>
+        !string.IsNullOrWhiteSpace(current) &&
+        !string.IsNullOrWhiteSpace(expected) &&
+        string.Equals(current, expected, StringComparison.OrdinalIgnoreCase);
+
+    private static string Sha256Hex(byte[] bytes) =>
+        Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(bytes))
+            .ToLowerInvariant();
+
+    private static RpfEntryState StateFromRecord(RpfEditRecord rec) => new()
+    {
+        Exists = rec.WasPresent,
+        IsResource = rec.IsResource,
+        FileOffset = rec.OriginalOffset,
+        FileSize = rec.OriginalSize,
+        FileUncompressedSize = rec.OriginalUncompressedSize,
+        SystemFlags = rec.OriginalSystemFlags,
+        GraphicsFlags = rec.OriginalGraphicsFlags,
+        IsEncrypted = rec.OriginalEncrypted,
+        Compression = rec.OriginalCompression
+    };
+
+    private static string RpfKey(string archive, string entryPath) =>
+        (archive ?? "").Replace('\\', '/').TrimStart('/') + "|" +
+        (entryPath ?? "").Replace('\\', '/').TrimStart('/');
+
+    private static string? OldOivCacheDir(InstalledAddon old, string newCacheDir)
+    {
+        if (string.IsNullOrWhiteSpace(old.Version)) return null;
+        var newCache = Path.GetFullPath(newCacheDir);
+        var root = Path.GetDirectoryName(newCache);
+        if (string.IsNullOrWhiteSpace(root)) return null;
+
+        var oldCache = Path.GetFullPath(Path.Combine(root,
+            Safe(old.Id) + "__" + Safe(old.Version)));
+        var prefix = root.TrimEnd('\\', '/') + Path.DirectorySeparatorChar;
+        return oldCache.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)
+            ? oldCache
+            : null;
+    }
+
+    private bool RpfEditsIntact(IReadOnlyList<RpfEditRecord> edits)
+    {
+        foreach (var group in edits.GroupBy(
+                     e => e.Archive, StringComparer.OrdinalIgnoreCase))
+        {
+            if (!TryModsArchivePath(group.Key, out var full) || !File.Exists(full))
+                return false;
+            try
+            {
+                lock (_rpfLock)
+                {
+                    using var archive = RpfArchive.Open(full);
+                    foreach (var edit in group)
+                    {
+                        if (archive.Find(edit.EntryPath.Replace('/', '\\')) == null)
+                            return false;
+                    }
+                }
+            }
+            catch
+            {
+                return false;
+            }
+        }
+        return true;
     }
 
     /// <summary>
@@ -1233,7 +1639,8 @@ public sealed class AddonApplier
     /// silinmez; o klasörün altına (klasör yapısı korunarak) taşınır — hiçbir şey kaybolmaz.
     /// </summary>
     public void Uninstall(InstalledAddon inst, string? quarantineRoot = null,
-        ISet<string>? protectedDlclistEntries = null)
+        ISet<string>? protectedDlclistEntries = null,
+        ISet<string>? protectedRpfKeys = null)
     {
         switch (inst.Type)
         {
@@ -1281,6 +1688,11 @@ public sealed class AddonApplier
                         "UYARI: OIV dlclist girdisi kaldırılamadı; dosyalar korundu."));
                     break;
                 }
+
+                // Arşiv düzenlemelerini geri al. Kullanıcı değiştirdiği girdiler
+                // ve başka bir kurulu paketin hâlâ kullandığı girdiler korunur.
+                if (inst.RpfEdits.Count > 0)
+                    RollbackRpfEdits(inst.RpfEdits, protectedRpfKeys);
 
                 foreach (var relPath in inst.InstalledPaths)
                 {
@@ -1349,8 +1761,14 @@ public sealed class AddonApplier
         foreach (var inst in state.Addons.ToList())
         {
             _log($"Kaldırılıyor: {inst.Id}");
+            var protectedRpf = state.Addons
+                .Where(other => !ReferenceEquals(other, inst))
+                .SelectMany(other => other.RpfEdits)
+                .Select(rec => rec.Key)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
             Uninstall(inst, quarantine,
-                DlclistEntriesStillNeededByOthers(inst, state.Addons));
+                DlclistEntriesStillNeededByOthers(inst, state.Addons),
+                protectedRpf);
             state.Addons.Remove(inst);
             SyncStateStore.Save(dataFolder, state); // çökme güvenliği: artımlı kayıt
         }

@@ -130,6 +130,69 @@ public static class RpfCrypto
         return output.ToArray();
     }
 
+    /// <summary>Ham DEFLATE açma; başarısızsa false (RSC kaynakları için).</summary>
+    public static bool TryInflateRaw(byte[] data, out byte[] output)
+    {
+        try
+        {
+            using var input = new MemoryStream(data);
+            using var deflate = new DeflateStream(input, CompressionMode.Decompress);
+            using var result = new MemoryStream(Math.Max(data.Length * 4, 4096));
+            deflate.CopyTo(result);
+            output = result.ToArray();
+            return true;
+        }
+        catch
+        {
+            output = Array.Empty<byte>();
+            return false;
+        }
+    }
+
+    // --------------------------------------------------- RSC7 kaynak boyutları
+
+    /// <summary>
+    /// RPF resource (RSC7) sayfa bayraklarından sistem/graphics bölüm boyutunu
+    /// hesaplar. CodeWalker'daki RpfResourcePageFlags formülünün aynısıdır.
+    /// </summary>
+    public static long GetResourcePageSize(uint flags)
+    {
+        long s0 = ((flags >> 27) & 0x1) << 0;
+        long s1 = ((flags >> 26) & 0x1) << 1;
+        long s2 = ((flags >> 25) & 0x1) << 2;
+        long s3 = ((flags >> 24) & 0x1) << 3;
+        long s4 = ((flags >> 17) & 0x7F) << 4;
+        long s5 = ((flags >> 11) & 0x3F) << 5;
+        long s6 = ((flags >> 7) & 0xF) << 6;
+        long s7 = ((flags >> 5) & 0x3) << 7;
+        long s8 = ((flags >> 4) & 0x1) << 8;
+        uint shift = flags & 0xF;
+        long baseSize = 0x200L << (int)shift;
+        return baseSize * (s0 + s1 + s2 + s3 + s4 + s5 + s6 + s7 + s8);
+    }
+
+    public static long GetResourceTotalSize(uint systemFlags, uint graphicsFlags) =>
+        GetResourcePageSize(systemFlags) + GetResourcePageSize(graphicsFlags);
+
+    /// <summary>RSC7 sürümü, TOC bayraklarının üst nibble'larından türetilir.</summary>
+    public static uint GetResourceVersion(uint systemFlags, uint graphicsFlags) =>
+        (uint)((((systemFlags >> 28) & 0xF) << 4) | ((graphicsFlags >> 28) & 0xF));
+
+    /// <summary>OpenIV uyumlu RSC7 başlığı oluşturur (16 bayt).</summary>
+    public static byte[] BuildResourceHeader(uint systemFlags, uint graphicsFlags)
+    {
+        var header = new byte[16];
+        BitConverter.TryWriteBytes(header.AsSpan(0, 4), 0x37435352u); // "RSC7"
+        BitConverter.TryWriteBytes(header.AsSpan(4, 4),
+            GetResourceVersion(systemFlags, graphicsFlags));
+        BitConverter.TryWriteBytes(header.AsSpan(8, 4), systemFlags);
+        BitConverter.TryWriteBytes(header.AsSpan(12, 4), graphicsFlags);
+        return header;
+    }
+
+    public static bool HasResourceHeader(byte[] data) =>
+        data.Length >= 16 && BitConverter.ToUInt32(data, 0) == 0x37435352u;
+
     // ------------------------------------------------------- anahtar arama
 
     private const int ScanAlignment = 8;

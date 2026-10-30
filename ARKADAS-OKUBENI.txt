@@ -1,5 +1,5 @@
 ==========================================================
- GTACoop Remake - Arkadaş Sürümü (Türkçe, v2.3.6)
+ GTACoop Remake - Arkadaş Sürümü (Türkçe, v2.4.0)
 ==========================================================
 
 Bu bir GTA V (Hikaye Modu) arkadaş-arası co-op aracıdır.

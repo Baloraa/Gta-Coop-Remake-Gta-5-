@@ -63,3 +63,20 @@ public sealed class RpfResourceFileEntry : RpfFileEntry
 
     public override long GetDataSize() => FileSize == 0 ? 0xFFFFFF : FileSize;
 }
+
+/// <summary>
+/// Bir RPF girdisinin ham TOC durumu. Şifreli (okunamayan) dosyaları geri
+/// alabilmek için içerik yerine yalnızca konum/bayrak bilgisi saklanır.
+/// </summary>
+public sealed class RpfEntryState
+{
+    public bool Exists { get; set; }
+    public bool IsResource { get; set; }
+    public uint FileOffset { get; set; }
+    public uint FileSize { get; set; }
+    public uint FileUncompressedSize { get; set; }
+    public uint SystemFlags { get; set; }
+    public uint GraphicsFlags { get; set; }
+    public bool IsEncrypted { get; set; }
+    public RpfCompression Compression { get; set; } = RpfCompression.Unknown;
+}

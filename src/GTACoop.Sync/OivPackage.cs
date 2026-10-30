@@ -22,14 +22,35 @@ public sealed class OivFileCopy
 }
 
 /// <summary>
+/// OIV paketinin mevcut bir RPF arşivine ekleyeceği/değiştireceği tek dosya.
+/// Yalnızca mods klasöründeki kopyalar hedeflenir; kök oyun arşivlerine dokunulmaz.
+/// </summary>
+public sealed class OivArchiveEdit
+{
+    /// <summary>Oyun köküne göre arşiv yolu ("/" ayraçlı, örn. mods/x64a.rpf).</summary>
+    public string Archive { get; init; } = "";
+
+    /// <summary>Arşiv içindeki hedef ("/" ayraçlı, örn. textures/rope.ytd).</summary>
+    public string EntryPath { get; init; } = "";
+
+    /// <summary>Zip içindeki tam girdi adı (content/...).</summary>
+    public string SourceEntry { get; init; } = "";
+
+    public long Size { get; init; }
+}
+
+/// <summary>
 /// OpenIV (.oiv) paketlerini güvenli bir alt kümeyle okur.
 ///
 /// Desteklenenler:
 /// - Doğrudan dosya ekleme: scripts/, mods/ ve update/x64/dlcpacks/ (mods/ katmanına yönlendirilir).
 /// - update/update.rpf içindeki dlclist.xml'e girdi ekleme (xml/text veya tam dlclist kaynağı).
+/// - mods klasöründeki mevcut RPF arşivlerine (x64a.rpf, common.rpf, update.rpf,
+///   dlcpacks/.../dlc.rpf) dosya ekleme/değiştirme. Yalnızca değişen girdi ve
+///   küçük TOC başlığı yazılır; arşivin tamamı kopyalanmaz.
 ///
-/// Desteklenmeyen işlemler (silme, orijinal RPF değiştirme, replace) uygulanmaz;
-/// paket yalnızca güvenli kısmıyla kurulur ve bu durum günlüğe yazılır.
+/// Desteklenmeyen işlemler (silme, iç içe arşiv, dlclist dışı XML/metin düzenlemesi)
+/// uygulanmaz; paket yalnızca güvenli kısmıyla kurulur ve bu durum günlüğe yazılır.
 /// </summary>
 public sealed class OivPackage : IDisposable
 {
@@ -48,10 +69,12 @@ public sealed class OivPackage : IDisposable
     public string Version { get; private set; } = "";
     public string PackageId { get; private set; } = "";
     public List<OivFileCopy> FileAdds { get; } = new();
+    public List<OivArchiveEdit> ArchiveEdits { get; } = new();
     public List<string> DlclistEntries { get; } = new();
     public List<string> Unsupported { get; } = new();
 
-    public bool HasSupportedOps => FileAdds.Count > 0 || DlclistEntries.Count > 0;
+    public bool HasSupportedOps =>
+        FileAdds.Count > 0 || ArchiveEdits.Count > 0 || DlclistEntries.Count > 0;
 
     private OivPackage(string path, ZipArchive zip)
     {
@@ -283,15 +306,15 @@ public sealed class OivPackage : IDisposable
 
     private void ParseArchive(XElement archive)
     {
-        var path = NormalizeEntryName((string?)archive.Attribute("path") ?? "");
-        bool isUpdate = path.Equals("update/update.rpf", StringComparison.OrdinalIgnoreCase) ||
-                        path.Equals("mods/update/update.rpf", StringComparison.OrdinalIgnoreCase);
-        if (!isUpdate)
+        var rawPath = NormalizeEntryName((string?)archive.Attribute("path") ?? "");
+        var target = MapArchiveToMods(rawPath, out var mapReason);
+        if (target == null)
         {
-            Unsupported.Add(SyncText.T(
-                "Arşiv düzenlemesi desteklenmiyor (yalnızca update.rpf/dlclist): {0}", path));
+            Unsupported.Add(SyncText.T("Arşiv düzenlemesi atlandı: {0} ({1})", rawPath, mapReason));
             return;
         }
+
+        bool isUpdate = target.Equals("mods/update/update.rpf", StringComparison.OrdinalIgnoreCase);
 
         foreach (var child in archive.Elements())
         {
@@ -299,24 +322,159 @@ public sealed class OivPackage : IDisposable
             switch (local)
             {
                 case "xml":
-                    ParseDlclistXml(child);
+                    if (isUpdate) ParseDlclistXml(child);
+                    else Unsupported.Add(SyncText.T(
+                        "Yalnızca dlclist.xml XML düzenlemesi destekleniyor: {0}", rawPath));
                     break;
+
                 case "text":
-                    ParseDlclistText(child);
+                    if (isUpdate) ParseDlclistText(child);
+                    else Unsupported.Add(SyncText.T(
+                        "Yalnızca dlclist.xml metin düzenlemesi destekleniyor: {0}", rawPath));
                     break;
+
                 case "add":
-                    ParseDlclistFile(child);
+                {
+                    var destination = NormalizeEntryName(child.Value);
+                    if (isUpdate && destination.Equals("common/data/dlclist.xml",
+                            StringComparison.OrdinalIgnoreCase))
+                    {
+                        ParseDlclistFile(child);
+                        break;
+                    }
+                    ParseArchiveFile(child, target);
                     break;
+                }
+
                 case "replace":
+                {
+                    var destination = NormalizeEntryName(child.Value);
+                    if (isUpdate && destination.Equals("common/data/dlclist.xml",
+                            StringComparison.OrdinalIgnoreCase))
+                    {
+                        Unsupported.Add(SyncText.T(
+                            "dlclist.xml'in tamamını değiştirmek güvenlik için uygulanmaz."));
+                        break;
+                    }
+                    ParseArchiveFile(child, target);
+                    break;
+                }
+
                 case "delete":
                     Unsupported.Add(SyncText.T(
-                        "update.rpf içinde {0} güvenlik için uygulanmaz: {1}",
-                        local, Shorten(child.Value)));
+                        "Arşivden dosya silme güvenlik için uygulanmaz: {0} ({1})",
+                        rawPath, Shorten(child.Value)));
                     break;
+
                 default:
-                    Unsupported.Add(SyncText.T("Desteklenmeyen update.rpf işlemi: {0}", local));
+                    Unsupported.Add(SyncText.T("Desteklenmeyen arşiv işlemi ({0}): {1}",
+                        local, rawPath));
                     break;
             }
+        }
+    }
+
+    /// <summary>
+    /// OIV arşiv yolunu yalnızca mods klasöründeki mevcut kopyaya eşler.
+    /// Kök oyun arşivleri ve iç içe (nested) arşivler desteklenmez.
+    /// </summary>
+    private static string? MapArchiveToMods(string path, out string reason)
+    {
+        reason = "";
+        var p = NormalizeEntryName(path).TrimEnd('/');
+        if (p.Length == 0)
+        {
+            reason = SyncText.T("arşiv yolu boş");
+            return null;
+        }
+        if (!p.EndsWith(".rpf", StringComparison.OrdinalIgnoreCase))
+        {
+            reason = SyncText.T("desteklenmeyen arşiv türü");
+            return null;
+        }
+        if (p.Contains(".rpf/", StringComparison.OrdinalIgnoreCase) ||
+            p.Contains(".rpf\\", StringComparison.OrdinalIgnoreCase))
+        {
+            reason = SyncText.T("iç içe arşiv düzenlemesi desteklenmiyor");
+            return null;
+        }
+        if (!IsSafeRelative(p, allowWildcard: false))
+        {
+            reason = SyncText.T("geçersiz/güvenlik dışı arşiv yolu");
+            return null;
+        }
+
+        // OpenIV, mods klasörü açıkken güncelleme arşivlerini ve diğer kök
+        // arşivleri otomatik olarak mods katmanına yönlendirir. Bu yüzden
+        // x64a.rpf, common.rpf, update/update2.rpf, x64/audio/... gibi tüm
+        // göreli .rpf yolları mods/<yol> olarak denenir. Kopya yoksa
+        // ApplyRpfEdits düzenlemeyi güvenle atlar.
+        if (p.Equals("update.rpf", StringComparison.OrdinalIgnoreCase) ||
+            p.Equals("update/update.rpf", StringComparison.OrdinalIgnoreCase))
+            return "mods/update/update.rpf";
+
+        if (p.StartsWith("mods/", StringComparison.OrdinalIgnoreCase))
+            return p;
+
+        return "mods/" + p;
+    }
+
+    private void ParseArchiveFile(XElement op, string archive)
+    {
+        var source = (string?)op.Attribute("source");
+        if (string.IsNullOrWhiteSpace(source))
+        {
+            Unsupported.Add(SyncText.T("Arşiv dosya işleminin kaynağı yok: {0}",
+                Shorten(op.Value)));
+            return;
+        }
+
+        var destination = NormalizeEntryName(op.Value);
+        if (destination.Length == 0 || !IsSafeRelative(destination, allowWildcard: false))
+        {
+            Unsupported.Add(SyncText.T("Arşiv dosya hedefi geçersiz: {0}", Shorten(op.Value)));
+            return;
+        }
+        if (destination.Equals("common/data/dlclist.xml", StringComparison.OrdinalIgnoreCase) &&
+            archive.Equals("mods/update/update.rpf", StringComparison.OrdinalIgnoreCase))
+        {
+            Unsupported.Add(SyncText.T(
+                "dlclist.xml yalnızca <xml>/<text> veya tam kaynak <add> ile güncellenir."));
+            return;
+        }
+
+        var sources = ResolveSources(source, out var sourceIsFolder);
+        if (sources.Count == 0)
+        {
+            Unsupported.Add(SyncText.T("OIV arşiv kaynağı bulunamadı: {0}", source));
+            return;
+        }
+
+        foreach (var (entryName, size, rel) in sources)
+        {
+            var finalDest = destination.EndsWith('/') || sourceIsFolder || sources.Count > 1
+                ? CombineDestination(destination, rel)
+                : destination;
+            finalDest = finalDest.Replace('\\', '/').Trim('/');
+            if (finalDest.Length == 0 ||
+                !IsSafeRelative(finalDest, allowWildcard: false))
+            {
+                Unsupported.Add(SyncText.T("Arşiv içi hedef geçersiz: {0}", finalDest));
+                continue;
+            }
+
+            if (ArchiveEdits.Any(e =>
+                    e.Archive.Equals(archive, StringComparison.OrdinalIgnoreCase) &&
+                    e.EntryPath.Equals(finalDest, StringComparison.OrdinalIgnoreCase)))
+                continue;
+
+            ArchiveEdits.Add(new OivArchiveEdit
+            {
+                Archive = archive,
+                EntryPath = finalDest,
+                SourceEntry = entryName,
+                Size = size
+            });
         }
     }
 
@@ -598,6 +756,23 @@ public sealed class OivPackage : IDisposable
         ".asi", ".dll", ".ini", ".xml", ".cfg", ".config", ".txt", ".log",
         ".pdb", ".dat", ".json", ".cs", ".vb"
     };
+
+    /// <summary>
+    /// RPF arşivine yazılacak kaynağı belleğe okur. Çok büyük girdiler bellek
+    /// şişmesini önlemek için reddedilir; paket bütünüyle geri alınır.
+    /// </summary>
+    public byte[] ReadArchiveEntry(OivArchiveEdit edit, long maxBytes)
+    {
+        if (!_entries.TryGetValue(edit.SourceEntry, out var entry))
+            throw new SyncException(SyncText.T("OIV kaynağı bulunamadı: {0}", edit.SourceEntry));
+        if (entry.Length > maxBytes || entry.Length > int.MaxValue - 64)
+            throw new SyncException(SyncText.T("OIV arşiv dosyası çok büyük: {0}", edit.SourceEntry));
+
+        using var stream = entry.Open();
+        using var ms = new MemoryStream((int)entry.Length);
+        stream.CopyTo(ms);
+        return ms.ToArray();
+    }
 
     public string CopyEntryTo(OivFileCopy copy, string destination)
     {

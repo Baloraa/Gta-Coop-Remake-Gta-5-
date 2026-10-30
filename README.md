@@ -8,7 +8,7 @@ GTACoop Remake is not a new multiplayer engine. It is the desktop layer around G
 
 GTACoop Remake is for private Story Mode co-op. It does not touch GTA Online, does not bypass anti-cheat, and does not inject into online sessions.
 
-**Current release:** 2.3.6  
+**Current release:** 2.4.0  
 **Platform:** Windows 10/11, x64  
 **UI:** Turkish, English, and Russian  
 **License:** GNU GPL v3
@@ -64,8 +64,11 @@ Each step is manageable. Together, they are enough to stop a casual session befo
 - Caches downloaded files per server, so joining the same server again does not download everything twice.
 - Installs DLC packs with directory junctions instead of copying gigabytes of data.
 - Adds OpenIV `.oiv` packages to a server under `Addons\oiv\<name>\package.oiv` and distributes them like DLC packs.
-- Applies only the safe subset of an OIV package: file adds into `scripts/`, `mods/`, and `update\x64\dlcpacks`, plus missing dlclist entries. `delete`, `replace`, original RPF edits, and direct `update.rpf` replacement are skipped with a warning.
-- Preserves every existing file whose content differs; OIV files are installed only when the destination is free.
+- Applies the safe subset of an OIV package: file adds into `scripts/`, `mods/`, and `update\x64\dlcpacks`, plus missing dlclist entries.
+- Applies `<archive>` `add` and `replace` operations to RPF archives that already exist inside `mods\`: `x64a.rpf`, `common.rpf`, `update.rpf`, and `update\x64\dlcpacks\...\dlc.rpf`. Root game archives are never opened for writing.
+- Writes RPF edits in place: only the new entry data and the small TOC/name header change. The archive is never copied as a whole, and the old data block stays in place for rollback.
+- Skips `delete`, nested archive edits, non-dlclist XML/text changes, and operations that would create a missing archive, with a warning in the log.
+- Preserves every existing standalone file whose content differs; OIV files are installed only when the destination is free.
 - Copies scripts into `scripts/` and ASI plugins into the game root.
 - Leaves an existing file with the same name alone, even if the server has a different version. The local file wins.
 - In **session mode**, removes the server's mods when the game exits. A separate watcher process handles Alt+F4, a game crash, or a reboot; if cleanup is missed, the next launcher start finishes it.
@@ -76,8 +79,9 @@ Each step is manageable. Together, they are enough to stop a casual session befo
 - Edits only `mods/update/update.rpf` when adding DLC packs. The original `update/update.rpf` is never modified.
 - Backs up the dlclist before each edit and keeps the last three backups.
 - If `mods/update/update.rpf` is close to 4 GB or structurally unhealthy, DLC installation is skipped rather than risking corruption. Scripts and ASI plugins can still be installed.
-- OIV installation records a SHA-256 for every file it writes. Removal deletes only files whose hashes still match; user-modified files are kept.
-- OIV updates back up the previous version to a temporary cache folder and restore it if the new version fails. dlclist entries are removed only when no installed package still provides that DLC folder.
+- OIV installation records a SHA-256 for every file it writes, plus a normalized payload hash for every RPF entry. Removal deletes only files whose hashes still match; user-modified files and archive entries are kept.
+- OIV updates roll back the previous version's archive edits first and re-apply them if the new version fails. An archive entry the user changed is never overwritten. dlclist entries are removed only when no installed package still provides that DLC folder.
+- RPF archives touched by OIV edits are checked before writing. If the header has no safe room to grow, installation stops with an error instead of risking corruption.
 - Never installs `NativeTrainer.asi`, even though it ships inside the official ScriptHookV archive.
 - Does not scan, delete, or overwrite the user's own `scripts/`, `mods/`, or component files.
 
@@ -285,19 +289,18 @@ This is a tool for playing with friends, not a hardened anti-cheat or privacy sy
 
 ---
 
-## What is new in 2.3.5
+## What is new in 2.4.0
 
-The main addition is the **Status** column on the Servers tab:
+The main addition is **OIV support for existing mods-folder RPF archives**:
 
-- A short TCP probe of each server's sync port every five seconds while the tab is visible, with a 1.4-second timeout per probe.
-- Direct address first, relay endpoint second.
-- `Online (ms)`, `Offline`, or `Unknown`, with green, red, and gray rows.
-- No background probing when the tab is hidden.
-- Short-code records with stale relay data are refreshed quietly at most every 30 seconds.
+- `<archive>` `add` and `replace` operations are applied to every archive that exists under `mods\`: `x64a.rpf`, `common.rpf`, `update\update.rpf`, `update\update2.rpf`, `update\x64\dlcpacks\...\dlc.rpf`, and nested paths such as `x64\audio\sfx\...rpf`.
+- Only the changed entry and the archive's TOC/name header are written. The archive is never copied as a whole.
+- When a new entry makes the TOC/name table outgrow the existing header gap, only the first small data block (or blocks) that overlap the new header is moved to the end of the archive. Its raw bytes are preserved and the TOC is patched, so the rest of the archive is not rewritten and encrypted/compressed blocks keep their exact content.
+- Rollback restores the original TOC state and entry offsets. A resource or file the user has edited is detected by hash and left untouched.
+- Missing `mods\` archives, nested archives, `delete` operations, and non-dlclist XML/text edits are skipped with a warning.
+- Encrypted binary entries and RSC7 resources (`ytd`, `yft`, `ymap`, ...) can be replaced or added. Opaque encrypted blocks are never re-encrypted; new plaintext data is appended and the entry flag is cleared, while the original block remains available for rollback.
 
-The release also updates the About tab to credit the first tester, `zaza specialist (Discord)`.
-
-The 2.3.4 release added UPnP mapping, custom relay servers, and the diagnostic copy. The 2.3.3 release added parallel Range downloads and the resume/stall handling described above. Those features are all present in 2.3.5.
+The 2.3.6 release added OpenIV `.oiv` package support: direct file adds, dlclist entries, per-file hashes, and session cleanup. The 2.3.5 release added the Servers tab status column; 2.3.4 added UPnP, custom relay servers, and diagnostic copy. All of those features remain.
 
 ---
 

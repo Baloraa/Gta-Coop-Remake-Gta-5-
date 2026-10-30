@@ -12,21 +12,25 @@ Suggested topics:
 
 `gta-v` `gtacoop` `gta-coop` `multiplayer` `coop` `launcher` `winforms` `dotnet` `csharp` `mod-manager` `relay` `story-mode`
 
-## Release 2.3.5 description
+## Release 2.4.0 description
 
 Use this as the GitHub Release body:
 
-> **GTACoop Remake 2.3.5**
+> **GTACoop Remake 2.4.0 — OIV archive edits for the mods folder**
 >
-> This release adds a live status column to the **Servers** tab. While the tab is visible, the launcher probes each server's sync port every five seconds with a 1.4-second timeout and shows **Online (ms)**, **Offline**, or **Unknown**. Direct addresses are tried first, then relay endpoints. No probes run while the tab is hidden. Short-code entries whose relay data looks stale are refreshed quietly at most every 30 seconds.
+> This release makes OpenIV `.oiv` `<archive>` `add` and `replace` operations work on the RPF archives that already exist under `mods\`, not only on DLC packs. Supported targets include `x64a.rpf`, `common.rpf`, `update\update.rpf`, `update\update2.rpf`, `update\x64\dlcpacks\...\dlc.rpf`, and nested archives such as `x64\audio\sfx\...rpf`. Root game archives are never opened for writing.
 >
-> The **About** tab now credits the first tester, `zaza specialist (Discord)`.
+> **No whole-archive copies.** Only the changed entry's data and the small TOC/name header are written. When a new entry makes the header outgrow the existing gap, only the first small data block (or blocks) that overlap the new header is moved to the end of the archive. Its raw encrypted/compressed bytes are preserved and the TOC offset is patched, so the rest of the archive is not rewritten.
 >
-> The 2.3.4 foundation is unchanged: UPnP port mapping, custom relay servers, the diagnostic copy, and the session cleanup watcher. The 2.3.3 download path is also unchanged: parallel HTTP Range downloads with resume, SHA-256 verification, and single-connection fallback.
+> **Safer writes and rollback.** Header space is checked before writing. If room still cannot be made, installation stops with a clear message instead of risking the archive. Rollback restores the original TOC and offsets; files you edited yourself are detected by SHA-256 and left untouched.
+>
+> **Resources and encrypted entries.** RSC7 resources (`ytd`, `yft`, `ymap`, ...) and encrypted binary entries can be replaced or added. Opaque encrypted blocks are not re-encrypted: new plaintext data is appended and the entry flag is cleared, while the old block stays available for rollback.
+>
+> Missing `mods\` archives, nested archive edits, `delete` operations, and non-dlclist XML/text changes are skipped with a warning in the log.
 >
 > **Upgrade:** replace the application folder with the new build. Your `%LOCALAPPDATA%\GTACoopRemake` settings, server cache, and logs are not part of the ZIP and are left in place. The share ZIP still excludes GTA V, ScriptHookV, ScriptHookVDotNet, and RageOpenV. The bundled `OpenIV.asi` is user-supplied.
 
-Attach `GTACoop-Remake-Share-2.3.5.zip` as the release asset. Do not commit it to the repository.
+Attach `GTACoop-Remake-Share-2.4.0.zip` and the built launcher EXE as release assets. Do not commit them to the repository.
 
 ## Before you make the repository public
 
@@ -114,6 +118,6 @@ Before uploading, check:
 
 ## A note on the current repository state
 
-The working tree has uncommitted changes for 2.3.5, including the live status feature, the About credit, and the finalized README files. Review `git status`, commit them in logical chunks, and tag the release only after the build and ZIP verification pass.
+The working tree has uncommitted changes for 2.4.0, including the RPF header relocation, OIV archive mapping, and the finalized README files. Review `git status`, commit them in logical chunks, and tag the release only after the build and ZIP verification pass.
 
-The repository has no remote configured yet. Add the GitHub remote, push `main`, then create the release from the tag. The English README is already the default; keep the language links intact when you make further edits.
+The GitHub remote is configured. Push `main`, then create the release from the tag. The English README is already the default; keep the language links intact when you make further edits.

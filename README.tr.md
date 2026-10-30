@@ -2,17 +2,33 @@
 
 **Türkçe** | [English](README.md)
 
-2.3.6 sürümü - kendi sunucu yönetimi, otomatik mod indirme, **oturum modu**,
+2.4.0 sürümü - kendi sunucu yönetimi, otomatik mod indirme, **oturum modu**,
 **kısa kod** (ör. `Gel.com`) ile internetten sunucu bulma, **otomatik relay**,
 **UPnP doğrudan bağlantı**, **özel relay sunucusu**, **tanılama kopyalama**,
-**canlı sunucu durumu**, **Sunucu Tarayıcı** sekmesi, **OpenIV (.oiv) paket desteği**
-ve **Bileşenler** sekmesinden
+**canlı sunucu durumu**, **Sunucu Tarayıcı** sekmesi, **OpenIV (.oiv) paket desteği**,
+**mods klasöründeki RPF arşivlerine yerinde ekleme/değiştirme** ve **Bileşenler** sekmesinden
 ScriptHookV / ScriptHookVDotNet / OpenIV.asi / RageOpenV kurulumu:
 port yönlendirme veya Radmin VPN olmadan da arkadaşlarınız bağlanabilir. Sunucu modları
 yalnızca oyun açıkken kurulu kalır, oyundan çıkınca otomatik kaldırılır.
 Oyun başlatma dosyası seçilebilir; varsayılan **PlayGTAV.exe**'dir (GTA5.exe de seçilebilir).
 **Sesli sohbet** (bas-konuş, `[MIC]` göstergesi) ve **host-led hikaye görevi koordinasyonu**
 bu sürümde eklendi; ayrıntılar aşağıda.
+
+### 2.4.0 — mods klasöründeki RPF arşivleri
+
+- OIV `<archive>` `add` ve `replace` işlemleri artık `mods\` altındaki **tüm mevcut
+  arşivlerde** çalışır: `x64a.rpf`, `common.rpf`, `update\update.rpf`,
+  `update\update2.rpf`, `update\x64\dlcpacks\...\dlc.rpf` ve
+  `x64\audio\sfx\...rpf` gibi iç içe yollar. Kök oyun arşivlerine asla yazılmaz.
+- Arşivin tamamı kopyalanmaz; yalnızca değişen girdinin verisi ve küçük TOC/isim
+  başlığı yazılır.
+- Yeni girdi başlığı büyütünce yalnızca başlıkla çakışan ilk küçük veri bloğu
+  arşivin sonuna taşınır; ham (şifreli/sıkıştırılmış) baytlar aynen korunur ve
+  TOC offseti güncellenir. Arşivin geri kalanı yeniden yazılmaz.
+- Geri alma orijinal TOC ve offsetleri geri getirir. Kullanıcının kendi
+  değiştirdiği dosya SHA-256 ile algılanır ve korunur.
+- Şifreli binary girdiler ve RSC7 kaynakları (`ytd`, `yft`, `ymap`, ...) eklenebilir
+  veya değiştirilebilir. Eski şifreli blok geri alma için yerinde bırakılır.
 
 ### 2.3.6 — OpenIV (.oiv) paket desteği
 
@@ -239,7 +255,7 @@ Kurallar:
 - Bu betik uygulamayı `%LOCALAPPDATA%\Programs\GTACoop Remake` klasörüne kopyalar ve
   **masaüstü** + **Başlat menüsü** kısayollarını buraya bağlar. Hiçbir şey silinmez
   (eski `dist` klasörü olduğu yerde kalır).
-- Uygulama simgesi ve sürüm bilgisi (2.3.6) exe dosyasına işlenmiştir.
+- Uygulama simgesi ve sürüm bilgisi (2.4.0) exe dosyasına işlenmiştir.
 
 ---
 

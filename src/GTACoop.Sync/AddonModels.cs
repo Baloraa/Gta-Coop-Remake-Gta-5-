@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using GTACoop.Rpf;
 
 namespace GTACoop.Sync;
 
@@ -113,6 +114,42 @@ public sealed class InstalledAddon
 
     /// <summary>OivPackage: bu paket tarafından eklenen dlclist girdileri.</summary>
     public List<string> DlclistEntries { get; set; } = new();
+
+    /// <summary>
+    /// OivPackage: mods klasöründeki RPF arşivlerinde yapılan dosya ekleme/
+    /// değiştirme kayıtları. Kaldırma ve güncelleme geri alımı için kullanılır.
+    /// </summary>
+    public List<RpfEditRecord> RpfEdits { get; set; } = new();
+}
+
+/// <summary>
+/// RPF arşivinde tek bir dosya değişikliğinin geri alınabilir kaydı.
+/// Eski veri bloğu arşivden silinmediği için içerik yedeği tutulmaz.
+/// </summary>
+public sealed class RpfEditRecord
+{
+    /// <summary>Oyun köküne göre arşiv yolu (örn. mods/x64a.rpf).</summary>
+    public string Archive { get; set; } = "";
+
+    /// <summary>Arşiv içindeki dosya yolu ("\" ayraçlı).</summary>
+    public string EntryPath { get; set; } = "";
+
+    /// <summary>Değişiklikten önce girdi var mıydı?</summary>
+    public bool WasPresent { get; set; }
+
+    public bool IsResource { get; set; }
+    public uint OriginalOffset { get; set; }
+    public uint OriginalSize { get; set; }
+    public uint OriginalUncompressedSize { get; set; }
+    public uint OriginalSystemFlags { get; set; }
+    public uint OriginalGraphicsFlags { get; set; }
+    public bool OriginalEncrypted { get; set; }
+    public RpfCompression OriginalCompression { get; set; } = RpfCompression.Unknown;
+
+    /// <summary>Bizim yazdığımız içeriğin SHA-256 özeti (kullanıcı değişikliğini ayırt etmek için).</summary>
+    public string InstalledHash { get; set; } = "";
+
+    public string Key => Archive + "|" + EntryPath;
 }
 
 /// <summary>Bir sunucudan yapılan kurulumun durumu.</summary>

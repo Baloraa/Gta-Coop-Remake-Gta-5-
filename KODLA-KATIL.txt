@@ -1,5 +1,5 @@
 ==========================================================
- GTACoop Remake - Sunucuya Katılma (v2.3.6)
+ GTACoop Remake - Sunucuya Katılma (v2.4.0)
 ==========================================================
 
 Sunucuya katılmanın iki yolu var:
@@ -149,7 +149,7 @@ SIK SORULANLAR
   internet bağlantın çalışıyor mu? Kısa kod ancak sunucu
   başlatılınca yayınlanır. Uzun GTC1 kodunu da deneyebilirsin.
 - Kısa kod bulundu ama bağlanmadı: sunucu sahibiyle ikiniz de
-  v2.3.6 (veya daha yeni) kullanın. Sunucu tarafında "Otomatik
+  v2.4.0 (veya daha yeni) kullanın. Sunucu tarafında "Otomatik
   relay: <sunucu> ..." yazısı görünmeli. Birkaç saniye sonra
   "Yeniden Ara" ile tekrar dene.
 - Relay çalışmıyor: bore.pub (veya sunucunun seçtiği özel relay)

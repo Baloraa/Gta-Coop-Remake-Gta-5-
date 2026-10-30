@@ -104,6 +104,66 @@ public static partial class SyncText
         ["Eski OIV önbelleği temizlendi: {0}"] =
             "Old OIV cache cleaned: {0}",
         ["UYARI: eski OIV önbelleği temizlenemedi: {0}"] =
-            "WARNING: old OIV cache could not be cleaned: {0}"
+            "WARNING: old OIV cache could not be cleaned: {0}",
+
+        // mods klasöründeki RPF arşiv düzenlemeleri
+        ["Arşiv düzenlemesi atlandı: {0} ({1})"] =
+            "Archive edit skipped: {0} ({1})",
+        ["Yalnızca dlclist.xml XML düzenlemesi destekleniyor: {0}"] =
+            "Only dlclist.xml XML editing is supported: {0}",
+        ["Yalnızca dlclist.xml metin düzenlemesi destekleniyor: {0}"] =
+            "Only dlclist.xml text editing is supported: {0}",
+        ["dlclist.xml'in tamamını değiştirmek güvenlik için uygulanmaz."] =
+            "Replacing the whole dlclist.xml is not applied for safety.",
+        ["Arşivden dosya silme güvenlik için uygulanmaz: {0} ({1})"] =
+            "Deleting files from an archive is not applied for safety: {0} ({1})",
+        ["Desteklenmeyen arşiv işlemi ({0}): {1}"] =
+            "Unsupported archive operation ({0}): {1}",
+        ["arşiv yolu boş"] = "archive path is empty",
+        ["desteklenmeyen arşiv türü"] = "unsupported archive type",
+        ["iç içe arşiv düzenlemesi desteklenmiyor"] =
+            "nested archive editing is not supported",
+        ["geçersiz/güvenlik dışı arşiv yolu"] = "invalid/unsafe archive path",
+        ["yalnızca mods klasöründeki arşivler düzenlenebilir"] =
+            "only archives inside the mods folder can be edited",
+        ["Arşiv dosya işleminin kaynağı yok: {0}"] =
+            "Archive file operation has no source: {0}",
+        ["Arşiv dosya hedefi geçersiz: {0}"] =
+            "Archive file destination is invalid: {0}",
+        ["dlclist.xml yalnızca <xml>/<text> veya tam kaynak <add> ile güncellenir."] =
+            "dlclist.xml is only updated via <xml>/<text> or a full-source <add>.",
+        ["OIV arşiv kaynağı bulunamadı: {0}"] = "OIV archive source not found: {0}",
+        ["Arşiv içi hedef geçersiz: {0}"] = "Archive entry destination is invalid: {0}",
+        ["OIV arşiv dosyası çok büyük: {0}"] = "OIV archive file is too large: {0}",
+        ["OIV: önceki sürümün arşiv düzenlemeleri geri alınıyor."] =
+            "OIV: rolling back the previous version's archive edits.",
+        ["OIV: mods arşivi bulunamadı, arşiv düzenlemesi atlandı: {0}"] =
+            "OIV: mods archive not found, archive edit skipped: {0}",
+        ["OIV: arşiv yapısı sağlıklı değil, düzenleme yapılmadı: {0}"] =
+            "OIV: archive structure is not healthy, no edit was made: {0}",
+        ["OIV: kullanıcı değişikliği korundu (arşiv): {0} :: {1}"] =
+            "OIV: user change preserved (archive): {0} :: {1}",
+        ["OIV: arşiv girdisi türü uyuşmuyor, güvenlik için kurulum durduruldu: {0} :: {1}"] =
+            "OIV: archive entry type mismatch, installation stopped for safety: {0} :: {1}",
+        ["OIV: {0} arşiv dosyası eklendi/değiştirildi."] =
+            "OIV: {0} archive file(s) added/replaced.",
+        ["OIV: {0} arşiv düzenlemesi atlandı (eksik arşiv)."] =
+            "OIV: {0} archive edit(s) skipped (missing archive).",
+        ["UYARI: eski OIV arşiv önbelleği bulunamadı: {0}"] =
+            "WARNING: old OIV archive cache not found: {0}",
+        ["UYARI: eski OIV paketi önbellekte yok: {0}"] =
+            "WARNING: old OIV package is not in the cache: {0}",
+        ["OIV: önceki sürümün arşiv düzenlemeleri geri getirildi."] =
+            "OIV: previous version's archive edits were restored.",
+        ["UYARI: önceki OIV arşiv düzenlemeleri geri getirilemedi: {0}"] =
+            "WARNING: previous OIV archive edits could not be restored: {0}",
+        ["OIV: kullanıcı değiştirdiği için arşiv girdisi korundu: {0} :: {1}"] =
+            "OIV: archive entry preserved because the user changed it: {0} :: {1}",
+        ["UYARI: arşiv girdisi geri alınamadı, korundu: {0} :: {1} ({2})"] =
+            "WARNING: archive entry could not be rolled back and was preserved: {0} :: {1} ({2})",
+        ["OIV: arşiv girdisi zaten yok, atlandı: {0} :: {1}"] =
+            "OIV: archive entry is already gone, skipped: {0} :: {1}",
+        ["geçersiz arşiv yolu"] = "invalid archive path",
+        ["arşiv bulunamadı"] = "archive not found"
     };
 }
