@@ -510,7 +510,7 @@ public static class AddonPeds
         var sb = new StringBuilder();
         foreach (var ped in peds.OrderBy(p => p.Model, StringComparer.OrdinalIgnoreCase))
         {
-            sb.Append("P:").Append(ped.Model).Append('|').Append(ped.Kind).Append('|')
+            sb.Append("P:").Append(ped.Model).Append('|').Append(EffectiveKind(ped)).Append('|')
               .Append(ped.Streamed ? 1 : 0).Append(';');
             foreach (var rel in ped.Files.OrderBy(f => f, StringComparer.OrdinalIgnoreCase))
             {
@@ -706,26 +706,45 @@ public static class AddonPeds
         return Encoding.UTF8.GetString(StripUtf8Bom(ms.ToArray()));
     }
 
+    /// <summary>
+    /// Sunucu manifestosu Kind alan��n�� bo�Y veya "human" b��raksa bile a_c_
+    /// ��nekli modeller hayvand��r. Yanl���� CIVMALE meta verisi pedi g��r��nmez
+    /// b��rak��yor ve ragdoll s��ras��nda oyunu ��kertiyor.
+    /// </summary>
+    public static string EffectiveKind(AddonPedInfo ped)
+    {
+        var kind = (ped.Kind ?? string.Empty).Trim();
+        if (kind.Equals(AnimalKind, StringComparison.OrdinalIgnoreCase))
+            return AnimalKind;
+        if (kind.Equals(FemaleKind, StringComparison.OrdinalIgnoreCase))
+            return FemaleKind;
+        if (!string.IsNullOrWhiteSpace(ped.Model) &&
+            ped.Model.StartsWith("a_c_", StringComparison.OrdinalIgnoreCase))
+            return AnimalKind;
+        return HumanKind;
+    }
+
     public static XElement BuildMetadataItem(AddonPedInfo ped,
         IReadOnlyDictionary<string, XElement>? known = null)
     {
+        var kind = EffectiveKind(ped);
         XElement item;
         if (known != null && known.TryGetValue(ped.Model, out var source))
         {
             var sourceKind = GuessKind(ped.Model, source);
-            if ((ped.Kind == AnimalKind) == (sourceKind == AnimalKind))
+            if ((kind == AnimalKind) == (sourceKind == AnimalKind))
                 item = new XElement(source);
             else
-                item = XElement.Parse(TemplateFor(ped.Kind));
+                item = XElement.Parse(TemplateFor(kind));
         }
         else
         {
-            item = XElement.Parse(TemplateFor(ped.Kind));
+            item = XElement.Parse(TemplateFor(kind));
         }
 
         item.SetElementValue("Name", ped.Model);
 
-        if (ped.Kind == FemaleKind)
+        if (kind == FemaleKind)
         {
             item.SetElementValue("Pedtype", "CIVFEMALE");
             item.SetElementValue("ClipDictionaryName", "move_f@generic");
@@ -739,7 +758,7 @@ public static class AddonPeds
             item.SetElementValue("PedCapsuleName", "STANDARD_FEMALE");
             item.SetElementValue("RelationshipGroup", "CIVFEMALE");
         }
-        else if (ped.Kind == AnimalKind)
+        else if (kind == AnimalKind)
         {
             item.SetElementValue("Pedtype", "ANIMAL");
         }
@@ -794,7 +813,7 @@ public static class AddonPeds
                 {
                     Model = ped.Model,
                     Name = string.IsNullOrWhiteSpace(ped.Name) ? ped.Model : ped.Name,
-                    Kind = ped.Kind,
+                    Kind = EffectiveKind(ped),
                     Pack = string.IsNullOrWhiteSpace(addon.DisplayName) ? addon.Id : addon.DisplayName,
                     Health = ped.Health <= 0 ? 200 : ped.Health
                 });

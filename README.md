@@ -8,7 +8,7 @@ GTACoop Remake is not a new multiplayer engine. It is the desktop layer around G
 
 GTACoop Remake is for private Story Mode co-op. It does not touch GTA Online, does not bypass anti-cheat, and does not inject into online sessions.
 
-**Current release:** 2.5.7  
+**Current release:** 2.5.8  
 **Platform:** Windows 10/11, x64  
 **UI:** Turkish, English, and Russian  
 **License:** GNU GPL v3
@@ -288,6 +288,16 @@ This is a tool for playing with friends, not a hardened anti-cheat or privacy sy
 - Server owners are responsible for the mods they distribute. The launcher automates delivery; it does not grant permission to redistribute someone else's work.
 
 ---
+
+## What is new in 2.5.8
+
+This release fixes **addon animal peds that stay invisible and crash on ragdoll** when the model is applied through Menyoo, Ped Selector, or another trainer instead of the Addon Peds menu.
+
+- **The real cause was the ped metadata, not the ragdoll.** A server pack could declare an `a_c_*` animal as a human (`CIVMALE`). The game then reports the ped as human, draws no animal model, and builds a human skeleton that crashes on impact. The sync server now forces `ANIMAL` metadata for every `a_c_*` model and rebuilds packs whose metadata was wrong.
+- **External model changes are handled.** A watcher on the local player model applies the post-swap variation fix when the animal comes from Menyoo, Ped Selector, or Rampage, not only from this launcher's Addon Peds menu.
+- **Ragdoll stays on.** No ragdoll flag or ragdoll-on-collision is disabled for animals.
+- **Diagnostics.** `error.log` now records `Local animal model detected`, `Local addon ped ready`, and `Addon variation stage 0/1` with the ped type and drawable count so a remaining problem can be identified.
+- **No protocol change.** 2.5.8 still uses `VERSION_0_9_4` and can play with 2.5.7, 2.5.6, 2.5.5, 2.5.4, 2.5.3, 2.5.2, 2.5.1, and 2.5.0 clients.
 
 ## What is new in 2.5.7
 

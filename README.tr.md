@@ -2,7 +2,7 @@
 
 **Türkçe** | [English](README.md)
 
-2.5.7 sürümü - kendi sunucu yönetimi, otomatik mod indirme, **oturum modu**,
+2.5.8 sürümü - kendi sunucu yönetimi, otomatik mod indirme, **oturum modu**,
 **kısa kod** (ör. `Gel.com`) ile internetten sunucu bulma, **otomatik relay**,
 **UPnP doğrudan bağlantı**, **özel relay sunucusu**, **tanılama kopyalama**,
 **canlı sunucu durumu**, **Sunucu Tarayıcı** sekmesi, **OpenIV (.oiv) paket desteği**,
@@ -14,6 +14,25 @@ yalnızca oyun açıkken kurulu kalır, oyundan çıkınca otomatik kaldırılı
 Oyun başlatma dosyası seçilebilir; varsayılan **PlayGTAV.exe**'dir (GTA5.exe de seçilebilir).
 **Sesli sohbet** (bas-konuş, `[MIC]` göstergesi) ve **host-led hikaye görevi koordinasyonu**
 bu sürümde eklendi; ayrıntılar aşağıda.
+
+### 2.5.8 — Addon hayvan görünmezliği ve ragdoll çökmesi düzeltildi
+
+Bu sürüm, modeli Addon Pedler menüsü yerine Menyoo, Ped Selector veya başka bir
+trainer ile uygulanan **görünmez ve ragdoll sırasında çöken addon hayvanları** düzeltir.
+
+- **Asıl neden ragdoll değil, ped meta verisiydi.** Sunucu paketi `a_c_*` hayvanını
+  insan (`CIVMALE`) olarak tanımlayabiliyordu. Oyun pedi insan sayıyor, hayvan modeli
+  çizilmiyor ve çarpışmada çöken insan iskeleti kuruluyordu. Sync sunucusu artık tüm
+  `a_c_*` modelleri için `ANIMAL` meta verisini zorunlu kılar ve yanlış meta verili
+  paketleri yeniden oluşturur.
+- **Dış model değişiklikleri de yakalanır.** Yerel oyuncu modelini izleyen bir denetleyici,
+  hayvan Menyoo, Ped Selector veya Rampage ile gelmiş olsa da model değişimi sonrası
+  varyasyon düzeltmesini uygular.
+- **Ragdoll açık kalır.** Hayvanlarda ragdoll bayrağı veya çarpışmada ragdoll kapatılmaz.
+- **Tanılama.** `error.log` artık `Local animal model detected`, `Local addon ped ready`
+  ve `Addon variation stage 0/1` satırlarını ped türü ve drawable sayısıyla kaydeder.
+- **Ağ protokolü değişmedi.** 2.5.8 istemciler `VERSION_0_9_4` kullanmaya devam eder;
+  2.5.7, 2.5.6, 2.5.5, 2.5.4, 2.5.3, 2.5.2, 2.5.1 ve 2.5.0 istemcilerle oynayabilir.
 
 ### 2.5.7 — Addon hayvan görünürlüğü geri geldi
 

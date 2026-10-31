@@ -41,6 +41,12 @@ namespace GTACoOp
         private NativeMenu _addonPedsMenu;
         private int _defaultPlayerModel;
         private PendingAddonPed _pendingAddonPed;
+
+        // Watches the local player model even when it was changed by Menyoo,
+        // Ped Selector or another trainer instead of our own menu.
+        private int _watchedLocalModel;
+        private int _watchedLocalDueAt;
+        private bool _watchedLocalDone;
         private readonly ObjectPool _menuPool;
 
         /// <summary>
@@ -52,6 +58,7 @@ namespace GTACoOp
         private sealed class PendingAddonPed
         {
             public int ModelHash;
+            public string Model;
             public string Name;
             public int Health;
             public int ApplyAt;
@@ -316,6 +323,8 @@ namespace GTACoOp
             {
                 _addonPedsMenu.Clear();
             };
+
+            RegisterConfiguredAnimalModels();
 
             var listenItem = new NativeItem("Server IP");
             listenItem.AltTitle = PlayerSettings.LastIP;
@@ -660,6 +669,23 @@ namespace GTACoOp
             return ped.Name.Trim();
         }
 
+        private void RegisterConfiguredAnimalModels()
+        {
+            try
+            {
+                var config = AddonPedsClient.Load();
+                if (config == null || config.Peds == null) return;
+                foreach (var ped in config.Peds)
+                {
+                    if (ped == null || string.IsNullOrWhiteSpace(ped.Model)) continue;
+                    if (string.Equals(ped.Kind, "animal", StringComparison.OrdinalIgnoreCase) ||
+                        ped.Model.StartsWith("a_c_", StringComparison.OrdinalIgnoreCase))
+                        AddonPedVariation.RegisterAnimalModel(ped.Model);
+                }
+            }
+            catch { }
+        }
+
         private void RebuildAddonPedsMenu()
         {
             _addonPedsMenu.Clear();
@@ -689,6 +715,11 @@ namespace GTACoOp
 
             foreach (var ped in config.Peds)
             {
+                if (string.Equals(ped.Kind, "animal", StringComparison.OrdinalIgnoreCase) ||
+                    (!string.IsNullOrWhiteSpace(ped.Model) &&
+                     ped.Model.StartsWith("a_c_", StringComparison.OrdinalIgnoreCase)))
+                    AddonPedVariation.RegisterAnimalModel(ped.Model);
+
                 var kind = string.Equals(ped.Kind, "animal", StringComparison.OrdinalIgnoreCase)
                     ? "~o~Animal"
                     : string.Equals(ped.Kind, "female", StringComparison.OrdinalIgnoreCase)
@@ -723,7 +754,11 @@ namespace GTACoOp
 
             // Hayvan modelleri araç kullanamaz; araçtayken model değiştirmek
             // oyunu kilitleyebilir. Önce araçtan inmesini iste.
-            var isAnimal = string.Equals(ped.Kind, "animal", StringComparison.OrdinalIgnoreCase);
+            if (string.Equals(ped.Kind, "animal", StringComparison.OrdinalIgnoreCase) ||
+                ped.Model.StartsWith("a_c_", StringComparison.OrdinalIgnoreCase))
+                AddonPedVariation.RegisterAnimalModel(ped.Model);
+
+            var isAnimal = AddonPedVariation.LooksLikeAnimal(ped.Model, Game.Player.Character);
             if (isAnimal && Game.Player.Character.IsInVehicle())
             {
                 Notification.Show("~o~Exit the vehicle before using an animal ped.");
@@ -759,6 +794,7 @@ namespace GTACoOp
                 _pendingAddonPed = new PendingAddonPed
                 {
                     ModelHash = model.Hash,
+                    Model = ped.Model,
                     Name = string.IsNullOrWhiteSpace(ped.Name) ? ped.Model : ped.Name,
                     Health = ped.Health,
                     ApplyAt = now + 100,
@@ -799,7 +835,8 @@ namespace GTACoOp
             if (Game.GameTime < pending.ApplyAt) return;
             _pendingAddonPed = null;
 
-            if (!player.IsHuman)
+            var animal = AddonPedVariation.LooksLikeAnimal(pending.Model, player);
+            if (animal)
             {
                 // Human weapons and armor make no sense on an animal skeleton
                 // and can leave invalid ped parts behind. Ragdoll stays at the
@@ -816,7 +853,7 @@ namespace GTACoOp
                 // vehicle impacts.
                 Main.Logger.WriteLine("Local addon ped ready: " + pending.Name +
                     " model=0x" + pending.ModelHash.ToString("X8") +
-                    " animal=" + (!player.IsHuman));
+                    " animal=" + animal + " isHuman=" + player.IsHuman);
                 AddonPedVariation.ScheduleAnimalFix(player);
             }
 
@@ -829,6 +866,41 @@ namespace GTACoOp
                 }
                 catch { /* bazı ped türlerinde sağlık ataması desteklenmeyebilir */ }
             }
+        }
+
+        /// <summary>
+        /// The player model can be changed by Menyoo, Ped Selector, Rampage or
+        /// the server instead of our Addon Peds menu. Watch the actual model so
+        /// those animals receive the same post-swap variation fix.
+        /// </summary>
+        private void WatchLocalPlayerAnimal()
+        {
+            var player = Game.Player.Character;
+            if (player == null || !player.Exists()) return;
+
+            var hash = player.Model.Hash;
+            if (hash != _watchedLocalModel)
+            {
+                _watchedLocalModel = hash;
+                _watchedLocalDone = false;
+                _watchedLocalDueAt = Game.GameTime + 300;
+                return;
+            }
+
+            if (_watchedLocalDone || Game.GameTime < _watchedLocalDueAt) return;
+            _watchedLocalDone = true;
+
+            if (player.Model.Hash != hash) return;
+            if (player.IsHuman && !AddonPedVariation.IsAnimalHash(hash)) return;
+            if (AddonPedVariation.IsScheduled(player.Handle)) return;
+
+            try { player.Weapons.RemoveAll(); } catch { }
+            try { player.Armor = 0; } catch { }
+            try { player.CanRagdoll = true; } catch { }
+
+            Main.Logger.WriteLine("Local animal model detected: handle=" + player.Handle +
+                " model=0x" + hash.ToString("X8") + " isHuman=" + player.IsHuman);
+            AddonPedVariation.ScheduleAnimalFix(player);
         }
 
         private void ResetPlayerModel()
@@ -1890,6 +1962,7 @@ namespace GTACoOp
             {
                 Ped player = Game.Player.Character;
                 ProcessPendingAddonPed();
+                WatchLocalPlayerAnimal();
                 AddonPedVariation.Process();
                 ProcessServerBrowserQueue();
                 UpdateServerBrowserScan();
