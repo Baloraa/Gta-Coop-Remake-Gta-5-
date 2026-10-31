@@ -17,6 +17,8 @@ public sealed class MainForm : Form
     private readonly MyServerTab _serverTab = new();
     private readonly LogTab _logTab = new();
     private readonly AboutTab _aboutTab = new();
+    private AddonPedsTab? _addonPedsTab;
+    private TabPage? _addonPedsPage;
 
     public MainForm()
     {
@@ -61,7 +63,23 @@ public sealed class MainForm : Form
                 _componentsTab.OnShown();
             if (_tabs.SelectedTab?.Controls.Contains(_serverBrowserTab) == true)
                 _serverBrowserTab.OnShown();
+            if (_addonPedsTab != null &&
+                _tabs.SelectedTab?.Controls.Contains(_addonPedsTab) == true)
+                _addonPedsTab.RefreshList();
         };
+    }
+
+    /// <summary>"Sunucum" sekmesindeki Addon Peds düğmesinden ayrı sekmeyi açar.</summary>
+    public void ShowAddonPedsTab()
+    {
+        if (_addonPedsPage == null)
+        {
+            _addonPedsTab = new AddonPedsTab();
+            _addonPedsPage = AddTab(T("Addon Peds"), _addonPedsTab, 5);
+        }
+
+        _addonPedsTab!.RefreshList();
+        _tabs.SelectedTab = _addonPedsPage;
     }
 
     /// <summary>Pencereyi ekrana sığdır (yüksek DPI'da taşmasın).</summary>
@@ -163,12 +181,16 @@ public sealed class MainForm : Form
         _tabs.BringToFront();
     }
 
-    private void AddTab(string title, UserControl control)
+    private TabPage AddTab(string title, UserControl control, int index = -1)
     {
         control.Dock = DockStyle.Fill;
         var page = new TabPage(title) { Padding = new Padding(8) };
         page.Controls.Add(control);
-        _tabs.TabPages.Add(page);
+        if (index >= 0 && index <= _tabs.TabPages.Count)
+            _tabs.TabPages.Insert(index, page);
+        else
+            _tabs.TabPages.Add(page);
+        return page;
     }
 
     private void BuildStatusBar()

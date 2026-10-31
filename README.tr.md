@@ -2,17 +2,39 @@
 
 **Türkçe** | [English](README.md)
 
-2.5.1 sürümü - kendi sunucu yönetimi, otomatik mod indirme, **oturum modu**,
+2.5.2 sürümü - kendi sunucu yönetimi, otomatik mod indirme, **oturum modu**,
 **kısa kod** (ör. `Gel.com`) ile internetten sunucu bulma, **otomatik relay**,
 **UPnP doğrudan bağlantı**, **özel relay sunucusu**, **tanılama kopyalama**,
 **canlı sunucu durumu**, **Sunucu Tarayıcı** sekmesi, **OpenIV (.oiv) paket desteği**,
 **mods klasöründeki RPF arşivlerine yerinde ekleme/değiştirme**, **Bileşenler** sekmesinden
-ScriptHookV / ScriptHookVDotNet / OpenIV.asi / RageOpenV kurulumu ve **F9 oyuncuya ışınlanma**:
+ScriptHookV / ScriptHookVDotNet / OpenIV.asi / RageOpenV kurulumu, **F9 oyuncuya ışınlanma**
+ve **sunucudan gelen addon pedler**:
 port yönlendirme veya Radmin VPN olmadan da arkadaşlarınız bağlanabilir. Sunucu modları
 yalnızca oyun açıkken kurulu kalır, oyundan çıkınca otomatik kaldırılır.
 Oyun başlatma dosyası seçilebilir; varsayılan **PlayGTAV.exe**'dir (GTA5.exe de seçilebilir).
 **Sesli sohbet** (bas-konuş, `[MIC]` göstergesi) ve **host-led hikaye görevi koordinasyonu**
 bu sürümde eklendi; ayrıntılar aşağıda.
+
+### 2.5.2 — Sunucudan addon pedler
+
+- **Launcher'da Addon Peds sekmesi.** Sunucum bölümündeki **Addon Peds** düğmesi ayrı bir
+  sekme açar; `Addons\peds` içindeki her ped paketi, insan/hayvan türü, model adı ve ped
+  başına etkinleştirme kutusuyla listelenir. Oyuncular yalnızca açık bıraktığınız pedleri görür.
+- **İnsan ve hayvan pedleri.** AddonPeds paketleri ve normal ped DLC paketleri desteklenir.
+  Hayvan modelleri (`a_c_...`) otomatik algılanır; hayvan pedlerinde insana özel kıyafet,
+  silah, nişan alma, ateş etme, zıplama ve paraşüt mantığı atlanır. Böylece senkron ve
+  çarpışma bozulmaz.
+- **Kendi AddonPeds kurulumunuza dokunulmaz.** Sunucu paketleri benzersiz bağlantı adı ve
+  gömülü meta veriyle kendi kendine yeterli DLC'lere dönüştürülür. `ap_m.xml`, `UserMods`
+  klasörü ve mevcut `dlcpacks` yalnızca okunur; değiştirilmez, üzerine yazılmaz.
+- **Diğer paketlerle çakışmaz.** Her sunucu paketi `gcs_<paket>` olarak, kendi cihaz adı,
+  `nameHash` ve değişiklik kümesi adıyla bağlanır. Aynı adlı paket bilgisayarınızda zaten
+  varsa algılanır ve atlanır.
+- **Oyun içi menü.** F9 > **Addon Peds** ile sunucunun insan ve hayvan pedleri arasında
+  geçiş yapın veya normal karakterinize dönün. Menü her açılışta kurulu pedlerden yenilenir.
+
+Ağ protokolü değişmedi (`VERSION_0_9_4`); 2.5.2 istemciler 2.5.1 ve 2.5.0 istemcilerle aynı
+sunucuda oynayabilir. Eski istemciler yeni ped listesini yok sayar.
 
 ### 2.5.1 — Gecikme ve takılma düzeltmeleri
 
@@ -301,7 +323,7 @@ Kurallar:
 - Bu betik uygulamayı `%LOCALAPPDATA%\Programs\GTACoop Remake` klasörüne kopyalar ve
   **masaüstü** + **Başlat menüsü** kısayollarını buraya bağlar. Hiçbir şey silinmez
   (eski `dist` klasörü olduğu yerde kalır).
-- Uygulama simgesi ve sürüm bilgisi (2.5.1) exe dosyasına işlenmiştir.
+- Uygulama simgesi ve sürüm bilgisi (2.5.2) exe dosyasına işlenmiştir.
 
 ---
 

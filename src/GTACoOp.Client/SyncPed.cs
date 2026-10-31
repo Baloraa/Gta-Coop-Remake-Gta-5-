@@ -273,7 +273,7 @@ namespace GTACoOp
                         SetBlipName(Character.AttachedBlip, Name);
                     }
 
-                    if (PedProps != null)
+                    if (PedProps != null && Character.IsHuman)
                         for (int i = 0; i < 12; i++)
                             if (PedProps.ContainsKey(i))
                                 Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Character.Handle, i, PedProps[i],
@@ -285,7 +285,9 @@ namespace GTACoOp
 
                 if (!Character.IsOccluded && Character.IsInRange(Game.Player.Character.Position, 20f))
                 {
-                    Vector3 targetPos = Character.Bones[Bone.IKHead].Position + new Vector3(0, 0, 0.5f);
+                    // Hayvan iskeletlerinde IK_Head yoktur; SKEL_Head kullanılır.
+                    var headBone = Character.IsHuman ? Bone.IKHead : Bone.SkelHead;
+                    Vector3 targetPos = Character.Bones[headBone].Position + new Vector3(0, 0, 0.5f);
 
                     targetPos += Character.Velocity / Game.FPS;
 
@@ -524,25 +526,29 @@ namespace GTACoOp
                 }
                 else
                 {
-                    if (PedProps != null && Game.Player.Character.IsInRange(Position, 30f))
+                    var isHuman = Character.IsHuman;
+
+                    if (isHuman && PedProps != null &&
+                        Game.Player.Character.IsInRange(Position, 30f))
                         for (int i = 0; i < 12; i++)
                             if (PedProps.ContainsKey(i) && PedProps[i] != Function.Call<int>(Hash.GET_PED_DRAWABLE_VARIATION, Character.Handle, i))
                                 Function.Call(Hash.SET_PED_COMPONENT_VARIATION, Character.Handle, i, PedProps[i],
                                     PedProps.ContainsKey(i + 12) ? PedProps[i + 12] : 0,
                                     PedProps.ContainsKey(i + 24) ? PedProps[i + 24] : 0);
 
-                    if (Character.Weapons.Current.Hash != (WeaponHash) CurrentWeapon)
+                    if (isHuman &&
+                        Character.Weapons.Current.Hash != (WeaponHash) CurrentWeapon)
                     {
                         var wep = Character.Weapons.Give((WeaponHash) CurrentWeapon, 9999, true, true);
                         Character.Weapons.Select(wep);
                     }
 
-                    if (!_lastJumping && IsJumping)
+                    if (isHuman && !_lastJumping && IsJumping)
                     {
                         Character.Task.Jump();
                     }
 
-                    if (IsParachuteOpen)
+                    if (isHuman && IsParachuteOpen)
                     {
                         if (_parachuteProp == null)
                         {
@@ -572,18 +578,18 @@ namespace GTACoOp
                         }
 
                         const int threshold = 50;
-                        if (IsAiming && !IsShooting && !Character.IsInRange(Position, 0.5f) && _switch%threshold == 0)
+                        if (isHuman && IsAiming && !IsShooting && !Character.IsInRange(Position, 0.5f) && _switch%threshold == 0)
                         {
                             Function.Call(Hash.TASK_GO_TO_COORD_WHILE_AIMING_AT_COORD, Character.Handle, dest.X, dest.Y,
                                 dest.Z, AimCoords.X, AimCoords.Y, AimCoords.Z, 2f, 0, 0x3F000000, 0x40800000, 1, 512, 0,
                                 (uint) FiringPattern.FullAuto);
                         }
-                        else if (IsAiming && !IsShooting && Character.IsInRange(Position, 0.5f))
+                        else if (isHuman && IsAiming && !IsShooting && Character.IsInRange(Position, 0.5f))
                         {
                             Character.Task.AimAt(AimCoords, 100);
                         }
 
-                        if (!Character.IsInRange(Position, 0.5f) &&
+                        if (isHuman && !Character.IsInRange(Position, 0.5f) &&
                             ((IsShooting && !_lastShooting) ||
                              (IsShooting && _lastShooting && _switch%(threshold*2) == 0)))
                         {
@@ -591,8 +597,8 @@ namespace GTACoOp
                                 dest.Z, AimCoords.X, AimCoords.Y, AimCoords.Z, 2f, 1, 0x3F000000, 0x40800000, 1, 0, 0,
                                 (uint) FiringPattern.FullAuto);
                         }
-                        else if ((IsShooting && !_lastShooting) ||
-                                 (IsShooting && _lastShooting && _switch%(threshold/2) == 0))
+                        else if (isHuman && ((IsShooting && !_lastShooting) ||
+                                 (IsShooting && _lastShooting && _switch%(threshold/2) == 0)))
                         {
                             Function.Call(Hash.TASK_SHOOT_AT_COORD, Character.Handle, AimCoords.X, AimCoords.Y,
                                 AimCoords.Z, 1500, (uint) FiringPattern.FullAuto);
@@ -627,7 +633,7 @@ namespace GTACoOp
                             }
                         }
 
-                        if (IsInParachuteFreeFall)
+                        if (isHuman && IsInParachuteFreeFall)
                         {
                             if (!Function.Call<bool>(Hash.IS_PED_IN_PARACHUTE_FREE_FALL, Character))
                                 Function.Call(Hash.TASK_SKY_DIVE, Character);

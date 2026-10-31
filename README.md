@@ -8,7 +8,7 @@ GTACoop Remake is not a new multiplayer engine. It is the desktop layer around G
 
 GTACoop Remake is for private Story Mode co-op. It does not touch GTA Online, does not bypass anti-cheat, and does not inject into online sessions.
 
-**Current release:** 2.5.1  
+**Current release:** 2.5.2  
 **Platform:** Windows 10/11, x64  
 **UI:** Turkish, English, and Russian  
 **License:** GNU GPL v3
@@ -288,6 +288,18 @@ This is a tool for playing with friends, not a hardened anti-cheat or privacy sy
 - Server owners are responsible for the mods they distribute. The launcher automates delivery; it does not grant permission to redistribute someone else's work.
 
 ---
+
+## What is new in 2.5.2
+
+This release adds **server-delivered addon peds**.
+
+- **Addon Peds tab in the launcher.** The server section has an **Addon Peds** button that opens a dedicated tab listing every ped pack in `Addons\peds`, with human/animal type, model name, and an enable checkbox per ped. Players only see the peds you leave enabled.
+- **Human and animal peds.** AddonPeds packs and plain ped DLC packs are supported. Animal models (`a_c_...`) are detected automatically; animal peds skip human-only props, weapons, aiming, shooting, jumping, and parachute logic so they do not break sync or collision.
+- **Your own AddonPeds installation is never touched.** Server packs are rewritten into self-contained DLCs with a unique mount name and embedded metadata. Your `ap_m.xml`, `UserMods` folder, and existing `dlcpacks` are read-only references and are never modified or overwritten.
+- **No collisions with other packs.** Each server pack mounts as `gcs_<pack>` with its own device name, `nameHash`, and change-set name. A pack that already exists on your PC under the same name is detected and skipped.
+- **In-game menu.** Press F9 and open **Addon Peds** to switch between the server's human and animal peds or return to your normal character. The menu is rebuilt from the installed server peds each time it opens.
+
+The network protocol is unchanged (`VERSION_0_9_4`), so 2.5.2 clients can still play with 2.5.1 and 2.5.0 clients on the same server. Older clients simply ignore the new ped list.
 
 ## What is new in 2.5.1
 

@@ -12,25 +12,25 @@ Suggested topics:
 
 `gta-v` `gtacoop` `gta-coop` `multiplayer` `coop` `launcher` `winforms` `dotnet` `csharp` `mod-manager` `relay` `story-mode`
 
-## Release 2.5.1 description
+## Release 2.5.2 description
 
 Use this as the GitHub Release body:
 
-> **GTACoop Remake 2.5.1 — lower latency, fewer stutters**
+> **GTACoop Remake 2.5.2 — server-delivered addon peds**
 >
-> This release fixes the heavy latency and the intermittent stutter reported in 2.5.0. The network protocol is unchanged (`VERSION_0_9_4`), so 2.5.1 and 2.5.0 clients can still play on the same server.
+> This release adds **addon peds delivered by the server**, for both human and animal models. The network protocol is unchanged (`VERSION_0_9_4`), so 2.5.2, 2.5.1, and 2.5.0 clients can still play on the same server.
 >
-> **Direct game connection first.** When the server is directly reachable (same network, Radmin/Tailscale, forwarded port, UPnP), the game now connects straight to the server instead of through the relay. The launcher still starts the relay in the background and the client switches to it automatically within 6 seconds if the direct path cannot be established, so connection reliability is unchanged.
+> **Addon Peds tab.** The server section has an **Addon Peds** button that opens a separate tab listing every pack in `Addons\peds`, with human/animal type, model name, and an enable checkbox per ped. Only enabled peds appear in players' menus.
 >
-> **NPC sync is capped at 10 Hz** per NPC and scanned four times per second instead of every frame. Nothing is scanned while you are alone on the server. Dense traffic no longer floods the uplink or the frame loop.
+> **Human and animal peds.** AddonPeds packs and plain ped DLC packs are supported. Animal models (`a_c_...`) are detected automatically and skip human-only props, weapons, aiming, shooting, jumping, and parachute logic, so sync and collision stay stable.
 >
-> **Voice is sent only while you actually speak.** Holding push-to-talk in silence no longer streams empty audio, and the playback buffer is capped at 500 ms, so speech latency no longer grows the longer you play.
+> **Your own AddonPeds setup is never touched.** Server packs are rewritten into self-contained DLCs with a unique mount name and embedded metadata. Your `ap_m.xml`, `UserMods` folder, and existing `dlcpacks` are read-only references and are never modified or overwritten. Packs with the same name already on your PC are detected and skipped, and each server pack mounts as `gcs_<pack>` with its own device name, `nameHash`, and change-set name to avoid collisions.
 >
-> **Cheaper per-frame work:** vehicle radio and mod details are applied once per second, the radio station list is cached, remote peds share one relationship group, stale opponent/NPC cleanup runs once per second, and Lidgren message recycling is enabled.
+> **In-game menu.** Press F9 and open **Addon Peds** to switch between the server's human and animal peds or return to your normal character.
 >
 > **Upgrade:** replace the application folder with the new build, or run the installer as usual. Your `%LOCALAPPDATA%\GTACoopRemake` settings, server list, and logs are kept in place. The share ZIP still excludes GTA V, ScriptHookV, ScriptHookVDotNet, and RageOpenV. The bundled `OpenIV.asi` is user-supplied.
 
-Attach `GTACoop-Remake-Share-2.5.1.zip`, `GTACoop.Launcher.exe`, and `GTACoop.Sync.dll` as release assets. Do not commit them to the repository.
+Attach `GTACoop-Remake-Share-2.5.2.zip`, `GTACoop.Launcher.exe`, and `GTACoop.Sync.dll` as release assets. Do not commit them to the repository.
 
 ## Before you make the repository public
 
@@ -120,6 +120,6 @@ Before uploading, check:
 
 ## A note on the current repository state
 
-The working tree has the 2.5.1 changes, including the lag fixes and the updated documentation. Review `git status`, commit them in logical chunks, and tag the release only after the build and ZIP verification pass.
+The working tree has the 2.5.2 changes, including server-delivered addon peds and the updated documentation. Review `git status`, commit them in logical chunks, and tag the release only after the build and ZIP verification pass.
 
 The GitHub remote is configured. Push `main`, then create the release from the tag. The English README is already the default; keep the language links intact when you make further edits.

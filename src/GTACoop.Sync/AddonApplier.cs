@@ -554,6 +554,7 @@ public sealed class AddonApplier
 
         state.LastSyncUtc = DateTime.UtcNow;
         SyncStateStore.Save(dataFolder, state);
+        AddonPeds.WriteClientConfig(_gameFolder, manifest, state.Addons);
         progress?.Report(new SyncProgress(
             SyncText.T("Senkronizasyon tamamlandı."), 1.0));
         return state;
@@ -1774,6 +1775,7 @@ public sealed class AddonApplier
         }
         state.LastSyncUtc = DateTime.UtcNow;
         SyncStateStore.Save(dataFolder, state);
+        AddonPeds.DeleteClientConfig(_gameFolder);
 
         if (_quarantineMoved > 0)
         {

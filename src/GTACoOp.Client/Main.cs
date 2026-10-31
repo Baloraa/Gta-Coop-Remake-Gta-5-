@@ -38,6 +38,8 @@ namespace GTACoOp
         public NativeMenu _serverBrowserMenu;
         private readonly NativeMenu _settingsMenu;
         private readonly NativeMenu _teleportMenu;
+        private NativeMenu _addonPedsMenu;
+        private int _defaultPlayerModel;
         private readonly ObjectPool _menuPool;
 
         // Pending teleport: the target's vehicle may not be streamed in yet.
@@ -286,6 +288,19 @@ namespace GTACoOp
                 _teleportMenu.Clear();
             };
 
+            _addonPedsMenu = new NativeMenu("GTA CooP", "Addon Peds");
+            _addonPedsMenu.Width += 150;
+            _addonPedsMenu.MouseBehavior = LemonUI.Menus.MenuMouseBehavior.Disabled;
+            _addonPedsMenu.ItemCount = CountVisibility.Always;
+            _addonPedsMenu.Opening += (object sender, System.ComponentModel.CancelEventArgs e) =>
+            {
+                RebuildAddonPedsMenu();
+            };
+            _addonPedsMenu.Closing += (object sender, System.ComponentModel.CancelEventArgs e) =>
+            {
+                _addonPedsMenu.Clear();
+            };
+
             var listenItem = new NativeItem("Server IP");
             listenItem.AltTitle = PlayerSettings.LastIP;
             listenItem.Activated += (menu, item) =>
@@ -380,6 +395,7 @@ namespace GTACoOp
             _mainMenu.Add(listenItem);
             _mainMenu.Add(portItem);
             _mainMenu.Add(_passItem);
+            _mainMenu.AddSubMenu(_addonPedsMenu);
             _mainMenu.AddSubMenu(_teleportMenu);
             _mainMenu.AddSubMenu(_settingsMenu);
             _mainMenu.Add(aboutItem);
@@ -601,6 +617,7 @@ namespace GTACoOp
             _menuPool.Add(_mainMenu);
             _menuPool.Add(_serverBrowserMenu);
             _menuPool.Add(_teleportMenu);
+            _menuPool.Add(_addonPedsMenu);
             _menuPool.Add(_settingsMenu);
 
             _storyMissions = new StoryMissionCoop(_mainMenu, _menuPool);
@@ -625,6 +642,140 @@ namespace GTACoOp
         {
             if (ped == null || string.IsNullOrWhiteSpace(ped.Name)) return "Player";
             return ped.Name.Trim();
+        }
+
+        private void RebuildAddonPedsMenu()
+        {
+            _addonPedsMenu.Clear();
+
+            if (!IsOnServer())
+            {
+                var offline = new NativeItem("Not connected", "Connect to a server to use its addon peds.");
+                offline.Enabled = false;
+                _addonPedsMenu.Add(offline);
+                return;
+            }
+
+            var config = AddonPedsClient.Load();
+            if (config == null || config.Peds == null || config.Peds.Count == 0)
+            {
+                var empty = new NativeItem("No addon peds",
+                    "This server does not provide addon peds.");
+                empty.Enabled = false;
+                _addonPedsMenu.Add(empty);
+                return;
+            }
+
+            var reset = new NativeItem("Reset to normal model",
+                "Return to your own character.");
+            reset.Activated += (sender, item) => ResetPlayerModel();
+            _addonPedsMenu.Add(reset);
+
+            foreach (var ped in config.Peds)
+            {
+                var kind = string.Equals(ped.Kind, "animal", StringComparison.OrdinalIgnoreCase)
+                    ? "~o~Animal"
+                    : "~b~Human";
+                var pack = string.IsNullOrWhiteSpace(ped.Pack) ? config.ServerName : ped.Pack;
+                var name = string.IsNullOrWhiteSpace(ped.Name) ? ped.Model : ped.Name;
+                var entry = ped;
+                var item = new NativeItem(name,
+                    kind + "~w~ • " + (string.IsNullOrWhiteSpace(pack) ? "Server" : pack));
+                item.AltTitle = entry.Model;
+                item.Activated += (sender, selected) => ApplyAddonPed(entry);
+                _addonPedsMenu.Add(item);
+            }
+        }
+
+        private void ApplyAddonPed(ClientAddonPed ped)
+        {
+            if (ped == null || string.IsNullOrWhiteSpace(ped.Model)) return;
+            if (!IsOnServer())
+            {
+                Notification.Show("~r~Connect to a server first.");
+                return;
+            }
+
+            var model = new Model(ped.Model);
+            if (!model.IsInCdImage)
+            {
+                Notification.Show("~r~Ped model not found: ~w~" + ped.Model);
+                return;
+            }
+
+            // Hayvan modelleri araç kullanamaz; araçtayken model değiştirmek
+            // oyunu kilitleyebilir. Önce araçtan inmesini iste.
+            var isAnimal = string.Equals(ped.Kind, "animal", StringComparison.OrdinalIgnoreCase);
+            if (isAnimal && Game.Player.Character.IsInVehicle())
+            {
+                Notification.Show("~o~Exit the vehicle before using an animal ped.");
+                return;
+            }
+
+            if (!model.IsLoaded && !model.Request(1000))
+            {
+                Notification.Show("~r~Ped model could not be loaded: ~w~" + ped.Model);
+                return;
+            }
+
+            // İlk addon ped seçiminde oyuncunun kendi modelini sakla; "Reset"
+            // bu modele döner. Sunucu değişse bile yerel oturum boyunca geçerli.
+            if (_defaultPlayerModel == 0)
+            {
+                try { _defaultPlayerModel = Game.Player.Character.Model.Hash; }
+                catch { _defaultPlayerModel = new Model(PedHash.Michael).Hash; }
+            }
+
+            try
+            {
+                if (!Game.Player.ChangeModel(model))
+                {
+                    Notification.Show("~r~Could not change ped model.");
+                    return;
+                }
+
+                var player = Game.Player.Character;
+                if (!player.IsHuman)
+                {
+                    // Hayvan modellerinde insan silah/parçaları anlamsızdır ve
+                    // bazı sürümlerde hata üretebilir.
+                    player.Weapons.RemoveAll();
+                    player.Armor = 0;
+                }
+
+                Notification.Show("~g~Addon ped: ~w~" + (string.IsNullOrWhiteSpace(ped.Name)
+                    ? ped.Model
+                    : ped.Name));
+            }
+            catch (Exception ex)
+            {
+                Notification.Show("~r~Ped error: ~w~" + ex.Message);
+                Main.Logger.WriteException("Exception while changing addon ped", ex);
+            }
+        }
+
+        private void ResetPlayerModel()
+        {
+            try
+            {
+                var hash = _defaultPlayerModel != 0 ? _defaultPlayerModel : (int)PedHash.Michael;
+                var model = new Model(hash);
+                if (!model.IsInCdImage)
+                {
+                    model = new Model(PedHash.Michael);
+                }
+                if (!model.IsLoaded && !model.Request(1000))
+                {
+                    Notification.Show("~r~Default model could not be loaded.");
+                    return;
+                }
+                Game.Player.ChangeModel(model);
+                Notification.Show("~g~Player model reset.");
+            }
+            catch (Exception ex)
+            {
+                Notification.Show("~r~Reset error: ~w~" + ex.Message);
+            }
         }
 
         private void RebuildTeleportMenu()
@@ -1345,6 +1496,7 @@ namespace GTACoOp
             _lastDataSend = Game.GameTime;
 
             var player = Game.Player.Character;
+            var isHuman = player.IsHuman;
             if (player.IsInVehicle())
             {
                 var veh = player.CurrentVehicle;
@@ -1364,7 +1516,7 @@ namespace GTACoOp
                 {
                     _lastFullDataSend = Game.GameTime;
                     obj.VehicleMods = Util.GetVehicleMods(veh);
-                    obj.PedProps = Util.GetPlayerProps(player);
+                    if (isHuman) obj.PedProps = Util.GetPlayerProps(player);
                 }
                 obj.WheelSpeed = veh.WheelSpeed;
                 obj.Steering = veh.SteeringAngle;
@@ -1409,8 +1561,11 @@ namespace GTACoOp
             }
             else
             {
-                bool aiming = Game.IsControlPressed(GTA.Control.Aim);
-                bool shooting = player.IsShooting && player.Weapons.Current?.AmmoInClip != 0;
+                // Hayvan modellerinde silah/nişan/paraşüt kavramları yoktur;
+                // bu değerleri göndermek karşı tarafta hatalı görevlere yol açar.
+                bool aiming = isHuman && Game.IsControlPressed(GTA.Control.Aim);
+                bool shooting = isHuman && player.IsShooting &&
+                                player.Weapons.Current?.AmmoInClip != 0;
 
                 GTA.Math.Vector3 aimCoord = new GTA.Math.Vector3();
                 if (aiming || shooting)
@@ -1427,13 +1582,13 @@ namespace GTACoOp
                 obj.Position = player.Position.ToLVector();
                 obj.Quaternion = player.Quaternion.ToLQuaternion();
                 obj.PedModelHash = player.Model.Hash;
-                obj.WeaponHash = (int)player.Weapons.Current.Hash;
+                obj.WeaponHash = isHuman ? (int)player.Weapons.Current.Hash : 0;
                 obj.PlayerHealth = player.Health;
 
                 if (Game.GameTime >= _lastFullDataSend + 3000)
                 {
                     _lastFullDataSend = Game.GameTime;
-                    obj.PedProps = Util.GetPlayerProps(player);
+                    if (isHuman) obj.PedProps = Util.GetPlayerProps(player);
                 }
 
                 if (aiming)
@@ -1442,9 +1597,11 @@ namespace GTACoOp
                     obj.Flag |= (byte)PedDataFlags.IsShooting;
                 if (Function.Call<bool>(Hash.IS_PED_JUMPING, player.Handle))
                     obj.Flag |= (byte)PedDataFlags.IsJumping;
-                if (Function.Call<int>(Hash.GET_PED_PARACHUTE_STATE, Game.Player.Character.Handle) == 2)
+                if (isHuman &&
+                    Function.Call<int>(Hash.GET_PED_PARACHUTE_STATE, Game.Player.Character.Handle) == 2)
                     obj.Flag |= (byte)PedDataFlags.IsParachuteOpen;
-                if (Function.Call<bool>(Hash.IS_PED_IN_PARACHUTE_FREE_FALL, player.Handle))
+                if (isHuman &&
+                    Function.Call<bool>(Hash.IS_PED_IN_PARACHUTE_FREE_FALL, player.Handle))
                     obj.Flag |= (byte)PedDataFlags.IsInParachuteFreeFall;
 
                 var bin = SerializeBinary(obj);
@@ -1545,7 +1702,9 @@ namespace GTACoOp
             }
             else
             {
-                bool shooting = ped.IsShooting && ped.Weapons.Current?.AmmoInClip != 0;
+                var isHuman = ped.IsHuman;
+                bool shooting = isHuman && ped.IsShooting &&
+                                ped.Weapons.Current?.AmmoInClip != 0;
 
                 GTA.Math.Vector3 aimCoord = new GTA.Math.Vector3();
                 if (shooting)
@@ -1556,7 +1715,7 @@ namespace GTACoOp
                 obj.Position = ped.Position.ToLVector();
                 obj.Quaternion = ped.Quaternion.ToLQuaternion();
                 obj.PedModelHash = ped.Model.Hash;
-                obj.WeaponHash = (int)ped.Weapons.Current.Hash;
+                obj.WeaponHash = isHuman ? (int)ped.Weapons.Current.Hash : 0;
                 obj.PlayerHealth = ped.Health;
                 obj.Name = ped.Handle.ToString();
 
@@ -1564,9 +1723,11 @@ namespace GTACoOp
                     obj.Flag |= (byte)PedDataFlags.IsShooting;
                 if (Function.Call<bool>(Hash.IS_PED_JUMPING, ped.Handle))
                     obj.Flag |= (byte)PedDataFlags.IsJumping;
-                if (Function.Call<int>(Hash.GET_PED_PARACHUTE_STATE, ped.Handle) == 2)
+                if (isHuman &&
+                    Function.Call<int>(Hash.GET_PED_PARACHUTE_STATE, ped.Handle) == 2)
                     obj.Flag |= (byte)PedDataFlags.IsParachuteOpen;
-                if (Function.Call<bool>(Hash.IS_PED_IN_PARACHUTE_FREE_FALL, ped.Handle))
+                if (isHuman &&
+                    Function.Call<bool>(Hash.IS_PED_IN_PARACHUTE_FREE_FALL, ped.Handle))
                     obj.Flag |= (byte)PedDataFlags.IsInParachuteFreeFall;
 
                 var bin = SerializeBinary(obj);
@@ -2726,13 +2887,15 @@ namespace GTACoOp
                     _debugSyncPed.Speed = veh.Speed;
                     _debugSyncPed.Steering = veh.SteeringAngle;
                     _debugSyncPed.IsInVehicle = true;
-                    _debugSyncPed.PedProps = Util.GetPlayerProps(player);
+                    if (player.IsHuman)
+                        _debugSyncPed.PedProps = Util.GetPlayerProps(player);
                     _debugSyncPed.LastUpdateReceived = Environment.TickCount;
                 }
                 else
                 {
-                    bool aiming = Game.IsControlPressed(GTA.Control.Aim);
-                    bool shooting = player.IsShooting && player.Weapons.Current?.AmmoInClip != 0;
+                    var isHuman = player.IsHuman;
+                    bool aiming = isHuman && Game.IsControlPressed(GTA.Control.Aim);
+                    bool shooting = isHuman && player.IsShooting && player.Weapons.Current?.AmmoInClip != 0;
 
                     GTA.Math.Vector3 aimCoord = new GTA.Math.Vector3();
                     if (aiming || shooting)
@@ -2743,14 +2906,17 @@ namespace GTACoOp
                     _debugSyncPed.Position = player.Position;
                     _debugSyncPed.Rotation = player.Quaternion;
                     _debugSyncPed.ModelHash = player.Model.Hash;
-                    _debugSyncPed.CurrentWeapon = (int)player.Weapons.Current.Hash;
+                    _debugSyncPed.CurrentWeapon = isHuman ? (int)player.Weapons.Current.Hash : 0;
                     _debugSyncPed.PedHealth = player.Health;
                     _debugSyncPed.IsAiming = aiming;
                     _debugSyncPed.IsShooting = shooting;
-                    _debugSyncPed.IsJumping = Function.Call<bool>(Hash.IS_PED_JUMPING, player.Handle);
-                    _debugSyncPed.IsParachuteOpen = Function.Call<int>(Hash.GET_PED_PARACHUTE_STATE, Game.Player.Character.Handle) == 2;
+                    _debugSyncPed.IsJumping = player.IsHuman &&
+                        Function.Call<bool>(Hash.IS_PED_JUMPING, player.Handle);
+                    _debugSyncPed.IsParachuteOpen = isHuman &&
+                        Function.Call<int>(Hash.GET_PED_PARACHUTE_STATE, Game.Player.Character.Handle) == 2;
                     _debugSyncPed.IsInVehicle = false;
-                    _debugSyncPed.PedProps = Util.GetPlayerProps(player);
+                    if (isHuman)
+                        _debugSyncPed.PedProps = Util.GetPlayerProps(player);
                     _debugSyncPed.LastUpdateReceived = Environment.TickCount;
                 }
             }

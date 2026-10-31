@@ -152,6 +152,8 @@ public sealed class MyServerTab : UserControl
 
         var modsRow1 = Ui.Flow();
         modsRow1.Controls.Add(Ui.Btn(T("DLC Paketi Ekle (araç/ped)..."), (_, _) => AddDlcPack()));
+        modsRow1.Controls.Add(Ui.Btn(T("Addon Peds"), (_, _) =>
+            (FindForm() as MainForm)?.ShowAddonPedsTab()));
         modsRow1.Controls.Add(Ui.Btn(T("İstemci Scripti Ekle (dll + ini/xml/pdb)..."), (_, _) => AddScriptFiles()));
         modsRow1.Controls.Add(Ui.Btn(T("Script Klasörü Ekle..."), (_, _) => AddScriptFolder()));
 
@@ -166,7 +168,7 @@ public sealed class MyServerTab : UserControl
             AutoSize = false,
             Height = 40,
             ForeColor = Color.DimGray,
-            Text = T("DLC paketleri: Addons\\dlcpacks\\  |  OIV paketleri: Addons\\oiv\\  |  Scriptler: Addons\\scripts\\  |  ASI: Addons\\asi\\  |  Sunucu eklentileri: Plugins\\\r\nHer OIV paketi kendi klasöründe saklanır. Meta için: addon.json")
+            Text = T("DLC paketleri: Addons\\dlcpacks\\  |  Addon pedleri: Addons\\peds\\  |  OIV paketleri: Addons\\oiv\\  |  Scriptler: Addons\\scripts\\  |  ASI: Addons\\asi\\  |  Sunucu eklentileri: Plugins\\\r\nHer OIV paketi kendi klasöründe saklanır. Meta için: addon.json / peds.json")
         };
         modsGroup.Controls.Add(modsInfo);
         modsGroup.Controls.Add(modsRow2);
@@ -471,6 +473,8 @@ public sealed class MyServerTab : UserControl
 
         AddFolderEntries(entries, Path.Combine(addons, "dlcpacks"),
             "dlcpacks", T("DLC Paketi"), AddonType.DlcPack);
+        AddFolderEntries(entries, Path.Combine(addons, "peds"),
+            "peds", T("Addon Ped Paketi"), AddonType.DlcPack);
         AddFolderEntries(entries, Path.Combine(addons, "oiv"),
             "oiv", T("OIV Paketi"), AddonType.OivPackage);
         AddFolderEntries(entries, Path.Combine(addons, "scripts"),
@@ -568,6 +572,20 @@ public sealed class MyServerTab : UserControl
         try
         {
             var path = Path.Combine(dir, "addon.json");
+            if (File.Exists(path))
+            {
+                using var doc = JsonDocument.Parse(File.ReadAllText(path));
+                if (doc.RootElement.TryGetProperty("displayName", out var name) &&
+                    name.ValueKind == JsonValueKind.String)
+                    return name.GetString();
+            }
+        }
+        catch { /* meta okunamazsa klasör adı kullanılır */ }
+
+        // Addon ped paketlerinde görünen ad peds.json içindedir.
+        try
+        {
+            var path = Path.Combine(dir, AddonPeds.PackFileName);
             if (File.Exists(path))
             {
                 using var doc = JsonDocument.Parse(File.ReadAllText(path));

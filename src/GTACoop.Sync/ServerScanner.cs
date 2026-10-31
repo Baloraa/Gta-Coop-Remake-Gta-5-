@@ -25,7 +25,7 @@ public sealed class ServerScanner
     /// <summary>Sunucu klasör yapısını oluşturur.</summary>
     public static void EnsureLayout(string addonsDir)
     {
-        foreach (var sub in new[] { "dlcpacks", "oiv", "scripts", "asi", "files", "plugins" })
+        foreach (var sub in new[] { "dlcpacks", "peds", "oiv", "scripts", "asi", "files", "plugins" })
             Directory.CreateDirectory(Path.Combine(addonsDir, sub));
     }
 
@@ -73,6 +73,7 @@ public sealed class ServerScanner
         var before = _cache.Count;
 
         ScanDlcPacks(manifest, result);
+        ScanPedPacks(manifest, result);
         ScanOivPackages(manifest, result);
         ScanScripts(manifest, result);
         ScanAsi(manifest, result);
@@ -120,6 +121,143 @@ public sealed class ServerScanner
                 RelativePackPath = relPackPath.Replace('\\', '/'),
                 Files = HashTree(packDir, result, id)
             });
+        }
+    }
+
+    /// <summary>
+    /// Addons\peds\&lt;paket&gt; klasörlerini tarar. AddonPeds biçimindeki
+    /// paketler kendi kendine yeterli hale getirilir; kullanıcının ap_m.xml
+    /// dosyasına veya kendi ped modlarına dokunulmaz.
+    /// </summary>
+    private void ScanPedPacks(Manifest manifest, ScanResult result)
+    {
+        var dir = Path.Combine(_addonsDir, AddonPeds.DirectoryName);
+        if (!Directory.Exists(dir)) return;
+
+        var preparedRoot = Path.Combine(_addonsDir, AddonPeds.PreparedDirectoryName);
+
+        foreach (var packDir in Directory.GetDirectories(dir))
+        {
+            var id = Path.GetFileName(packDir);
+            if (id.StartsWith('.')) continue;
+
+            if (manifest.Addons.Any(a => string.Equals(a.Id, id, StringComparison.OrdinalIgnoreCase)))
+            {
+                result.Warnings.Add($"Ped paketi '{id}' atlandı: aynı kimlikte bir DLC paketi zaten var.");
+                continue;
+            }
+
+            // Farklı kimlikler aynı güvenli bağlantı adına düşebilir (ör. "My Pack"
+            // ve "my_pack"). İkisi birden kurulursa biri diğerini ezer; erken atla.
+            var mountFolder = AddonApplier.MountFolderName(id);
+            if (manifest.Addons.Any(a => a.Type == AddonType.DlcPack &&
+                    string.Equals(AddonApplier.MountFolderName(a.Id), mountFolder,
+                        StringComparison.OrdinalIgnoreCase)))
+            {
+                result.Warnings.Add($"Ped paketi '{id}' atlandı: başka bir paketle aynı " +
+                                    $"DLCPack klasör adını ({mountFolder}) kullanıyor.");
+                continue;
+            }
+
+            var source = AddonPeds.FindDlcRpf(packDir);
+            if (source == null)
+            {
+                result.Warnings.Add($"Ped paketi '{id}' atlandı: içinde dlc.rpf bulunamadı.");
+                continue;
+            }
+
+            try
+            {
+                var models = GetPedModels(source, result, id);
+                if (models.Count == 0)
+                {
+                    result.Warnings.Add($"Ped paketi '{id}' atlandı: içinde ped modeli (.yft) bulunamadı.");
+                    continue;
+                }
+
+                var packFile = AddonPeds.LoadOrCreatePackFile(packDir, models);
+                var enabled = packFile.Peds
+                    .Where(p => p.Enabled && models.Contains(p.Model, StringComparer.OrdinalIgnoreCase))
+                    .ToList();
+
+                var addon = new AddonInfo
+                {
+                    Id = id,
+                    Type = AddonType.DlcPack,
+                    DisplayName = string.IsNullOrWhiteSpace(packFile.DisplayName)
+                        ? id
+                        : packFile.DisplayName,
+                    Description = packFile.Description,
+                    Required = true,
+                    Peds = enabled
+                };
+
+                try
+                {
+                    var prepared = AddonPeds.PrepareSelfContained(packDir, id,
+                        Path.Combine(preparedRoot, AddonApplier.Safe(id)), packFile);
+                    addon.RelativePackPath = "";
+                    addon.Files = HashTree(Path.GetDirectoryName(prepared)!, result, id);
+                }
+                catch (Exception ex)
+                {
+                    // Hazırlanamazsa orijinal paketi sun; eski istemciler ve
+                    // kullanıcının kendi AddonPeds kurulumu yine çalışabilir.
+                    result.Warnings.Add($"Ped paketi '{id}' hazırlanamadı ({ex.Message}); " +
+                                        "orijinal dlc.rpf sunuluyor.");
+                    var rel = Path.GetRelativePath(packDir, Path.GetDirectoryName(source)!);
+                    addon.RelativePackPath = rel == "." ? "" : rel.Replace('\\', '/');
+                    addon.Files = HashTree(packDir, result, id);
+                }
+
+                if (addon.Files.Count == 0)
+                {
+                    result.Warnings.Add($"Ped paketi '{id}' atlandı: sunulacak dosya yok.");
+                    continue;
+                }
+
+                manifest.Addons.Add(addon);
+            }
+            catch (Exception ex)
+            {
+                result.Warnings.Add($"Ped paketi '{id}' atlandı: {ex.Message}");
+            }
+        }
+    }
+
+    private readonly Dictionary<string, PedModelCache> _pedModelCache =
+        new(StringComparer.OrdinalIgnoreCase);
+
+    private sealed class PedModelCache
+    {
+        public long Ticks { get; set; }
+        public long Length { get; set; }
+        public List<string> Models { get; set; } = new();
+    }
+
+    private List<string> GetPedModels(string dlcRpf, ScanResult result, string id)
+    {
+        try
+        {
+            var info = new FileInfo(dlcRpf);
+            if (_pedModelCache.TryGetValue(dlcRpf, out var hit) &&
+                hit.Ticks == info.LastWriteTimeUtc.Ticks && hit.Length == info.Length)
+                return hit.Models;
+
+            var models = AddonPeds.DiscoverModels(dlcRpf,
+                msg => result.Warnings.Add($"Ped paketi '{id}': {msg}"));
+            _pedModelCache[dlcRpf] = new PedModelCache
+            {
+                Ticks = info.LastWriteTimeUtc.Ticks,
+                Length = info.Length,
+                Models = models
+            };
+            return models;
+        }
+        catch (Exception ex)
+        {
+            result.Warnings.Add($"Ped paketi '{id}': dlc.rpf okunamadı: {ex.Message}");
+            return new List<string>();
         }
     }
 
@@ -370,8 +508,13 @@ public sealed class ServerScanner
         {
             var rel = Path.GetRelativePath(root, file).Replace('\\', '/');
             if (rel.StartsWith('.')) continue;
-            // addon.json yalnızca meta veridir; istemciye içerik olarak gönderilmez.
-            if (rel.Equals("addon.json", StringComparison.OrdinalIgnoreCase)) continue;
+            // addon.json ve ped meta dosyaları yalnızca sunucu tarafı verisidir;
+            // istemciye içerik olarak gönderilmez.
+            if (rel.Equals("addon.json", StringComparison.OrdinalIgnoreCase) ||
+                rel.Equals(AddonPeds.PackFileName, StringComparison.OrdinalIgnoreCase) ||
+                rel.Equals("pedmeta.xml", StringComparison.OrdinalIgnoreCase) ||
+                rel.Equals("ap_m.xml", StringComparison.OrdinalIgnoreCase))
+                continue;
             list.Add(HashFile(rel, file));
             result.PhysicalFiles[addonId + "/" + rel] = file;
         }

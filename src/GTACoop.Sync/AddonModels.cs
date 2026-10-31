@@ -54,6 +54,12 @@ public sealed class AddonInfo
     public List<AddonFileInfo> Files { get; set; } = new();
 
     /// <summary>
+    /// DlcPack: sunucunun istemci menüsünde gösterdiği addon pedler.
+    /// Boşsa paket normal bir DLC paketidir.
+    /// </summary>
+    public List<AddonPedInfo> Peds { get; set; } = new();
+
+    /// <summary>
     /// OivPackage: paketin güvenli biçimde yazacağı oyun içi hedefler ("/" ayraçlı).
     /// İndirmeden önce kullanıcı çakışmalarını tespit etmek için kullanılır.
     /// </summary>
