@@ -2,7 +2,7 @@
 
 **Türkçe** | [English](README.md)
 
-2.5.6 sürümü - kendi sunucu yönetimi, otomatik mod indirme, **oturum modu**,
+2.5.7 sürümü - kendi sunucu yönetimi, otomatik mod indirme, **oturum modu**,
 **kısa kod** (ör. `Gel.com`) ile internetten sunucu bulma, **otomatik relay**,
 **UPnP doğrudan bağlantı**, **özel relay sunucusu**, **tanılama kopyalama**,
 **canlı sunucu durumu**, **Sunucu Tarayıcı** sekmesi, **OpenIV (.oiv) paket desteği**,
@@ -14,6 +14,22 @@ yalnızca oyun açıkken kurulu kalır, oyundan çıkınca otomatik kaldırılı
 Oyun başlatma dosyası seçilebilir; varsayılan **PlayGTAV.exe**'dir (GTA5.exe de seçilebilir).
 **Sesli sohbet** (bas-konuş, `[MIC]` göstergesi) ve **host-led hikaye görevi koordinasyonu**
 bu sürümde eklendi; ayrıntılar aşağıda.
+
+### 2.5.7 — Addon hayvan görünürlüğü geri geldi
+
+Bu sürüm, 2.5.6'daki çarpışma düzeltmesini koruyarak **yerel oyuncuda addon hayvanın görünmesini** geri getirir.
+
+- **Hayvan yeniden görünür.** 2.5.6 yerel oyuncuya akışlı komponent varyasyonunu uygulamayı
+  bıraktığı için model görünmüyordu. Varsayılan varyasyon artık yeni ped onaylandıktan sonra
+  uygulanıyor; eski pede değil.
+- **Çarpışma düzeltmesi korunur.** Varyasyon ve ped ayarları hâlâ yalnızca model değişimi
+  tamamlandıktan sonra çalışır; 2.5.6'daki çökme yolu değişmedi.
+- **Ragdoll açık kalır.** Hayvanlarda ragdoll bayrağı veya çarpışmada ragdoll kapatılmaz.
+- **Ağ protokolü değişmedi.** 2.5.7 istemciler `VERSION_0_9_4` kullanmaya devam eder;
+  2.5.6, 2.5.5, 2.5.4, 2.5.3, 2.5.2, 2.5.1 ve 2.5.0 istemcilerle oynayabilir.
+
+Bu istemci tarafında bir düzeltmedir; launcher sürümü yalnızca güncellemenin dağıtılması
+için yükseltildi.
 
 ### 2.5.6 — Hayvan pedi çarpışma çökmesi ragdoll kapatılmadan düzeltildi
 

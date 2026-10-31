@@ -807,6 +807,17 @@ namespace GTACoOp
                 try { player.Weapons.RemoveAll(); } catch { }
                 try { player.Armor = 0; } catch { }
                 try { player.CanRagdoll = true; } catch { }
+
+                // The game does not apply the streamed variation when
+                // SET_PLAYER_MODEL swaps the ped, so an addon animal renders
+                // nothing until the default variation is applied to the new
+                // ped. This has to run after the model check above; applying
+                // it to the outgoing ped corrupted the animal and crashed on
+                // vehicle impacts.
+                Main.Logger.WriteLine("Local addon ped ready: " + pending.Name +
+                    " model=0x" + pending.ModelHash.ToString("X8") +
+                    " animal=" + (!player.IsHuman));
+                AddonPedVariation.ScheduleAnimalFix(player);
             }
 
             if (pending.Health > 0 && pending.Health <= 10000)

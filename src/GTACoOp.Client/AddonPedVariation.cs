@@ -62,6 +62,8 @@ namespace GTACoOp
                 {
                     // The known working sequence for animals is:
                     // component 0 -> drawable 0, texture 0, then texture 1.
+                    Main.Logger.WriteLine("Addon variation stage 0: handle=" +
+                        ped.Handle + " model=0x" + ped.Model.Hash.ToString("X8"));
                     Function.Call(Hash.SET_PED_COMPONENT_VARIATION, ped.Handle, 0, 0, 0, 0);
                     fix.Stage = 1;
                     fix.DueAt = now + 250;
@@ -71,6 +73,9 @@ namespace GTACoOp
                 var count = Function.Call<int>(
                     Hash.GET_NUMBER_OF_PED_TEXTURE_VARIATIONS, ped.Handle, 0, 0);
                 var texture = count > 1 ? 1 : 0;
+                Main.Logger.WriteLine("Addon variation stage 1: handle=" +
+                    ped.Handle + " model=0x" + ped.Model.Hash.ToString("X8") +
+                    " textures=" + count + " pick=" + texture);
                 Function.Call(Hash.SET_PED_COMPONENT_VARIATION, ped.Handle, 0, 0,
                     texture, 0);
                 Pending.RemoveAt(i);
