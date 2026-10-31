@@ -20,14 +20,16 @@ bu sürümde eklendi; ayrıntılar aşağıda.
 Bu sürüm, modeli Addon Pedler menüsü yerine Menyoo, Ped Selector veya başka bir
 trainer ile uygulanan **görünmez ve ragdoll sırasında çöken addon hayvanları** düzeltir.
 
-- **Asıl neden ragdoll değil, ped meta verisiydi.** Sunucu paketi `a_c_*` hayvanını
-  insan (`CIVMALE`) olarak tanımlayabiliyordu. Oyun pedi insan sayıyor, hayvan modeli
-  çizilmiyor ve çarpışmada çöken insan iskeleti kuruluyordu. Sync sunucusu artık tüm
-  `a_c_*` modelleri için `ANIMAL` meta verisini zorunlu kılar ve yanlış meta verili
-  paketleri yeniden oluşturur.
+- **Neden oldu?** 2.5.7 varyasyon düzeltmesini yalnızca ped bu launcher'ın Addon Pedler
+  menüsünden gelince çalıştırıyordu. Menyoo veya Ped Selector ile uygulanan pedde
+  drawable varyasyonu ayarlanmıyordu: ped görünmüyor ve ragdoll verisi bozuk kalıyordu.
 - **Dış model değişiklikleri de yakalanır.** Yerel oyuncu modelini izleyen bir denetleyici,
   hayvan Menyoo, Ped Selector veya Rampage ile gelmiş olsa da model değişimi sonrası
-  varyasyon düzeltmesini uygular.
+  aynı varyasyon düzeltmesini uygular.
+- **Meta veri güvencesi.** Sunucu paketi `a_c_*` hayvanını insan (`CIVMALE`) olarak
+  tanımlayabiliyordu. Oyun pedi insan sayıp çarpışmada çöken insan iskeleti kuruyordu.
+  Sync sunucusu artık tüm `a_c_*` modelleri için `ANIMAL` meta verisini zorunlu kılar
+  ve yanlış meta verili paketleri yeniden oluşturur.
 - **Ragdoll açık kalır.** Hayvanlarda ragdoll bayrağı veya çarpışmada ragdoll kapatılmaz.
 - **Tanılama.** `error.log` artık `Local animal model detected`, `Local addon ped ready`
   ve `Addon variation stage 0/1` satırlarını ped türü ve drawable sayısıyla kaydeder.

@@ -293,8 +293,9 @@ This is a tool for playing with friends, not a hardened anti-cheat or privacy sy
 
 This release fixes **addon animal peds that stay invisible and crash on ragdoll** when the model is applied through Menyoo, Ped Selector, or another trainer instead of the Addon Peds menu.
 
-- **The real cause was the ped metadata, not the ragdoll.** A server pack could declare an `a_c_*` animal as a human (`CIVMALE`). The game then reports the ped as human, draws no animal model, and builds a human skeleton that crashes on impact. The sync server now forces `ANIMAL` metadata for every `a_c_*` model and rebuilds packs whose metadata was wrong.
-- **External model changes are handled.** A watcher on the local player model applies the post-swap variation fix when the animal comes from Menyoo, Ped Selector, or Rampage, not only from this launcher's Addon Peds menu.
+- **Why it happened.** 2.5.7 only ran its variation fix when the ped came from this launcher's Addon Peds menu. Applied through Menyoo or Ped Selector, the ped stayed without a drawable variation: invisible, and its ragdoll had invalid data.
+- **External model changes are handled.** A watcher on the local player model now applies the same post-swap variation fix after any model change, including Menyoo, Ped Selector, and Rampage.
+- **Metadata safety net.** A server pack could also declare an `a_c_*` animal as a human (`CIVMALE`). The game then reports the ped as human and builds a human skeleton that crashes on impact. The sync server now forces `ANIMAL` metadata for every `a_c_*` model and rebuilds packs whose metadata was wrong.
 - **Ragdoll stays on.** No ragdoll flag or ragdoll-on-collision is disabled for animals.
 - **Diagnostics.** `error.log` now records `Local animal model detected`, `Local addon ped ready`, and `Addon variation stage 0/1` with the ped type and drawable count so a remaining problem can be identified.
 - **No protocol change.** 2.5.8 still uses `VERSION_0_9_4` and can play with 2.5.7, 2.5.6, 2.5.5, 2.5.4, 2.5.3, 2.5.2, 2.5.1, and 2.5.0 clients.
