@@ -8,7 +8,7 @@ GTACoop Remake is not a new multiplayer engine. It is the desktop layer around G
 
 GTACoop Remake is for private Story Mode co-op. It does not touch GTA Online, does not bypass anti-cheat, and does not inject into online sessions.
 
-**Current release:** 2.5.3  
+**Current release:** 2.5.4  
 **Platform:** Windows 10/11, x64  
 **UI:** Turkish, English, and Russian  
 **License:** GNU GPL v3
@@ -288,6 +288,16 @@ This is a tool for playing with friends, not a hardened anti-cheat or privacy sy
 - Server owners are responsible for the mods they distribute. The launcher automates delivery; it does not grant permission to redistribute someone else's work.
 
 ---
+
+## What is new in 2.5.4
+
+This release fixes **invisible addon animal peds**.
+
+- **Animals are visible again.** Addon animals now receive the game's default component variation and a forced texture refresh after the model change. The same fix is applied to remote player clones, so other players can see the animal too.
+- **Human peds keep their look.** The animal-only variation reset does not touch human clothing, props, or accessories.
+- **No protocol change.** 2.5.4 clients still use `VERSION_0_9_4` and can play with 2.5.3, 2.5.2, 2.5.1, and 2.5.0 clients.
+
+No launcher behavior changed in this build; it is a client-side visibility fix.
 
 ## What is new in 2.5.3
 

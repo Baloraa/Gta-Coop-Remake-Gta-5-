@@ -2,7 +2,7 @@
 
 **Türkçe** | [English](README.md)
 
-2.5.3 sürümü - kendi sunucu yönetimi, otomatik mod indirme, **oturum modu**,
+2.5.4 sürümü - kendi sunucu yönetimi, otomatik mod indirme, **oturum modu**,
 **kısa kod** (ör. `Gel.com`) ile internetten sunucu bulma, **otomatik relay**,
 **UPnP doğrudan bağlantı**, **özel relay sunucusu**, **tanılama kopyalama**,
 **canlı sunucu durumu**, **Sunucu Tarayıcı** sekmesi, **OpenIV (.oiv) paket desteği**,
@@ -14,6 +14,18 @@ yalnızca oyun açıkken kurulu kalır, oyundan çıkınca otomatik kaldırılı
 Oyun başlatma dosyası seçilebilir; varsayılan **PlayGTAV.exe**'dir (GTA5.exe de seçilebilir).
 **Sesli sohbet** (bas-konuş, `[MIC]` göstergesi) ve **host-led hikaye görevi koordinasyonu**
 bu sürümde eklendi; ayrıntılar aşağıda.
+
+### 2.5.4 — Görünmeyen hayvan pedleri düzeltildi
+
+Bu sürüm **görünmeyen addon hayvan pedlerini** düzeltir.
+
+- **Hayvanlar artık görünür.** Model değişiminden sonra oyunun varsayılan komponent
+  varyasyonu uygulanır ve doku yenilemesi zorlanır. Aynı düzeltme diğer oyuncuların
+  istemcilerinde oluşturulan kopyalara da uygulanır.
+- **İnsan pedleri etkilenmez.** Hayvana özel varyasyon sıfırlaması insan kıyafetlerine,
+  aksesuarlarına veya prop'larına dokunmaz.
+- **Ağ protokolü değişmedi.** 2.5.4 istemciler `VERSION_0_9_4` kullanmaya devam eder;
+  2.5.3, 2.5.2, 2.5.1 ve 2.5.0 istemcilerle oynayabilir.
 
 ### 2.5.3 — Gevşek ped dosyalarından peds.rpf
 

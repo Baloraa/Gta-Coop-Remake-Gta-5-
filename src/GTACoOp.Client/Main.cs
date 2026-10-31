@@ -745,6 +745,11 @@ namespace GTACoOp
                     player.Armor = 0;
                 }
 
+                // Akışlı hayvan pedleri varsayılan komponent varyasyonu
+                // uygulanmadan görünmez kalabiliyor (özellikle diğer oyuncularda).
+                if (isAnimal || !player.IsHuman)
+                    AddonPedVariation.ScheduleAnimalFix(player);
+
                 if (ped.Health > 0 && ped.Health <= 10000)
                 {
                     try
@@ -1824,6 +1829,7 @@ namespace GTACoOp
             try
             {
                 Ped player = Game.Player.Character;
+                AddonPedVariation.Process();
                 ProcessServerBrowserQueue();
                 UpdateServerBrowserScan();
                 _menuPool.Process();

@@ -280,6 +280,11 @@ namespace GTACoOp
                                     PedProps.ContainsKey(i + 12) ? PedProps[i + 12] : 0,
                                     PedProps.ContainsKey(i + 24) ? PedProps[i + 24] : 0);
 
+                    // A freshly cloned addon animal has no resolved variation
+                    // until one is explicitly applied locally.
+                    if (!Character.IsHuman)
+                        AddonPedVariation.ScheduleAnimalFix(Character);
+
                     return;
                 }
 
