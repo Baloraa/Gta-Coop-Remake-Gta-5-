@@ -55,6 +55,12 @@ public sealed class AddonPedsTab : UserControl
         _list.HeaderStyle = ColumnHeaderStyle.Nonclickable;
         _list.SelectedIndexChanged += (_, _) => UpdateStatus();
         _list.DoubleClick += (_, _) => EditSelected();
+        // ItemChecked, liste programatik olarak doldurulurken de tetiklenir
+        // ve ped ayarlarını yanlışlıkla değiştirebilir. Bunun yerine yalnızca
+        // kullanıcının fare/klavye eylemini dinle; onay durumunu eylem
+        // tamamlandıktan sonra oku.
+        _list.MouseUp += OnListMouseUp;
+        _list.KeyUp += OnListKeyUp;
 
         var buttons = Ui.Flow();
         buttons.Controls.Add(Ui.Btn(T("Ped Ekle..."), (_, _) => AddPedFiles()));
@@ -121,10 +127,6 @@ public sealed class AddonPedsTab : UserControl
         try
         {
             UseWaitCursor = true;
-            // Liste doldurulurken ItemChecked olayları kullanıcı tıklaması gibi
-            // görünüp pedleri yanlışlıkla açıp kapatabilir; işleyiciyi geçici
-            // olarak ayır, liste hazır olunca yeniden bağla.
-            _list.ItemChecked -= OnItemChecked;
             Directory.CreateDirectory(PedsDir);
             var rows = new List<PedRow>();
 
@@ -198,8 +200,6 @@ public sealed class AddonPedsTab : UserControl
         }
         finally
         {
-            _list.ItemChecked -= OnItemChecked;
-            _list.ItemChecked += OnItemChecked;
             UseWaitCursor = false;
         }
     }
@@ -218,11 +218,35 @@ public sealed class AddonPedsTab : UserControl
         }
     }
 
-    private void OnItemChecked(object? sender, ItemCheckedEventArgs e)
+    private void OnListMouseUp(object? sender, MouseEventArgs e)
     {
-        if (e.Item.Tag is not PedRow row) return;
-        // Programatik doldurma sırasında oluşan olaylar modelle aynı durumu taşır.
-        if (e.Item.Checked == row.Enabled) return;
+        if (e.Button != MouseButtons.Left) return;
+        var hit = _list.HitTest(e.Location);
+        if (hit.Item?.Tag is not PedRow row) return;
+        if ((hit.Location & ListViewHitTestLocations.StateImage) == 0) return;
+        var item = hit.Item;
+        // Onay kutusu durumu fare olayı işlendikten sonra değişir; kaydetmeyi
+        // bir sonraki UI turuna bırak ve güncel durumu oku.
+        BeginInvoke(new Action(() => ApplyCheck(row, item)));
+    }
+
+    private void OnListKeyUp(object? sender, KeyEventArgs e)
+    {
+        if (e.KeyCode != Keys.Space) return;
+        var items = _list.SelectedItems.Cast<ListViewItem>()
+            .Where(i => i.Tag is PedRow)
+            .ToList();
+        BeginInvoke(new Action(() =>
+        {
+            foreach (var item in items)
+                if (item.Tag is PedRow row) ApplyCheck(row, item);
+        }));
+    }
+
+    private void ApplyCheck(PedRow row, ListViewItem item)
+    {
+        var wanted = item.Checked;
+        if (wanted == row.Enabled) return;
 
         try
         {
@@ -234,20 +258,20 @@ public sealed class AddonPedsTab : UserControl
                 string.Equals(p.Model, row.Model, StringComparison.OrdinalIgnoreCase));
             if (ped == null)
             {
-                e.Item.Checked = row.Enabled;
+                item.Checked = row.Enabled;
                 return;
             }
 
-            ped.Enabled = e.Item.Checked;
-            row.Enabled = e.Item.Checked;
+            ped.Enabled = wanted;
+            row.Enabled = wanted;
             SyncJson.Save(path, file);
-            AppEnv.Log((e.Item.Checked ? "Ped etkinleştirildi: " : "Ped devre dışı: ") +
+            AppEnv.Log((wanted ? "Ped etkinleştirildi: " : "Ped devre dışı: ") +
                        row.Name + " (" + row.PackName + ")");
             UpdateStatus();
         }
         catch (Exception ex)
         {
-            e.Item.Checked = row.Enabled;
+            item.Checked = row.Enabled;
             AppEnv.LogError("Ped ayarı kaydedilemedi: " + ex);
             Ui.Error(FindForm()!, T("Ped ayarı kaydedilemedi:\r\n") + ex.Message);
         }
@@ -255,11 +279,14 @@ public sealed class AddonPedsTab : UserControl
 
     private void UpdateStatus()
     {
-        var total = _list.Items.Count;
-        var enabled = _list.Items.Cast<ListViewItem>().Count(i => i.Checked);
-        var packs = _list.Items.Cast<ListViewItem>()
-            .Select(i => (i.Tag as PedRow)?.PackPath)
-            .Where(p => p != null)
+        var rows = _list.Items.Cast<ListViewItem>()
+            .Select(i => i?.Tag as PedRow)
+            .Where(r => r != null)
+            .Cast<PedRow>()
+            .ToList();
+        var total = rows.Count;
+        var enabled = rows.Count(r => r.Enabled);
+        var packs = rows.Select(r => r.PackPath)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Count();
         _status.Text = T("Paket: {0} | Ped: {1} | Etkin: {2} | Devre dışı: {3}",
