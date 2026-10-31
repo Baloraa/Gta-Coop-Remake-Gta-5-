@@ -40,7 +40,23 @@ namespace GTACoOp
         private readonly NativeMenu _teleportMenu;
         private NativeMenu _addonPedsMenu;
         private int _defaultPlayerModel;
+        private PendingAddonPed _pendingAddonPed;
         private readonly ObjectPool _menuPool;
+
+        /// <summary>
+        /// SET_PLAYER_MODEL swaps the player ped on a later frame. Everything
+        /// that configures the new ped (health, weapons) has to wait for that
+        /// swap; touching the outgoing ped left addon animals in a broken
+        /// state and crashed the game when a vehicle hit them.
+        /// </summary>
+        private sealed class PendingAddonPed
+        {
+            public int ModelHash;
+            public string Name;
+            public int Health;
+            public int ApplyAt;
+            public int Deadline;
+        }
 
         // Pending teleport: the target's vehicle may not be streamed in yet.
         private long _pendingTeleportHost;
@@ -736,43 +752,71 @@ namespace GTACoOp
                     return;
                 }
 
-                var player = Game.Player.Character;
-                if (!player.IsHuman)
+                // ChangeModel returns before the game swaps in the new ped.
+                // Configuring Game.Player.Character here would still touch the
+                // outgoing ped. Do nothing else until the swap is visible.
+                var now = Game.GameTime;
+                _pendingAddonPed = new PendingAddonPed
                 {
-                    // Hayvan modellerinde insan silah/parçaları anlamsızdır ve
-                    // bazı sürümlerde hata üretebilir.
-                    player.Weapons.RemoveAll();
-                    player.Armor = 0;
-                }
+                    ModelHash = model.Hash,
+                    Name = string.IsNullOrWhiteSpace(ped.Name) ? ped.Model : ped.Name,
+                    Health = ped.Health,
+                    ApplyAt = now + 100,
+                    Deadline = now + 3000
+                };
 
-                // Akışlı hayvan pedleri varsayılan komponent varyasyonu
-                // uygulanmadan görünmez kalabiliyor (özellikle diğer oyuncularda).
-                if (isAnimal || !player.IsHuman)
-                {
-                    AddonPedVariation.ScheduleAnimalFix(player);
-                    // Custom animal skeletons crash when a vehicle impact
-                    // starts a human ragdoll. Guard before the player can be hit.
-                    AnimalPedSafety.Apply(player);
-                }
-
-                if (ped.Health > 0 && ped.Health <= 10000)
-                {
-                    try
-                    {
-                        player.MaxHealth = Math.Max(100, ped.Health);
-                        player.Health = ped.Health;
-                    }
-                    catch { /* bazı ped türlerinde sağlık ataması desteklenmeyebilir */ }
-                }
-
-                Notification.Show("~g~Addon ped: ~w~" + (string.IsNullOrWhiteSpace(ped.Name)
-                    ? ped.Model
-                    : ped.Name));
+                Notification.Show("~g~Addon ped: ~w~" + _pendingAddonPed.Name);
             }
             catch (Exception ex)
             {
                 Notification.Show("~r~Ped error: ~w~" + ex.Message);
                 Main.Logger.WriteException("Exception while changing addon ped", ex);
+            }
+        }
+
+        private void ProcessPendingAddonPed()
+        {
+            var pending = _pendingAddonPed;
+            if (pending == null) return;
+
+            var player = Game.Player.Character;
+            if (player == null || !player.Exists())
+            {
+                if (Game.GameTime > pending.Deadline) _pendingAddonPed = null;
+                return;
+            }
+
+            if (player.Model.Hash != pending.ModelHash)
+            {
+                if (Game.GameTime > pending.Deadline)
+                {
+                    _pendingAddonPed = null;
+                    Notification.Show("~r~Ped model could not be applied.");
+                }
+                return;
+            }
+
+            if (Game.GameTime < pending.ApplyAt) return;
+            _pendingAddonPed = null;
+
+            if (!player.IsHuman)
+            {
+                // Human weapons and armor make no sense on an animal skeleton
+                // and can leave invalid ped parts behind. Ragdoll stays at the
+                // game default so animals fall over like any ambient animal.
+                try { player.Weapons.RemoveAll(); } catch { }
+                try { player.Armor = 0; } catch { }
+                try { player.CanRagdoll = true; } catch { }
+            }
+
+            if (pending.Health > 0 && pending.Health <= 10000)
+            {
+                try
+                {
+                    player.MaxHealth = Math.Max(100, pending.Health);
+                    player.Health = pending.Health;
+                }
+                catch { /* bazı ped türlerinde sağlık ataması desteklenmeyebilir */ }
             }
         }
 
@@ -1834,8 +1878,8 @@ namespace GTACoOp
             try
             {
                 Ped player = Game.Player.Character;
+                ProcessPendingAddonPed();
                 AddonPedVariation.Process();
-                AnimalPedSafety.TickLocalPlayer(player);
                 ProcessServerBrowserQueue();
                 UpdateServerBrowserScan();
                 _menuPool.Process();

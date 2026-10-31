@@ -2,7 +2,7 @@
 
 **Türkçe** | [English](README.md)
 
-2.5.5 sürümü - kendi sunucu yönetimi, otomatik mod indirme, **oturum modu**,
+2.5.6 sürümü - kendi sunucu yönetimi, otomatik mod indirme, **oturum modu**,
 **kısa kod** (ör. `Gel.com`) ile internetten sunucu bulma, **otomatik relay**,
 **UPnP doğrudan bağlantı**, **özel relay sunucusu**, **tanılama kopyalama**,
 **canlı sunucu durumu**, **Sunucu Tarayıcı** sekmesi, **OpenIV (.oiv) paket desteği**,
@@ -14,6 +14,27 @@ yalnızca oyun açıkken kurulu kalır, oyundan çıkınca otomatik kaldırılı
 Oyun başlatma dosyası seçilebilir; varsayılan **PlayGTAV.exe**'dir (GTA5.exe de seçilebilir).
 **Sesli sohbet** (bas-konuş, `[MIC]` göstergesi) ve **host-led hikaye görevi koordinasyonu**
 bu sürümde eklendi; ayrıntılar aşağıda.
+
+### 2.5.6 — Hayvan pedi çarpışma çökmesi ragdoll kapatılmadan düzeltildi
+
+Bu sürüm, **addon hayvan pedine araç çarptığında oluşan çökmeyi** ragdoll'u kapatmadan düzeltir.
+
+- **Ragdoll açık kalır.** Hayvanlar diğer pedler gibi düşer. İstemci artık ragdoll bayrağını
+  veya çarpışmada ragdoll davranışını kapatmaz.
+- **Ped ayarları model değişimini bekler.** `ChangeModel` oyun pedi değiştirmeden döner.
+  İstemci artık yeni model etkin olana kadar bekler ve sağlık/silah temizliğini eski ped yerine
+  yeni pede uygular.
+- **Yerel oyuncuda zorunlu komponent varyasyonu yok.** Hayvan iskeletinde insan komponent
+  yuvalarını sıfırlamak pedin drawable durumunu bozuyor ve çarpmada çöküyordu. Yerel oyuncu
+  artık oyunun kendi varsayılan varyasyonunu kullanır; varyasyon düzeltmesi yalnızca uzak
+  kopyalarda kalır.
+- **Uzak hayvan kopyaları hayvan ped türüyle oluşturulur.** Kopyalar `CIVMALE` yerine ped
+  türü 28 ile oluşturulur; böylece oyun hayvan iskeletinde hayvan kodunu çalıştırır.
+- **Ağ protokolü değişmedi.** 2.5.6 istemciler `VERSION_0_9_4` kullanmaya devam eder;
+  2.5.5, 2.5.4, 2.5.3, 2.5.2, 2.5.1 ve 2.5.0 istemcilerle oynayabilir.
+
+Bu istemci tarafında bir düzeltmedir; launcher sürümü yalnızca güncellemenin dağıtılması
+için yükseltildi.
 
 ### 2.5.5 — Hayvan pedi araç çarpışması çökmesi düzeltildi
 

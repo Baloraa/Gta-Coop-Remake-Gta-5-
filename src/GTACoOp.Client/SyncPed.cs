@@ -257,7 +257,21 @@ namespace GTACoOp
                 {
                     if (Character != null) Character.Delete();
 
-                    Character = World.CreatePed(new Model(ModelHash), gPos, Rotation.Z);
+                    // World.CreatePed always uses ped type 4 (CIVMALE). An
+                    // animal model created as a human ped runs human ped code
+                    // on an animal skeleton, which crashes on vehicle impacts.
+                    // Ped type 28 keeps the clone on the animal path.
+                    var cloneModel = new Model(ModelHash);
+                    if (cloneModel.IsAnimalPed)
+                    {
+                        var handle = Function.Call<int>(Hash.CREATE_PED, 28, cloneModel.Hash,
+                            gPos.X, gPos.Y, gPos.Z, Rotation.Z, false, true);
+                        Character = handle != 0 ? Entity.FromHandle(handle) as Ped : null;
+                    }
+                    else
+                    {
+                        Character = World.CreatePed(cloneModel, gPos, Rotation.Z);
+                    }
                     if (Character == null) return;
 
                     Character.BlockPermanentEvents = true;
@@ -283,12 +297,7 @@ namespace GTACoOp
                     // A freshly cloned addon animal has no resolved variation
                     // until one is explicitly applied locally.
                     if (!Character.IsHuman)
-                    {
                         AddonPedVariation.ScheduleAnimalFix(Character);
-                        // Vehicle impacts on animal clones must not start a
-                        // human ragdoll either.
-                        AnimalPedSafety.Apply(Character);
-                    }
 
                     return;
                 }
