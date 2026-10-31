@@ -283,7 +283,12 @@ namespace GTACoOp
                     // A freshly cloned addon animal has no resolved variation
                     // until one is explicitly applied locally.
                     if (!Character.IsHuman)
+                    {
                         AddonPedVariation.ScheduleAnimalFix(Character);
+                        // Vehicle impacts on animal clones must not start a
+                        // human ragdoll either.
+                        AnimalPedSafety.Apply(Character);
+                    }
 
                     return;
                 }

@@ -2,7 +2,7 @@
 
 **Türkçe** | [English](README.md)
 
-2.5.4 sürümü - kendi sunucu yönetimi, otomatik mod indirme, **oturum modu**,
+2.5.5 sürümü - kendi sunucu yönetimi, otomatik mod indirme, **oturum modu**,
 **kısa kod** (ör. `Gel.com`) ile internetten sunucu bulma, **otomatik relay**,
 **UPnP doğrudan bağlantı**, **özel relay sunucusu**, **tanılama kopyalama**,
 **canlı sunucu durumu**, **Sunucu Tarayıcı** sekmesi, **OpenIV (.oiv) paket desteği**,
@@ -14,6 +14,24 @@ yalnızca oyun açıkken kurulu kalır, oyundan çıkınca otomatik kaldırılı
 Oyun başlatma dosyası seçilebilir; varsayılan **PlayGTAV.exe**'dir (GTA5.exe de seçilebilir).
 **Sesli sohbet** (bas-konuş, `[MIC]` göstergesi) ve **host-led hikaye görevi koordinasyonu**
 bu sürümde eklendi; ayrıntılar aşağıda.
+
+### 2.5.5 — Hayvan pedi araç çarpışması çökmesi düzeltildi
+
+Bu sürüm, **hayvan pedi bir araca çarptığında oyunun çökmesini** düzeltir.
+
+- **Çarpışma çökmesi bitti.** Addon hayvan pedlerinde insan ragdoll verisi yoktur.
+  Araç çarpması oyunun insan ragdoll başlatmasına ve çökmesine yol açıyordu. İstemci artık
+  yalnızca hayvanlarda çarpışmada ragdoll'u ve ped ragdoll bayrağını kapatır.
+- **Hayvan hareketleri aynı kalır.** Yürüme, koşma ve addon ped menüsü eskisi gibi çalışır.
+- **Diğer oyuncuların hayvanları da korunur.** Uzak hayvan kopyalarına da aynı koruma uygulanır;
+  yerel bir araba onlara çarptığında oyun çökmez.
+- **İnsan pedleri etkilenmez.** Koruma gerçek modele bakar; insan ve kadın addon pedleri
+  normal ragdoll davranışını korur.
+- **Ağ protokolü değişmedi.** 2.5.5 istemciler `VERSION_0_9_4` kullanmaya devam eder;
+  2.5.4, 2.5.3, 2.5.2, 2.5.1 ve 2.5.0 istemcilerle oynayabilir.
+
+Bu istemci tarafında bir güvenlik düzeltmesidir; launcher sürümü yalnızca güncellemenin
+dağıtılması için yükseltildi.
 
 ### 2.5.4 — Görünmeyen hayvan pedleri düzeltildi
 

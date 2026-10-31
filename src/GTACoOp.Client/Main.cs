@@ -748,7 +748,12 @@ namespace GTACoOp
                 // Akışlı hayvan pedleri varsayılan komponent varyasyonu
                 // uygulanmadan görünmez kalabiliyor (özellikle diğer oyuncularda).
                 if (isAnimal || !player.IsHuman)
+                {
                     AddonPedVariation.ScheduleAnimalFix(player);
+                    // Custom animal skeletons crash when a vehicle impact
+                    // starts a human ragdoll. Guard before the player can be hit.
+                    AnimalPedSafety.Apply(player);
+                }
 
                 if (ped.Health > 0 && ped.Health <= 10000)
                 {
@@ -1830,6 +1835,7 @@ namespace GTACoOp
             {
                 Ped player = Game.Player.Character;
                 AddonPedVariation.Process();
+                AnimalPedSafety.TickLocalPlayer(player);
                 ProcessServerBrowserQueue();
                 UpdateServerBrowserScan();
                 _menuPool.Process();

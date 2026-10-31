@@ -8,7 +8,7 @@ GTACoop Remake is not a new multiplayer engine. It is the desktop layer around G
 
 GTACoop Remake is for private Story Mode co-op. It does not touch GTA Online, does not bypass anti-cheat, and does not inject into online sessions.
 
-**Current release:** 2.5.4  
+**Current release:** 2.5.5  
 **Platform:** Windows 10/11, x64  
 **UI:** Turkish, English, and Russian  
 **License:** GNU GPL v3
@@ -288,6 +288,18 @@ This is a tool for playing with friends, not a hardened anti-cheat or privacy sy
 - Server owners are responsible for the mods they distribute. The launcher automates delivery; it does not grant permission to redistribute someone else's work.
 
 ---
+
+## What is new in 2.5.5
+
+This release fixes the **crash when an animal ped collides with a vehicle**.
+
+- **No more collision crash.** Addon animal peds normally have no human ragdoll data. A vehicle impact made the game start a human ragdoll and crash. The client now disables ragdoll-on-collision and the ped ragdoll flag for animals only.
+- **Normal animal movement is unchanged.** Walking, running, and the addon ped menu work as before.
+- **Remote animals are protected too.** Other players' animal clones receive the same guard, so a local car cannot crash the game by hitting them.
+- **Human peds are untouched.** The guard checks the actual model, so human and female addon peds keep their normal ragdoll behavior.
+- **No protocol change.** 2.5.5 clients still use `VERSION_0_9_4` and can play with 2.5.4, 2.5.3, 2.5.2, 2.5.1, and 2.5.0 clients.
+
+This is a client-side safety fix; the launcher version is bumped only so the update is delivered.
 
 ## What is new in 2.5.4
 
