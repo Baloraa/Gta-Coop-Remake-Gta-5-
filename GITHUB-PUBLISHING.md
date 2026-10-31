@@ -12,25 +12,27 @@ Suggested topics:
 
 `gta-v` `gtacoop` `gta-coop` `multiplayer` `coop` `launcher` `winforms` `dotnet` `csharp` `mod-manager` `relay` `story-mode`
 
-## Release 2.5.2 description
+## Release 2.5.3 description
 
 Use this as the GitHub Release body:
 
-> **GTACoop Remake 2.5.2 — server-delivered addon peds**
+> **GTACoop Remake 2.5.3 — loose addon peds, packed into one peds.rpf**
 >
-> This release adds **addon peds delivered by the server**, for both human and animal models. The network protocol is unchanged (`VERSION_0_9_4`), so 2.5.2, 2.5.1, and 2.5.0 clients can still play on the same server.
+> This release reworks addon peds around **loose ped files**, matching the AddonPeds workflow. Drop `.ydd/.ytd/.ymt/.yft` files into `Addons\peds\<pack>` and the server groups them by model, builds a single AddonPeds-style `peds.rpf`, and wraps it in a unique `dlc.rpf` when the manifest is generated. The network protocol is unchanged (`VERSION_0_9_4`), so 2.5.3, 2.5.2, 2.5.1, and 2.5.0 clients can still play on the same server.
 >
-> **Addon Peds tab.** The server section has an **Addon Peds** button that opens a separate tab listing every pack in `Addons\peds`, with human/animal type, model name, and an enable checkbox per ped. Only enabled peds appear in players' menus.
+> **Addon Peds tab.** The server section has an **Addon Peds** button that opens a dedicated tab. It now works like PedSelector: add loose files, add a streamed component folder, import a folder or a ZIP/RAR/7Z archive, edit a ped's display name, type, health, and metadata, view its files, or remove it. Removed files move to `Addons-Removed\<timestamp>\peds\...` instead of being deleted.
 >
-> **Human and animal peds.** AddonPeds packs and plain ped DLC packs are supported. Animal models (`a_c_...`) are detected automatically and skip human-only props, weapons, aiming, shooting, jumping, and parachute logic, so sync and collision stay stable.
+> **Human, female, and animal peds.** Animal models (`a_c_...`) are detected automatically and skip human-only props, weapons, aiming, shooting, jumping, and parachute logic, so sync and collision stay stable. The editor lets you correct the type and metadata when detection is wrong.
 >
-> **Your own AddonPeds setup is never touched.** Server packs are rewritten into self-contained DLCs with a unique mount name and embedded metadata. Your `ap_m.xml`, `UserMods` folder, and existing `dlcpacks` are read-only references and are never modified or overwritten. Packs with the same name already on your PC are detected and skipped, and each server pack mounts as `gcs_<pack>` with its own device name, `nameHash`, and change-set name to avoid collisions.
+> **Legacy packs keep working.** Existing `dlc.rpf`/`peds.rpf` packs are extracted to loose files once and then regenerated from those files. Only the server copy is changed.
+>
+> **Your own AddonPeds setup is never touched.** `ap_m.xml`, your `UserMods` folder, and your existing `dlcpacks` are read-only references and are never modified or overwritten. Every server pack mounts as `gcs_<pack>` with its own device name, `nameHash`, and change-set name, so it cannot collide with your packs. A pack with the same name already on your PC is detected and skipped.
 >
 > **In-game menu.** Press F9 and open **Addon Peds** to switch between the server's human and animal peds or return to your normal character.
 >
 > **Upgrade:** replace the application folder with the new build, or run the installer as usual. Your `%LOCALAPPDATA%\GTACoopRemake` settings, server list, and logs are kept in place. The share ZIP still excludes GTA V, ScriptHookV, ScriptHookVDotNet, and RageOpenV. The bundled `OpenIV.asi` is user-supplied.
 
-Attach `GTACoop-Remake-Share-2.5.2.zip`, `GTACoop.Launcher.exe`, and `GTACoop.Sync.dll` as release assets. Do not commit them to the repository.
+Attach `GTACoop-Remake-Share-2.5.3.zip`, `GTACoop.Launcher.exe`, and `GTACoop.Sync.dll` as release assets. Do not commit them to the repository.
 
 ## Before you make the repository public
 
@@ -120,6 +122,6 @@ Before uploading, check:
 
 ## A note on the current repository state
 
-The working tree has the 2.5.2 changes, including server-delivered addon peds and the updated documentation. Review `git status`, commit them in logical chunks, and tag the release only after the build and ZIP verification pass.
+The working tree has the 2.5.3 changes, including the loose-file addon ped pipeline and the updated documentation. Review `git status`, commit them in logical chunks, and tag the release only after the build and ZIP verification pass.
 
 The GitHub remote is configured. Push `main`, then create the release from the tag. The English README is already the default; keep the language links intact when you make further edits.

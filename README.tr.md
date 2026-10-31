@@ -2,7 +2,7 @@
 
 **Türkçe** | [English](README.md)
 
-2.5.2 sürümü - kendi sunucu yönetimi, otomatik mod indirme, **oturum modu**,
+2.5.3 sürümü - kendi sunucu yönetimi, otomatik mod indirme, **oturum modu**,
 **kısa kod** (ör. `Gel.com`) ile internetten sunucu bulma, **otomatik relay**,
 **UPnP doğrudan bağlantı**, **özel relay sunucusu**, **tanılama kopyalama**,
 **canlı sunucu durumu**, **Sunucu Tarayıcı** sekmesi, **OpenIV (.oiv) paket desteği**,
@@ -14,6 +14,32 @@ yalnızca oyun açıkken kurulu kalır, oyundan çıkınca otomatik kaldırılı
 Oyun başlatma dosyası seçilebilir; varsayılan **PlayGTAV.exe**'dir (GTA5.exe de seçilebilir).
 **Sesli sohbet** (bas-konuş, `[MIC]` göstergesi) ve **host-led hikaye görevi koordinasyonu**
 bu sürümde eklendi; ayrıntılar aşağıda.
+
+### 2.5.3 — Gevşek ped dosyalarından peds.rpf
+
+Bu sürüm addon pedleri **gevşek ped dosyaları** üzerinden yeniden düzenler.
+
+- **Dosyaları bırakın, tek peds.rpf oluşsun.** `.ydd/.ytd/.ymt/.yft` dosyalarını
+  `Addons\peds\<paket>` klasörüne koyun (düz dosyalar veya streamed ped başına bir klasör).
+  Sunucu dosyaları modele göre gruplar, AddonPeds biçimindeki tek bir `peds.rpf` içinde
+  paketler ve manifest hazırlanırken benzersiz bir `dlc.rpf` içine yerleştirir.
+- **Ped bazında yönetim.** **Addon Peds** sekmesi artık PedSelector gibi çalışır: gevşek
+  dosya ekleme, streamed bileşen klasörü ekleme, klasör veya ZIP/RAR/7Z arşivi içe aktarma,
+  görünen adı/türü/sağlığı/meta veriyi düzenleme, pedin dosyalarını görüntüleme ve pedi
+  kaldırma.
+- **Güvenli kaldırma.** Kaldırılan ped dosyaları silinmez;
+  `Addons-Removed\<zaman>\peds\...` klasörüne taşınır, böylece yanlış bir işlem geri alınabilir.
+- **Daha fazla ped türü.** İnsan, kadın ve hayvan pedleri desteklenir. Hayvanlarda insana
+  özel kıyafet, silah, nişan alma, ateş etme, zıplama ve paraşüt mantığı atlanır; otomatik
+  algılama yanlışsa tür ve meta veri Düzenle ile düzeltilebilir.
+- **Eski paketler çalışmaya devam eder.** Mevcut `dlc.rpf`/`peds.rpf` paketleri bir kez
+  gevşek dosyalara açılır ve sonra bu dosyalardan yeniden üretilir.
+- **Kendi AddonPeds kurulumunuza yine dokunulmaz.** `ap_m.xml`, `UserMods` ve mevcut
+  `dlcpacks` yalnızca okunur. Sunucu paketleri benzersiz bağlantı/cihaz/değişiklik kümesi
+  adları kullandığı için kendi paketlerinizle çakışmaz.
+
+Ağ protokolü değişmedi (`VERSION_0_9_4`); 2.5.3 istemciler 2.5.2, 2.5.1 ve 2.5.0
+istemcilerle aynı sunucuda oynayabilir. Eski istemciler ped listesini yok sayar.
 
 ### 2.5.2 — Sunucudan addon pedler
 
@@ -323,7 +349,7 @@ Kurallar:
 - Bu betik uygulamayı `%LOCALAPPDATA%\Programs\GTACoop Remake` klasörüne kopyalar ve
   **masaüstü** + **Başlat menüsü** kısayollarını buraya bağlar. Hiçbir şey silinmez
   (eski `dist` klasörü olduğu yerde kalır).
-- Uygulama simgesi ve sürüm bilgisi (2.5.2) exe dosyasına işlenmiştir.
+- Uygulama simgesi ve sürüm bilgisi (2.5.3) exe dosyasına işlenmiştir.
 
 ---
 

@@ -19,6 +19,7 @@ namespace GTACoOp
         public string Name { get; set; }
         public string Kind { get; set; }
         public string Pack { get; set; }
+        public int Health { get; set; }
     }
 
     internal static class AddonPedsClient

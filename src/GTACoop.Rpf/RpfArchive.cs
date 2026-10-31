@@ -85,6 +85,43 @@ public sealed class RpfArchive : IDisposable
         throw last!;
     }
 
+    /// <summary>
+    /// Yeni, boş bir RPF7 arşivi oluşturur. <paramref name="headerReserve"/>
+    /// baytlık başlangıç alanı TOC/isim tablosunun büyümesi için ayrılır;
+    /// böylece çok sayıda dosya eklerken veri blokları yeniden taşınmaz.
+    /// </summary>
+    public static RpfArchive Create(string path, bool overwrite = false,
+        int headerReserve = 512)
+    {
+        if (headerReserve < 512) headerReserve = 512;
+        headerReserve = (headerReserve + 511) / 512 * 512;
+
+        var dir = System.IO.Path.GetDirectoryName(path);
+        if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
+
+        using (var fs = new FileStream(path,
+                   overwrite ? FileMode.Create : FileMode.CreateNew,
+                   FileAccess.Write, FileShare.None))
+        {
+            var header = new byte[headerReserve];
+            BitConverter.TryWriteBytes(header.AsSpan(0, 4), Magic);
+            BitConverter.TryWriteBytes(header.AsSpan(4, 4), 1u);   // yalnızca kök dizin
+            BitConverter.TryWriteBytes(header.AsSpan(8, 4), 16u);  // 16 baytlık boş isim tablosu
+            BitConverter.TryWriteBytes(header.AsSpan(12, 4), (uint)RpfEncryption.Open);
+
+            // Kök dizin girdisi
+            BitConverter.TryWriteBytes(header.AsSpan(16, 4), 0u);  // isim ofseti
+            BitConverter.TryWriteBytes(header.AsSpan(20, 4), DirectoryIdent);
+            BitConverter.TryWriteBytes(header.AsSpan(24, 4), 1u);  // ilk alt girdi
+            BitConverter.TryWriteBytes(header.AsSpan(28, 4), 0u);  // alt girdi sayısı
+
+            fs.Write(header, 0, header.Length);
+            fs.Flush(true);
+        }
+
+        return Open(path);
+    }
+
     private static RpfArchive OpenCore(string path, byte[]? aesKey)
     {
         FileStream? fs = null;

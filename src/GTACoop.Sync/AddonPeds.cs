@@ -15,11 +15,27 @@ public sealed class AddonPedInfo
     /// <summary>Oyuncuya gösterilecek ad.</summary>
     public string Name { get; set; } = "";
 
-    /// <summary>"human" veya "animal".</summary>
+    /// <summary>"human", "female" veya "animal".</summary>
     public string Kind { get; set; } = "human";
 
     /// <summary>Sunucu bu pedi dağıtıyor mu?</summary>
     public bool Enabled { get; set; } = true;
+
+    /// <summary>Ped bileşenleri bir klasörde mi (streamed ped)?</summary>
+    public bool Streamed { get; set; }
+
+    /// <summary>Oyuncu modeli değişince uygulanacak sağlık değeri.</summary>
+    public int Health { get; set; } = 200;
+
+    /// <summary>İsteğe bağlı meta veri alanları (boşsa şablon değeri kullanılır).</summary>
+    public string ClipDictionary { get; set; } = "";
+    public string MovementClipSet { get; set; } = "";
+    public string DecisionMaker { get; set; } = "";
+    public string Personality { get; set; } = "";
+    public string CombatInfo { get; set; } = "";
+
+    /// <summary>Bu pede ait gevşek dosyalar (paket klasörüne göreli, "/" ayraçlı).</summary>
+    public List<string> Files { get; set; } = new();
 }
 
 /// <summary>Addons\peds\&lt;paket&gt;\peds.json içeriği.</summary>
@@ -44,12 +60,13 @@ public sealed class ClientAddonPed
     public string Name { get; set; } = "";
     public string Kind { get; set; } = "human";
     public string Pack { get; set; } = "";
+    public int Health { get; set; } = 200;
 }
 
 /// <summary>
-/// AddonPeds uyumlu DLC paketlerini sunucu tarafında inceler ve kendi kendine
-/// yeterli (self-contained) bir kopya üretir. Kullanıcının kendi AddonPeds
-/// kurulumuna ve ap_m.xml dosyasına asla dokunulmaz.
+/// Sunucudaki gevşek ped dosyalarını (.ydd/.ytd/.ymt/.yft) AddonPeds'in
+/// peds.rpf yapısına benzer tek bir RPF içinde paketler. Kullanıcının kendi
+/// AddonPeds kurulumuna, ap_m.xml dosyasına veya dlcpacks klasörüne dokunmaz.
 /// </summary>
 public static class AddonPeds
 {
@@ -57,12 +74,299 @@ public static class AddonPeds
     public const string PackFileName = "peds.json";
     public const string PreparedDirectoryName = ".gtacoop-peds";
     public const string ClientConfigFileName = "GTACoop-addonpeds.json";
-    private const string EmbeddedMetadataName = "gtacoop_peds.xml";
-    private const int PrepareFormat = 2;
+    public const string EmbeddedMetadataName = "gtacoop_peds.xml";
+    private const int PrepareFormat = 3;
     private const string HumanKind = "human";
+    private const string FemaleKind = "female";
     private const string AnimalKind = "animal";
 
-    // ---------------------------------------------------------------- paket dosyası
+    private static readonly string[] PedExtensions = { ".ydd", ".ytd", ".ymt", ".yft" };
+
+    private static readonly HashSet<string> ContainerFolders = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "streamed", "peds", "models", "addonpeds", "dlc", "files", "source", "loose"
+    };
+
+    // ---------------------------------------------------------------- keşif
+
+    /// <summary>Paket klasöründeki tek bir mantıksal ped.</summary>
+    public sealed class LoosePed
+    {
+        public string Model { get; init; } = "";
+        public string Name { get; init; } = "";
+        public string Kind { get; init; } = HumanKind;
+        public bool Streamed { get; init; }
+        public bool HasModelFile { get; init; }
+        public List<string> Files { get; init; } = new();
+    }
+
+    public static bool IsPedFile(string path) =>
+        PedExtensions.Contains(Path.GetExtension(path), StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Eski dlc.rpf/peds.rpf paketlerini bir kez gevşek dosyalara açar.
+    /// Kaynak arşiv silinmez; yalnızca yoksa dosya eklenir.
+    /// </summary>
+    public static bool EnsureLooseSource(string packDir, Action<string>? log = null)
+    {
+        try
+        {
+            if (Directory.EnumerateFiles(packDir, "*", SearchOption.AllDirectories)
+                .Any(IsPedFile))
+                return true;
+
+            var direct = Directory.EnumerateFiles(packDir, "peds.rpf", SearchOption.AllDirectories)
+                .OrderBy(p => p.Count(c => c == Path.DirectorySeparatorChar))
+                .FirstOrDefault();
+
+            if (direct != null)
+                return ExtractPedFiles(direct, packDir, log);
+
+            var dlc = FindDlcRpf(packDir);
+            if (dlc == null) return false;
+
+            string? temp = null;
+            try
+            {
+                using var outer = RpfArchive.Open(dlc);
+                var stream = outer.Find("peds.rpf");
+                if (stream != null)
+                {
+                    temp = Path.Combine(Path.GetTempPath(),
+                        "gtacoop-peds-" + Guid.NewGuid().ToString("N") + ".rpf");
+                    File.WriteAllBytes(temp, outer.ReadFile(stream));
+                    if (ExtractPedFiles(temp, packDir, log)) return true;
+                }
+
+                // Bazı paketler ped dosyalarını doğrudan dlc.rpf içinde tutar.
+                var extracted = 0;
+                foreach (var file in outer.AllFiles())
+                {
+                    if (!IsPedFile(file.Path)) continue;
+                    if (WriteExtracted(packDir, file.Path, outer.ReadFile(file), log)) extracted++;
+                }
+                return extracted > 0;
+            }
+            finally
+            {
+                if (temp != null)
+                {
+                    try { File.Delete(temp); } catch { }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            log?.Invoke($"Ped kaynağı açılamadı ({Path.GetFileName(packDir)}): {ex.Message}");
+            return false;
+        }
+    }
+
+    private static bool ExtractPedFiles(string archivePath, string packDir, Action<string>? log)
+    {
+        var extracted = 0;
+        using var archive = RpfArchive.Open(archivePath);
+        foreach (var file in archive.AllFiles())
+        {
+            if (!IsPedFile(file.Path)) continue;
+            if (WriteExtracted(packDir, file.Path, archive.ReadFile(file), log)) extracted++;
+        }
+        if (extracted > 0)
+            log?.Invoke($"Ped arşivi gevşek dosyalara açıldı: {Path.GetFileName(packDir)} ({extracted} dosya)");
+        return extracted > 0;
+    }
+
+    private static bool WriteExtracted(string packDir, string relPath, byte[] content,
+        Action<string>? log)
+    {
+        try
+        {
+            var rel = relPath.Replace('/', '\\').TrimStart('\\');
+            var target = Path.GetFullPath(Path.Combine(packDir, rel));
+            var root = Path.GetFullPath(packDir);
+            if (!target.StartsWith(root + Path.DirectorySeparatorChar,
+                    StringComparison.OrdinalIgnoreCase))
+                return false;
+            if (File.Exists(target)) return false;
+
+            Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+            File.WriteAllBytes(target, content);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            log?.Invoke($"Ped dosyası çıkarılamadı ({relPath}): {ex.Message}");
+            return false;
+        }
+    }
+
+    /// <summary>Paket klasöründeki gevşek ped dosyalarını mantıksal pedlere gruplar.</summary>
+    public static List<LoosePed> DiscoverLoosePeds(string packDir, Action<string>? log = null,
+        bool extractLegacy = true)
+    {
+        if (extractLegacy) EnsureLooseSource(packDir, log);
+
+        var groups = new Dictionary<string, LooseGroup>(StringComparer.OrdinalIgnoreCase);
+        foreach (var file in Directory.EnumerateFiles(packDir, "*", SearchOption.AllDirectories))
+        {
+            if (!IsPedFile(file)) continue;
+
+            var rel = Path.GetRelativePath(packDir, file).Replace('\\', '/');
+            var parts = rel.Split('/', StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length == 0) continue;
+
+            var skip = false;
+            foreach (var part in parts)
+            {
+                if (part.StartsWith('.'))
+                {
+                    skip = true;
+                    break;
+                }
+            }
+            if (skip) continue;
+
+            string key;
+            bool inFolder = false;
+            if (parts.Length > 1)
+            {
+                inFolder = true;
+                var index = 0;
+                if (ContainerFolders.Contains(parts[0]) && parts.Length > 2) index = 1;
+                key = parts[index];
+            }
+            else
+            {
+                key = Path.GetFileNameWithoutExtension(parts[0]);
+                var caret = key.IndexOf('^');
+                if (caret > 0) key = key[..caret];
+            }
+
+            key = key.Trim().ToLowerInvariant();
+            if (key.Length == 0) continue;
+
+            if (!groups.TryGetValue(key, out var group))
+            {
+                group = new LooseGroup { Model = key };
+                groups[key] = group;
+            }
+
+            group.Files.Add(rel);
+            if (inFolder) group.Streamed = true;
+            if (parts.Length == 1 &&
+                (Path.GetExtension(file).Equals(".yft", StringComparison.OrdinalIgnoreCase) ||
+                 Path.GetExtension(file).Equals(".ymt", StringComparison.OrdinalIgnoreCase)))
+                group.HasModelFile = true;
+            if (inFolder &&
+                (Path.GetExtension(file).Equals(".ydd", StringComparison.OrdinalIgnoreCase) ||
+                 Path.GetExtension(file).Equals(".ytd", StringComparison.OrdinalIgnoreCase)))
+                group.HasModelFile = true;
+        }
+
+        var models = groups.Keys.ToList();
+        var metadata = LoadMetadata(packDir, models);
+        var result = new List<LoosePed>();
+        foreach (var group in groups.Values)
+        {
+            group.Files.Sort(StringComparer.OrdinalIgnoreCase);
+            metadata.TryGetValue(group.Model, out var item);
+            result.Add(new LoosePed
+            {
+                Model = group.Model,
+                Name = PrettifyName(group.Model),
+                Kind = GuessKind(group.Model, item),
+                Streamed = group.Streamed,
+                HasModelFile = group.HasModelFile,
+                Files = group.Files
+            });
+        }
+
+        result.Sort((a, b) =>
+        {
+            var kind = KindSort(a.Kind).CompareTo(KindSort(b.Kind));
+            return kind != 0 ? kind : StringComparer.CurrentCultureIgnoreCase.Compare(a.Name, b.Name);
+        });
+        return result;
+    }
+
+    private sealed class LooseGroup
+    {
+        public string Model = "";
+        public bool Streamed;
+        public bool HasModelFile;
+        public List<string> Files = new();
+    }
+
+    private static int KindSort(string kind) =>
+        kind == AnimalKind ? 1 : 0;
+
+    /// <summary>peds.json dosyasını okur; yoksa keşfedilen dosyalardan oluşturur ve kaydeder.</summary>
+    public static AddonPedPackFile LoadOrCreatePackFile(string packDir, IList<LoosePed> discovered)
+    {
+        var path = Path.Combine(packDir, PackFileName);
+        var file = SyncJson.Load<AddonPedPackFile>(path) ?? new AddonPedPackFile();
+
+        if (string.IsNullOrWhiteSpace(file.DisplayName))
+        {
+            var addon = SyncJson.Load<AddonMetaFile>(Path.Combine(packDir, "addon.json"));
+            file.DisplayName = !string.IsNullOrWhiteSpace(addon?.DisplayName)
+                ? addon!.DisplayName!
+                : Path.GetFileName(packDir);
+        }
+
+        if (string.IsNullOrWhiteSpace(file.Description))
+            file.Description = SyncJson.Load<AddonMetaFile>(
+                Path.Combine(packDir, "addon.json"))?.Description ?? "";
+
+        var remaining = file.Peds
+            .Where(p => !string.IsNullOrWhiteSpace(p.Model))
+            .GroupBy(p => p.Model, StringComparer.OrdinalIgnoreCase)
+            .Select(g => g.First())
+            .ToList();
+
+        var merged = new List<AddonPedInfo>();
+        foreach (var loose in discovered)
+        {
+            var existing = remaining.FirstOrDefault(p =>
+                    p.Files != null && p.Files.Count > 0 &&
+                    p.Files.Intersect(loose.Files, StringComparer.OrdinalIgnoreCase).Any())
+                ?? remaining.FirstOrDefault(p =>
+                    string.Equals(p.Model, loose.Model, StringComparison.OrdinalIgnoreCase));
+
+            existing ??= new AddonPedInfo { Enabled = true };
+            remaining.Remove(existing);
+
+            existing.Model = loose.Model;
+            existing.Files = loose.Files;
+            existing.Streamed = loose.Streamed;
+            if (string.IsNullOrWhiteSpace(existing.Name))
+                existing.Name = loose.Name;
+            if (existing.Kind is not (HumanKind or FemaleKind or AnimalKind))
+                existing.Kind = loose.Kind;
+            if (existing.Health <= 0) existing.Health = 200;
+            existing.ClipDictionary ??= "";
+            existing.MovementClipSet ??= "";
+            existing.DecisionMaker ??= "";
+            existing.Personality ??= "";
+            existing.CombatInfo ??= "";
+            merged.Add(existing);
+        }
+
+        file.Peds = merged
+            .OrderBy(p => KindSort(p.Kind))
+            .ThenBy(p => p.Name, StringComparer.CurrentCultureIgnoreCase)
+            .ThenBy(p => p.Model, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        try { SyncJson.Save(path, file); } catch { /* okunamayan disk: tarama devam eder */ }
+        return file;
+    }
+
+    public sealed class AddonMetaFile
+    {
+        public string? DisplayName { get; set; }
+        public string? Description { get; set; }
+    }
 
     public static string? FindDlcRpf(string packDir)
     {
@@ -79,146 +383,6 @@ public static class AddonPeds
         }
     }
 
-    /// <summary>dlc.rpf içindeki peds.rpf'ten ped model adlarını okur.</summary>
-    public static List<string> DiscoverModels(string dlcRpf, Action<string>? log = null)
-    {
-        var models = new List<string>();
-        string? temp = null;
-        try
-        {
-            using var outer = RpfArchive.Open(dlcRpf);
-            var entry = outer.Find("peds.rpf");
-            if (entry != null)
-            {
-                temp = Path.Combine(Path.GetTempPath(), "gtacoop-peds-" + Guid.NewGuid().ToString("N") + ".rpf");
-                File.WriteAllBytes(temp, outer.ReadFile(entry));
-                using var inner = RpfArchive.Open(temp);
-
-                foreach (var file in inner.Root.Files)
-                {
-                    if (!file.NameLower.EndsWith(".yft", StringComparison.OrdinalIgnoreCase)) continue;
-                    var name = Path.GetFileNameWithoutExtension(file.NameLower);
-                    if (name.Length > 0) models.Add(name);
-                }
-
-                // Bazı paketlerde modeller alt klasörde olabilir; en sığ .yft'leri kullan.
-                if (models.Count == 0)
-                {
-                    var files = inner.AllEntries.OfType<RpfFileEntry>()
-                        .Where(f => f.Path.EndsWith(".yft", StringComparison.OrdinalIgnoreCase))
-                        .OrderBy(f => f.Path.Count(c => c == '\\'))
-                        .ThenBy(f => f.Path, StringComparer.OrdinalIgnoreCase);
-                    foreach (var file in files)
-                    {
-                        var name = Path.GetFileNameWithoutExtension(file.Path);
-                        if (name.Length == 0 || models.Contains(name, StringComparer.OrdinalIgnoreCase))
-                            continue;
-                        models.Add(name);
-                        // Alt klasör yapısı model adıyla eşleşmiyorsa yalnızca ilk grubu al.
-                        if (models.Count >= 512) break;
-                    }
-                }
-            }
-            else
-            {
-                // Standart DLC ped paketi: doğrudan dlc.rpf içinde modeller olabilir.
-                var files = outer.AllEntries.OfType<RpfFileEntry>()
-                    .Where(f => f.Path.EndsWith(".yft", StringComparison.OrdinalIgnoreCase))
-                    .OrderBy(f => f.Path.Count(c => c == '\\'))
-                    .ThenBy(f => f.Path, StringComparer.OrdinalIgnoreCase);
-                foreach (var file in files)
-                {
-                    var name = Path.GetFileNameWithoutExtension(file.Path);
-                    if (name.Length == 0 || models.Contains(name, StringComparer.OrdinalIgnoreCase)) continue;
-                    models.Add(name);
-                    if (models.Count >= 512) break;
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            log?.Invoke($"Ped modelleri okunamadı ({Path.GetFileName(dlcRpf)}): {ex.Message}");
-        }
-        finally
-        {
-            if (temp != null)
-            {
-                try { File.Delete(temp); } catch { }
-            }
-        }
-
-        models.Sort(StringComparer.OrdinalIgnoreCase);
-        return models;
-    }
-
-    /// <summary>peds.json dosyasını okur; yoksa modellerden oluşturur ve kaydeder.</summary>
-    public static AddonPedPackFile LoadOrCreatePackFile(string packDir, IList<string> models)
-    {
-        var path = Path.Combine(packDir, PackFileName);
-        var file = SyncJson.Load<AddonPedPackFile>(path) ?? new AddonPedPackFile();
-
-        if (string.IsNullOrWhiteSpace(file.DisplayName))
-        {
-            var addon = SyncJson.Load<AddonMetaFile>(Path.Combine(packDir, "addon.json"));
-            file.DisplayName = !string.IsNullOrWhiteSpace(addon?.DisplayName)
-                ? addon!.DisplayName!
-                : Path.GetFileName(packDir);
-        }
-        if (string.IsNullOrWhiteSpace(file.Description))
-            file.Description = SyncJson.Load<AddonMetaFile>(Path.Combine(packDir, "addon.json"))?.Description ?? "";
-
-        if (models.Count > 0)
-        {
-            var metadata = LoadMetadata(packDir, models);
-            var known = file.Peds
-                .GroupBy(p => p.Model, StringComparer.OrdinalIgnoreCase)
-                .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
-            var discovered = new HashSet<string>(models, StringComparer.OrdinalIgnoreCase);
-
-            // Artık pakette olmayan kayıtları listeden çıkar (yanlış menü girdisi bırakma).
-            file.Peds.RemoveAll(p => string.IsNullOrWhiteSpace(p.Model) ||
-                !discovered.Contains(p.Model));
-
-            foreach (var model in models)
-            {
-                metadata.TryGetValue(model, out var metaItem);
-                var metaKind = metaItem == null ? null : GuessKind(model, metaItem);
-
-                if (known.TryGetValue(model, out var existing))
-                {
-                    if (string.IsNullOrWhiteSpace(existing.Name)) existing.Name = PrettifyName(model);
-                    if (metaKind != null) existing.Kind = metaKind;
-                    else if (existing.Kind is not (HumanKind or AnimalKind))
-                        existing.Kind = GuessKind(model, null);
-                    continue;
-                }
-
-                file.Peds.Add(new AddonPedInfo
-                {
-                    Model = model,
-                    Name = PrettifyName(model),
-                    Kind = metaKind ?? GuessKind(model, null),
-                    Enabled = true
-                });
-            }
-        }
-
-        file.Peds = file.Peds
-            .OrderBy(p => p.Kind == AnimalKind ? 1 : 0)
-            .ThenBy(p => p.Name, StringComparer.CurrentCultureIgnoreCase)
-            .ThenBy(p => p.Model, StringComparer.OrdinalIgnoreCase)
-            .ToList();
-
-        try { SyncJson.Save(path, file); } catch { /* okunamayan disk: tarama devam eder */ }
-        return file;
-    }
-
-    public sealed class AddonMetaFile
-    {
-        public string? DisplayName { get; set; }
-        public string? Description { get; set; }
-    }
-
     public static string PrettifyName(string model)
     {
         var text = model.Replace('_', ' ').Trim();
@@ -231,9 +395,13 @@ public static class AddonPeds
     public static string GuessKind(string model, XElement? metadata)
     {
         var pedType = metadata?.Element("Pedtype")?.Value;
-        if (!string.IsNullOrWhiteSpace(pedType) &&
-            pedType.Contains("ANIMAL", StringComparison.OrdinalIgnoreCase))
-            return AnimalKind;
+        if (!string.IsNullOrWhiteSpace(pedType))
+        {
+            if (pedType.Contains("ANIMAL", StringComparison.OrdinalIgnoreCase))
+                return AnimalKind;
+            if (pedType.Contains("FEMALE", StringComparison.OrdinalIgnoreCase))
+                return FemaleKind;
+        }
 
         return model.StartsWith("a_c_", StringComparison.OrdinalIgnoreCase) ||
                model.StartsWith("a_c", StringComparison.OrdinalIgnoreCase) &&
@@ -242,190 +410,240 @@ public static class AddonPeds
             : HumanKind;
     }
 
+    public static bool IsAnimal(string kind) =>
+        string.Equals(kind, AnimalKind, StringComparison.OrdinalIgnoreCase);
+
     // ---------------------------------------------------------------- hazırlama
 
     private sealed class PrepareStamp
     {
         public int Format { get; set; }
-        public long SourceLength { get; set; }
-        public long SourceTicks { get; set; }
-        public string MetadataHash { get; set; } = "";
+        public string SourceHash { get; set; } = "";
     }
 
     /// <summary>
-    /// Paketi kendi kendine yeterli hale getirir: cihaz adını benzersiz yapar,
-    /// ped meta verisini dlc.rpf içine gömer. Dönen klasörde yalnızca dlc.rpf bulunur.
-    /// Kaynak paket ve kullanıcının ap_m.xml dosyası değiştirilmez.
+    /// Paketi kendi kendine yeterli hale getirir: gevşek dosyalardan AddonPeds
+    /// uyumlu peds.rpf, onu taşıyan benzersiz bir dlc.rpf ve gömülü ped meta
+    /// verisi üretir. Kaynak dosyalar ve kullanıcının ap_m.xml dosyası değiştirilmez.
     /// </summary>
     public static string PrepareSelfContained(string packDir, string addonId,
         string preparedRoot, AddonPedPackFile packFile, Action<string>? log = null)
     {
-        var source = FindDlcRpf(packDir)
-            ?? throw new FileNotFoundException($"'{packDir}' içinde dlc.rpf bulunamadı.");
         Directory.CreateDirectory(preparedRoot);
         var target = Path.Combine(preparedRoot, "dlc.rpf");
         var stampPath = Path.Combine(preparedRoot, ".prepare.json");
-        var sourceInfo = new FileInfo(source);
 
-        var items = LoadMetadata(packDir, packFile.Peds.Select(p => p.Model));
-        var metadataXml = BuildMetadataXml(packFile.Peds, items);
-        var metadataHash = HashMetadata(packFile.Peds, metadataXml);
+        var enabled = packFile.Peds
+            .Where(p => p.Enabled && !string.IsNullOrWhiteSpace(p.Model) &&
+                        p.Files != null && p.Files.Count > 0)
+            .ToList();
+        if (enabled.Count == 0)
+            throw new InvalidDataException("Etkin ped yok.");
+
+        var items = LoadMetadata(packDir, enabled.Select(p => p.Model));
+        var metadataXml = BuildMetadataXml(enabled, items);
+        var sourceHash = ComputeSourceHash(packDir, enabled, metadataXml);
 
         var stamp = SyncJson.Load<PrepareStamp>(stampPath);
         if (stamp != null && File.Exists(target) &&
             stamp.Format == PrepareFormat &&
-            stamp.SourceLength == sourceInfo.Length &&
-            stamp.SourceTicks == sourceInfo.LastWriteTimeUtc.Ticks &&
-            string.Equals(stamp.MetadataHash, metadataHash, StringComparison.Ordinal))
+            string.Equals(stamp.SourceHash, sourceHash, StringComparison.Ordinal))
         {
             return target;
         }
 
-        var temp = target + ".new";
+        var buildDir = Path.Combine(preparedRoot, ".building-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(buildDir);
+        var tempPeds = Path.Combine(buildDir, "peds.rpf");
+        var tempDlc = Path.Combine(buildDir, "dlc.rpf");
         var old = target + ".old";
         try
         {
-            if (File.Exists(temp)) File.Delete(temp);
-            File.Copy(source, temp, overwrite: true);
+            var fileCount = BuildLoosePedRpf(packDir, enabled, tempPeds, log);
+            BuildDlcRpf(tempDlc, addonId, tempPeds, metadataXml, log);
 
-            var mountFolder = AddonApplier.MountFolderName(addonId);
-            var device = "o_" + mountFolder;
-            using (var archive = RpfArchive.Open(temp))
+            using (var check = RpfArchive.Open(tempDlc))
             {
-                RewriteSetup(archive, device, mountFolder);
-                RewriteAppdata(archive, device);
-                archive.SetFile(EmbeddedMetadataName, Encoding.UTF8.GetBytes(metadataXml));
-            }
-
-            // Yapısal doğrulama: yeni girdi ve XML gerçekten okunabiliyor mu?
-            using (var check = RpfArchive.Open(temp))
-            {
+                _ = check.Find("setup2.xml")
+                    ?? throw new InvalidDataException("setup2.xml yazılamadı.");
+                _ = check.Find("appdata.xml")
+                    ?? throw new InvalidDataException("appdata.xml yazılamadı.");
                 _ = check.Find(EmbeddedMetadataName)
                     ?? throw new InvalidDataException("Gömülü ped meta verisi yazılamadı.");
-                _ = check.Find("appdata.xml")
-                    ?? throw new InvalidDataException("appdata.xml bulunamadı.");
+                var stream = check.Find("peds.rpf")
+                    ?? throw new InvalidDataException("peds.rpf yazılamadı.");
+                if (stream.FileSize == 0 && stream.GetDataSize() == 0)
+                    throw new InvalidDataException("peds.rpf boş.");
             }
 
             if (File.Exists(old)) File.Delete(old);
             if (File.Exists(target)) File.Move(target, old);
-            File.Move(temp, target);
+            File.Move(tempDlc, target);
             try { File.Delete(old); } catch { }
 
             SyncJson.Save(stampPath, new PrepareStamp
             {
                 Format = PrepareFormat,
-                SourceLength = sourceInfo.Length,
-                SourceTicks = sourceInfo.LastWriteTimeUtc.Ticks,
-                MetadataHash = metadataHash
+                SourceHash = sourceHash
             });
-            log?.Invoke($"Ped paketi hazırlandı: {addonId} ({packFile.Peds.Count(p => p.Enabled)} etkin ped)");
+            log?.Invoke($"Ped paketi hazırlandı: {addonId} " +
+                        $"({enabled.Count} ped, {fileCount} dosya)");
             return target;
         }
         catch
         {
-            if (File.Exists(temp))
-            {
-                try { File.Delete(temp); } catch { }
-            }
             if (File.Exists(old) && !File.Exists(target))
             {
                 try { File.Move(old, target); } catch { }
             }
             throw;
         }
+        finally
+        {
+            try { Directory.Delete(buildDir, recursive: true); } catch { }
+        }
     }
 
-    private static void RewriteSetup(RpfArchive archive, string device, string nameHash)
+    private static string ComputeSourceHash(string packDir, IEnumerable<AddonPedInfo> peds,
+        string metadataXml)
     {
-        var entry = archive.Find("setup2.xml")
-            ?? throw new InvalidDataException("setup2.xml bulunamadı (geçerli bir DLC paketi değil).");
-        var doc = XDocument.Parse(DecodeXml(archive.ReadFile(entry)));
-        var root = doc.Root ?? throw new InvalidDataException("setup2.xml kökü yok.");
-
-        var deviceEl = root.Element("deviceName");
-        if (deviceEl == null) root.Add(new XElement("deviceName", device));
-        else deviceEl.Value = device;
-
-        var nameHashEl = root.Element("nameHash");
-        if (nameHashEl != null) nameHashEl.Value = nameHash;
-
-        // İki AddonPeds paketi aynı değişiklik kümesi adını kullanırsa çakışabilir.
-        var newSet = "GTACOOP_" + nameHash.ToUpperInvariant() + "_AUTOGEN";
-        foreach (var set in root.Descendants("ContentChangeSets").Elements("Item"))
-            set.Value = newSet;
-        foreach (var set in root.Descendants("changeSetName"))
-            set.Value = newSet;
-
-        archive.SetFile("setup2.xml", SerializeXml(doc));
+        var sb = new StringBuilder();
+        foreach (var ped in peds.OrderBy(p => p.Model, StringComparer.OrdinalIgnoreCase))
+        {
+            sb.Append("P:").Append(ped.Model).Append('|').Append(ped.Kind).Append('|')
+              .Append(ped.Streamed ? 1 : 0).Append(';');
+            foreach (var rel in ped.Files.OrderBy(f => f, StringComparer.OrdinalIgnoreCase))
+            {
+                var full = Path.Combine(packDir, rel.Replace('/', Path.DirectorySeparatorChar));
+                var info = new FileInfo(full);
+                sb.Append(rel).Append(':').Append(info.Exists ? info.Length : -1).Append(':')
+                  .Append(info.Exists ? info.LastWriteTimeUtc.Ticks : 0).Append(';');
+            }
+        }
+        sb.Append(metadataXml);
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(sb.ToString())));
     }
 
-    private static void RewriteAppdata(RpfArchive archive, string device)
+    private static int BuildLoosePedRpf(string packDir, IEnumerable<AddonPedInfo> peds,
+        string target, Action<string>? log)
     {
-        var entry = archive.Find("appdata.xml")
-            ?? throw new InvalidDataException("appdata.xml bulunamadı (geçerli bir DLC paketi değil).");
-        var doc = XDocument.Parse(DecodeXml(archive.ReadFile(entry)));
-        var root = doc.Root ?? throw new InvalidDataException("appdata.xml kökü yok.");
+        var files = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var ped in peds)
+            foreach (var rel in ped.Files)
+                files.Add(rel.Replace('/', '\\'));
 
-        var metadataPath = device + ":/" + EmbeddedMetadataName;
-        var streamPath = device + ":/peds.rpf";
+        if (files.Count == 0)
+            throw new InvalidDataException("Ped dosyası yok.");
 
-        foreach (var dataFile in root.Descendants("dataFiles").Elements("Item"))
+        using (var rpf = RpfArchive.Create(target, overwrite: true, headerReserve: 1024 * 1024))
         {
-            var type = dataFile.Element("fileType")?.Value ?? "";
-            var filenameEl = dataFile.Element("filename");
-            if (filenameEl == null) continue;
-
-            if (type.Equals("PED_METADATA_FILE", StringComparison.OrdinalIgnoreCase))
+            foreach (var rel in files)
             {
-                filenameEl.Value = metadataPath;
-                continue;
-            }
+                var full = Path.Combine(packDir, rel);
+                if (!File.Exists(full))
+                    throw new FileNotFoundException($"Ped dosyası bulunamadı: {rel}");
 
-            var name = filenameEl.Value.Trim();
-            if (type.Equals("PEDSTREAM_FILE", StringComparison.OrdinalIgnoreCase) ||
-                name.EndsWith("/peds.rpf", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(name, "peds.rpf", StringComparison.OrdinalIgnoreCase))
-            {
-                filenameEl.Value = streamPath;
-                continue;
-            }
+                var bytes = File.ReadAllBytes(full);
+                if (!RpfCrypto.HasResourceHeader(bytes))
+                    throw new InvalidDataException(
+                        $"'{rel}' geçerli bir GTA kaynak dosyası değil (RSC7 başlığı yok). " +
+                        "Dosyayı OpenIV ile dışa aktarın.");
 
-            // Aynı cihazı kullanan diğer yolları da yeni benzersiz cihaza taşı.
-            var colon = name.IndexOf(':');
-            if (colon > 0 && name[..colon].StartsWith("o_", StringComparison.OrdinalIgnoreCase))
-                filenameEl.Value = device + name[colon..];
+                rpf.SetFile(rel, bytes, verify: false);
+            }
         }
 
-        foreach (var item in root.Descendants("filesToEnable").Elements("Item"))
+        using (var verify = RpfArchive.Open(target))
         {
-            var name = item.Value.Trim();
-            if (name.EndsWith("ap_m.xml", StringComparison.OrdinalIgnoreCase) ||
-                name.Contains("UserMods", StringComparison.OrdinalIgnoreCase))
-            {
-                item.Value = metadataPath;
-                continue;
-            }
-
-            var colon = name.IndexOf(':');
-            if (colon > 0 && name[..colon].StartsWith("o_", StringComparison.OrdinalIgnoreCase))
-                item.Value = device + name[colon..];
+            var count = verify.AllFiles().Count();
+            if (count != files.Count)
+                throw new InvalidDataException(
+                    $"peds.rpf doğrulanamadı ({count}/{files.Count} dosya).");
         }
 
-        foreach (var set in root.Descendants("changeSetName"))
-            set.Value = "GTACOOP_" + device[2..].ToUpperInvariant() + "_AUTOGEN";
+        log?.Invoke($"peds.rpf oluşturuldu: {files.Count} dosya");
+        return files.Count;
+    }
 
-        archive.SetFile("appdata.xml", SerializeXml(doc));
+    private static void BuildDlcRpf(string target, string addonId, string pedsRpf,
+        string metadataXml, Action<string>? log)
+    {
+        var mountFolder = AddonApplier.MountFolderName(addonId);
+        var device = "o_" + mountFolder;
+        var changeSet = "GTACOOP_" + mountFolder.ToUpperInvariant() + "_AUTOGEN";
+
+        var setup = new XDocument(new XDeclaration("1.0", "UTF-8", null),
+            new XElement("SSetupData",
+                new XElement("deviceName", device),
+                new XElement("datFile", "appdata.xml"),
+                new XElement("timeStamp", DateTime.UtcNow.ToString("dd/MM/yyyy HH:mm:ss",
+                    System.Globalization.CultureInfo.InvariantCulture)),
+                new XElement("nameHash", mountFolder),
+                new XElement("contentChangeSetGroups",
+                    new XElement("Item",
+                        new XElement("NameHash", "GROUP_STARTUP"),
+                        new XElement("ContentChangeSets",
+                            new XElement("Item", changeSet)))),
+                new XElement("type", "EXTRACONTENT_COMPAT_PACK"),
+                new XElement("order", new XAttribute("value", "1"))));
+
+        var appdata = new XDocument(new XDeclaration("1.0", "UTF-8", null),
+            new XElement("CDataFileMgr__ContentsOfDataFileXml",
+                new XElement("disabledFiles"),
+                new XElement("includedXmlFiles"),
+                new XElement("includedDataFiles"),
+                new XElement("dataFiles",
+                    new XElement("Item",
+                        new XElement("filename", device + ":/peds.rpf"),
+                        new XElement("fileType", "PEDSTREAM_FILE"),
+                        new XElement("overlay", new XAttribute("value", "false")),
+                        new XElement("disabled", new XAttribute("value", "true")),
+                        new XElement("persistent", new XAttribute("value", "true"))),
+                    new XElement("Item",
+                        new XElement("filename", device + ":/" + EmbeddedMetadataName),
+                        new XElement("fileType", "PED_METADATA_FILE"),
+                        new XElement("overlay", new XAttribute("value", "false")),
+                        new XElement("disabled", new XAttribute("value", "true")),
+                        new XElement("persistent", new XAttribute("value", "false")))),
+                new XElement("contentChangeSets",
+                    new XElement("Item",
+                        new XElement("changeSetName", changeSet),
+                        new XElement("mapChangeSetData"),
+                        new XElement("filesToInvalidate"),
+                        new XElement("filesToDisable"),
+                        new XElement("filesToEnable",
+                            new XElement("Item", device + ":/peds.rpf"),
+                            new XElement("Item", device + ":/" + EmbeddedMetadataName)),
+                        new XElement("txdToLoad"),
+                        new XElement("txdToUnload"),
+                        new XElement("residentResources"),
+                        new XElement("unregisterResources"))),
+                new XElement("patchFiles")));
+
+        var pedsBytes = File.ReadAllBytes(pedsRpf);
+        using var rpf = RpfArchive.Create(target, overwrite: true, headerReserve: 64 * 1024);
+        rpf.SetFile("setup2.xml", SerializeXml(setup), verify: false);
+        rpf.SetFile("appdata.xml", SerializeXml(appdata), verify: false);
+        rpf.SetFile(EmbeddedMetadataName, Utf8NoBom(metadataXml), verify: false);
+        rpf.SetFile("peds.rpf", pedsBytes, verify: false, compress: false);
+
+        log?.Invoke($"dlc.rpf oluşturuldu: {device}");
     }
 
     private static byte[] SerializeXml(XDocument doc)
     {
         using var ms = new MemoryStream();
         doc.Save(ms, SaveOptions.DisableFormatting);
-        return ms.ToArray();
+        return StripUtf8Bom(ms.ToArray());
     }
 
-    private static string DecodeXml(byte[] bytes) =>
-        Encoding.UTF8.GetString(bytes).TrimStart('\uFEFF');
+    private static byte[] StripUtf8Bom(byte[] bytes) =>
+        bytes.Length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF
+            ? bytes[3..]
+            : bytes;
+
+    private static byte[] Utf8NoBom(string text) =>
+        StripUtf8Bom(Encoding.UTF8.GetBytes(text));
 
     // ---------------------------------------------------------------- meta veri
 
@@ -468,45 +686,91 @@ public static class AddonPeds
         return result;
     }
 
-    private static string BuildMetadataXml(IEnumerable<AddonPedInfo> peds,
-        IReadOnlyDictionary<string, XElement> known)
+    public static string BuildMetadataXml(IEnumerable<AddonPedInfo> peds,
+        IReadOnlyDictionary<string, XElement>? known = null)
     {
-        var root = new XElement("CPedModelInfo__InitDataList",
-            new XElement("InitDatas"));
+        known ??= new Dictionary<string, XElement>(StringComparer.OrdinalIgnoreCase);
+        var root = new XElement("CPedModelInfo__InitDataList", new XElement("InitDatas"));
         var datas = root.Element("InitDatas")!;
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var ped in peds)
         {
             if (string.IsNullOrWhiteSpace(ped.Model) || !seen.Add(ped.Model)) continue;
-            if (known.TryGetValue(ped.Model, out var item))
-            {
-                var clone = new XElement(item);
-                clone.SetElementValue("Name", ped.Model);
-                datas.Add(clone);
-                continue;
-            }
-
-            var template = ped.Kind == AnimalKind ? AnimalTemplate : HumanTemplate;
-            var generated = XElement.Parse(template);
-            generated.SetElementValue("Name", ped.Model);
-            datas.Add(generated);
+            datas.Add(BuildMetadataItem(ped, known));
         }
 
         using var ms = new MemoryStream();
         var doc = new XDocument(new XDeclaration("1.0", "utf-8", null), root);
         doc.Save(ms, SaveOptions.DisableFormatting);
-        return Encoding.UTF8.GetString(ms.ToArray());
+        return Encoding.UTF8.GetString(StripUtf8Bom(ms.ToArray()));
     }
 
-    private static string HashMetadata(IEnumerable<AddonPedInfo> peds, string metadataXml)
+    public static XElement BuildMetadataItem(AddonPedInfo ped,
+        IReadOnlyDictionary<string, XElement>? known = null)
     {
-        var sb = new StringBuilder();
-        foreach (var p in peds.OrderBy(p => p.Model, StringComparer.OrdinalIgnoreCase))
-            sb.Append(p.Model).Append(':').Append(p.Kind).Append(';');
-        sb.Append(metadataXml);
-        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(sb.ToString())));
+        XElement item;
+        if (known != null && known.TryGetValue(ped.Model, out var source))
+        {
+            var sourceKind = GuessKind(ped.Model, source);
+            if ((ped.Kind == AnimalKind) == (sourceKind == AnimalKind))
+                item = new XElement(source);
+            else
+                item = XElement.Parse(TemplateFor(ped.Kind));
+        }
+        else
+        {
+            item = XElement.Parse(TemplateFor(ped.Kind));
+        }
+
+        item.SetElementValue("Name", ped.Model);
+
+        if (ped.Kind == FemaleKind)
+        {
+            item.SetElementValue("Pedtype", "CIVFEMALE");
+            item.SetElementValue("ClipDictionaryName", "move_f@generic");
+            item.SetElementValue("MovementClipSet", "move_f@generic");
+            item.SetElementValue("ExpressionSetName", "expr_set_ambient_female");
+            item.SetElementValue("DefaultGestureClipSet", "ANIM_GROUP_GESTURE_F_GENERIC");
+            item.SetElementValue("FacialClipsetGroupName", "facial_clipset_group_gen_female");
+            item.SetElementValue("DefaultVisemeClipSet", "ANIM_GROUP_VISEMES_F_LO");
+            item.SetElementValue("PoseMatcherName", "Female");
+            item.SetElementValue("PoseMatcherProneName", "Female_prone");
+            item.SetElementValue("PedCapsuleName", "STANDARD_FEMALE");
+            item.SetElementValue("RelationshipGroup", "CIVFEMALE");
+        }
+        else if (ped.Kind == AnimalKind)
+        {
+            item.SetElementValue("Pedtype", "ANIMAL");
+        }
+        else
+        {
+            item.SetElementValue("Pedtype", "CIVMALE");
+        }
+
+        if (!string.IsNullOrWhiteSpace(ped.ClipDictionary))
+            item.SetElementValue("ClipDictionaryName", ped.ClipDictionary.Trim());
+        if (!string.IsNullOrWhiteSpace(ped.MovementClipSet))
+            item.SetElementValue("MovementClipSet", ped.MovementClipSet.Trim());
+        if (!string.IsNullOrWhiteSpace(ped.DecisionMaker))
+            item.SetElementValue("DecisionMakerName", ped.DecisionMaker.Trim());
+        if (!string.IsNullOrWhiteSpace(ped.Personality))
+            item.SetElementValue("Personality", ped.Personality.Trim());
+        if (!string.IsNullOrWhiteSpace(ped.CombatInfo))
+            item.SetElementValue("CombatInfo", ped.CombatInfo.Trim());
+
+        var streamed = item.Element("IsStreamedGfx");
+        if (streamed != null)
+            streamed.SetAttributeValue("value", ped.Streamed ? "true" : "false");
+        else
+            item.Add(new XElement("IsStreamedGfx",
+                new XAttribute("value", ped.Streamed ? "true" : "false")));
+
+        return item;
     }
+
+    private static string TemplateFor(string kind) =>
+        IsAnimal(kind) ? AnimalTemplate : HumanTemplate;
 
     // ---------------------------------------------------------------- istemci yapılandırması
 
@@ -531,7 +795,8 @@ public static class AddonPeds
                     Model = ped.Model,
                     Name = string.IsNullOrWhiteSpace(ped.Name) ? ped.Model : ped.Name,
                     Kind = ped.Kind,
-                    Pack = string.IsNullOrWhiteSpace(addon.DisplayName) ? addon.Id : addon.DisplayName
+                    Pack = string.IsNullOrWhiteSpace(addon.DisplayName) ? addon.Id : addon.DisplayName,
+                    Health = ped.Health <= 0 ? 200 : ped.Health
                 });
             }
         }
@@ -557,6 +822,69 @@ public static class AddonPeds
             if (File.Exists(path)) File.Delete(path);
         }
         catch { }
+    }
+
+    // ---------------------------------------------------------------- düzenleme yardımcıları
+
+    /// <summary>Pedin dosyalarını bir klasöre çıkarır (görüntüleme / yedek).</summary>
+    public static int ExtractPed(string packDir, AddonPedInfo ped, string destination)
+    {
+        var count = 0;
+        foreach (var rel in ped.Files)
+        {
+            var source = Path.Combine(packDir, rel.Replace('/', Path.DirectorySeparatorChar));
+            if (!File.Exists(source)) continue;
+            var target = Path.Combine(destination, rel.Replace('/', Path.DirectorySeparatorChar));
+            Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+            File.Copy(source, target, overwrite: true);
+            count++;
+        }
+
+        var meta = BuildMetadataItem(ped);
+        var metaPath = Path.Combine(destination, "pedmeta.xml");
+        var doc = new XDocument(new XDeclaration("1.0", "utf-8", null),
+            new XElement("CPedModelInfo__InitDataList",
+                new XElement("InitDatas", meta)));
+        File.WriteAllBytes(metaPath, SerializeXml(doc));
+        return count;
+    }
+
+    /// <summary>Bir pedin dosyalarını yedek klasörüne taşır ve boş klasörleri temizler.</summary>
+    public static int MovePedToBackup(string packDir, AddonPedInfo ped, string backupRoot,
+        Action<string>? log = null)
+    {
+        var count = 0;
+        foreach (var rel in ped.Files)
+        {
+            var source = Path.Combine(packDir, rel.Replace('/', Path.DirectorySeparatorChar));
+            if (!File.Exists(source)) continue;
+            var target = Path.Combine(backupRoot, rel.Replace('/', Path.DirectorySeparatorChar));
+            Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+            File.Move(source, target, overwrite: true);
+            count++;
+        }
+
+        var root = Path.GetFullPath(packDir);
+        foreach (var rel in ped.Files)
+        {
+            var dir = Path.GetDirectoryName(Path.Combine(packDir,
+                rel.Replace('/', Path.DirectorySeparatorChar)));
+            while (dir != null && dir.Length > root.Length &&
+                   dir.StartsWith(root + Path.DirectorySeparatorChar,
+                       StringComparison.OrdinalIgnoreCase))
+            {
+                try
+                {
+                    if (Directory.EnumerateFileSystemEntries(dir).Any()) break;
+                    Directory.Delete(dir);
+                }
+                catch { break; }
+                dir = Path.GetDirectoryName(dir);
+            }
+        }
+
+        log?.Invoke($"Ped yedeğe taşındı: {ped.Model} ({count} dosya)");
+        return count;
     }
 
     // ---------------------------------------------------------------- şablonlar

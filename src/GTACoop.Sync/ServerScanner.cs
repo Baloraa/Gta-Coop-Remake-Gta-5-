@@ -125,9 +125,10 @@ public sealed class ServerScanner
     }
 
     /// <summary>
-    /// Addons\peds\&lt;paket&gt; klasörlerini tarar. AddonPeds biçimindeki
-    /// paketler kendi kendine yeterli hale getirilir; kullanıcının ap_m.xml
-    /// dosyasına veya kendi ped modlarına dokunulmaz.
+    /// Addons\peds\&lt;paket&gt; klasörlerini tarar. Gevşek ped dosyaları
+    /// (.ydd/.ytd/.ymt/.yft) AddonPeds uyumlu tek bir peds.rpf ve benzersiz
+    /// bir dlc.rpf içinde paketlenir; kullanıcının ap_m.xml dosyasına veya
+    /// kendi ped modlarına dokunulmaz.
     /// </summary>
     private void ScanPedPacks(Manifest manifest, ScanResult result)
     {
@@ -159,26 +160,26 @@ public sealed class ServerScanner
                 continue;
             }
 
-            var source = AddonPeds.FindDlcRpf(packDir);
-            if (source == null)
-            {
-                result.Warnings.Add($"Ped paketi '{id}' atlandı: içinde dlc.rpf bulunamadı.");
-                continue;
-            }
-
             try
             {
-                var models = GetPedModels(source, result, id);
-                if (models.Count == 0)
+                var loose = AddonPeds.DiscoverLoosePeds(packDir,
+                    msg => result.Warnings.Add($"Ped paketi '{id}': {msg}"));
+                if (loose.Count == 0)
                 {
-                    result.Warnings.Add($"Ped paketi '{id}' atlandı: içinde ped modeli (.yft) bulunamadı.");
+                    result.Warnings.Add($"Ped paketi '{id}' atlandı: içinde ped dosyası " +
+                                        "(.ydd/.ytd/.ymt/.yft) bulunamadı.");
                     continue;
                 }
 
-                var packFile = AddonPeds.LoadOrCreatePackFile(packDir, models);
+                var packFile = AddonPeds.LoadOrCreatePackFile(packDir, loose);
                 var enabled = packFile.Peds
-                    .Where(p => p.Enabled && models.Contains(p.Model, StringComparer.OrdinalIgnoreCase))
+                    .Where(p => p.Enabled && p.Files.Count > 0)
                     .ToList();
+                if (enabled.Count == 0)
+                {
+                    result.Warnings.Add($"Ped paketi '{id}' atlandı: tüm pedler devre dışı.");
+                    continue;
+                }
 
                 var addon = new AddonInfo
                 {
@@ -192,23 +193,11 @@ public sealed class ServerScanner
                     Peds = enabled
                 };
 
-                try
-                {
-                    var prepared = AddonPeds.PrepareSelfContained(packDir, id,
-                        Path.Combine(preparedRoot, AddonApplier.Safe(id)), packFile);
-                    addon.RelativePackPath = "";
-                    addon.Files = HashTree(Path.GetDirectoryName(prepared)!, result, id);
-                }
-                catch (Exception ex)
-                {
-                    // Hazırlanamazsa orijinal paketi sun; eski istemciler ve
-                    // kullanıcının kendi AddonPeds kurulumu yine çalışabilir.
-                    result.Warnings.Add($"Ped paketi '{id}' hazırlanamadı ({ex.Message}); " +
-                                        "orijinal dlc.rpf sunuluyor.");
-                    var rel = Path.GetRelativePath(packDir, Path.GetDirectoryName(source)!);
-                    addon.RelativePackPath = rel == "." ? "" : rel.Replace('\\', '/');
-                    addon.Files = HashTree(packDir, result, id);
-                }
+                var prepared = AddonPeds.PrepareSelfContained(packDir, id,
+                    Path.Combine(preparedRoot, AddonApplier.Safe(id)), packFile,
+                    msg => result.Warnings.Add($"Ped paketi '{id}': {msg}"));
+                addon.RelativePackPath = "";
+                addon.Files = HashTree(Path.GetDirectoryName(prepared)!, result, id);
 
                 if (addon.Files.Count == 0)
                 {
@@ -222,42 +211,6 @@ public sealed class ServerScanner
             {
                 result.Warnings.Add($"Ped paketi '{id}' atlandı: {ex.Message}");
             }
-        }
-    }
-
-    private readonly Dictionary<string, PedModelCache> _pedModelCache =
-        new(StringComparer.OrdinalIgnoreCase);
-
-    private sealed class PedModelCache
-    {
-        public long Ticks { get; set; }
-        public long Length { get; set; }
-        public List<string> Models { get; set; } = new();
-    }
-
-    private List<string> GetPedModels(string dlcRpf, ScanResult result, string id)
-    {
-        try
-        {
-            var info = new FileInfo(dlcRpf);
-            if (_pedModelCache.TryGetValue(dlcRpf, out var hit) &&
-                hit.Ticks == info.LastWriteTimeUtc.Ticks && hit.Length == info.Length)
-                return hit.Models;
-
-            var models = AddonPeds.DiscoverModels(dlcRpf,
-                msg => result.Warnings.Add($"Ped paketi '{id}': {msg}"));
-            _pedModelCache[dlcRpf] = new PedModelCache
-            {
-                Ticks = info.LastWriteTimeUtc.Ticks,
-                Length = info.Length,
-                Models = models
-            };
-            return models;
-        }
-        catch (Exception ex)
-        {
-            result.Warnings.Add($"Ped paketi '{id}': dlc.rpf okunamadı: {ex.Message}");
-            return new List<string>();
         }
     }
 

@@ -675,7 +675,9 @@ namespace GTACoOp
             {
                 var kind = string.Equals(ped.Kind, "animal", StringComparison.OrdinalIgnoreCase)
                     ? "~o~Animal"
-                    : "~b~Human";
+                    : string.Equals(ped.Kind, "female", StringComparison.OrdinalIgnoreCase)
+                        ? "~p~Female"
+                        : "~b~Human";
                 var pack = string.IsNullOrWhiteSpace(ped.Pack) ? config.ServerName : ped.Pack;
                 var name = string.IsNullOrWhiteSpace(ped.Name) ? ped.Model : ped.Name;
                 var entry = ped;
@@ -741,6 +743,16 @@ namespace GTACoOp
                     // bazı sürümlerde hata üretebilir.
                     player.Weapons.RemoveAll();
                     player.Armor = 0;
+                }
+
+                if (ped.Health > 0 && ped.Health <= 10000)
+                {
+                    try
+                    {
+                        player.MaxHealth = Math.Max(100, ped.Health);
+                        player.Health = ped.Health;
+                    }
+                    catch { /* bazı ped türlerinde sağlık ataması desteklenmeyebilir */ }
                 }
 
                 Notification.Show("~g~Addon ped: ~w~" + (string.IsNullOrWhiteSpace(ped.Name)

@@ -8,7 +8,7 @@ GTACoop Remake is not a new multiplayer engine. It is the desktop layer around G
 
 GTACoop Remake is for private Story Mode co-op. It does not touch GTA Online, does not bypass anti-cheat, and does not inject into online sessions.
 
-**Current release:** 2.5.2  
+**Current release:** 2.5.3  
 **Platform:** Windows 10/11, x64  
 **UI:** Turkish, English, and Russian  
 **License:** GNU GPL v3
@@ -289,9 +289,22 @@ This is a tool for playing with friends, not a hardened anti-cheat or privacy sy
 
 ---
 
+## What is new in 2.5.3
+
+This release reworks addon peds around **loose ped files**, matching the AddonPeds workflow.
+
+- **Drop files, get one peds.rpf.** Put `.ydd/.ytd/.ymt/.yft` files in `Addons\peds\<pack>` (flat files or one folder per streamed ped). The server groups them by model, packs them into a single AddonPeds-style `peds.rpf`, and wraps that in a unique `dlc.rpf` when the manifest is built.
+- **Per-ped management.** The **Addon Peds** tab now works like PedSelector: add loose files, add a streamed component folder, import a folder or a ZIP/RAR/7Z archive, edit the display name, type, health, and metadata, view a ped's files, or remove a ped.
+- **Safe removal.** Removed ped files are moved to `Addons-Removed\<timestamp>\peds\...`, not deleted, so a mistake can be undone.
+- **More ped types.** Human, female, and animal peds are supported. Animals skip human-only props, weapons, aiming, shooting, jumping, and parachute logic; the editor lets you correct the type and metadata if automatic detection is wrong.
+- **Legacy packs keep working.** Existing `dlc.rpf`/`peds.rpf` packs are extracted to loose files once and then regenerated from those files.
+- **Your own AddonPeds installation is still untouched.** `ap_m.xml`, `UserMods`, and your existing `dlcpacks` remain read-only. Server packs use unique mount/device/change-set names, so they cannot collide with your packs.
+
+The network protocol is unchanged (`VERSION_0_9_4`), so 2.5.3 clients can still play with 2.5.2, 2.5.1, and 2.5.0 clients on the same server. Older clients ignore the ped list.
+
 ## What is new in 2.5.2
 
-This release adds **server-delivered addon peds**.
+This release added **server-delivered addon peds**.
 
 - **Addon Peds tab in the launcher.** The server section has an **Addon Peds** button that opens a dedicated tab listing every ped pack in `Addons\peds`, with human/animal type, model name, and an enable checkbox per ped. Players only see the peds you leave enabled.
 - **Human and animal peds.** AddonPeds packs and plain ped DLC packs are supported. Animal models (`a_c_...`) are detected automatically; animal peds skip human-only props, weapons, aiming, shooting, jumping, and parachute logic so they do not break sync or collision.
