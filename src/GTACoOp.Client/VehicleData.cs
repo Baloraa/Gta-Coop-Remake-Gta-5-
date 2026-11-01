@@ -150,7 +150,13 @@ namespace GTACoOp
         IsShooting = 1 << 1,
         IsAiming = 1 << 2,
         IsParachuteOpen = 1 << 3,
-        IsInParachuteFreeFall = 1 << 4
+        IsInParachuteFreeFall = 1 << 4,
+
+        /// <summary>
+        /// Hayvan modelinde saldırı (ısırma) oynatılıyor. Yeni bir bit olduğu
+        /// için eski istemciler bu bayrağı yok sayar; protokol sürümü değişmez.
+        /// </summary>
+        IsAttacking = 1 << 5
     }
 
     [ProtoContract]

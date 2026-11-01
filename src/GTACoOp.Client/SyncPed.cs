@@ -30,6 +30,9 @@ namespace GTACoOp
         public int CurrentWeapon;
         public bool IsShooting;
         public bool IsAiming;
+
+        /// <summary>Hayvan kopyası ısırık animasyonu oynatıyor.</summary>
+        public bool IsAttacking;
         public Vector3 AimCoords;
         public float Latency;
         public bool IsHornPressed;
@@ -584,6 +587,20 @@ namespace GTACoOp
                         Character.Task.Jump();
                     }
 
+                    // Uzak hayvanın saldırısını aynı vanilla melee animasyonuyla
+                    // göster. İstemci animasyonları otomatik çoğaltmaz, bu yüzden
+                    // sunucudan gelen IsAttacking bayrağı animasyonu tetikler.
+                    if (!isHuman && IsAttacking)
+                    {
+                        if (!Function.Call<bool>(Hash.HAS_ANIM_DICT_LOADED, Main.AnimalAttackDict))
+                            Function.Call(Hash.REQUEST_ANIM_DICT, Main.AnimalAttackDict);
+                        else if (!Function.Call<bool>(Hash.IS_ENTITY_PLAYING_ANIM, Character.Handle,
+                                     Main.AnimalAttackDict, Main.AnimalAttackClip, 3))
+                            Function.Call(Hash.TASK_PLAY_ANIM, Character.Handle,
+                                Main.AnimalAttackDict, Main.AnimalAttackClip,
+                                4.0f, -4.0f, -1, 0, 0.0f, false, false, false);
+                    }
+
                     if (isHuman && IsParachuteOpen)
                     {
                         if (_parachuteProp == null)
@@ -640,7 +657,8 @@ namespace GTACoOp
                                 AimCoords.Z, 1500, (uint) FiringPattern.FullAuto);
                         }
 
-                        if (!IsAiming && !IsShooting && !IsJumping && !IsInParachuteFreeFall)
+                        if (!IsAiming && !IsShooting && !IsJumping && !IsAttacking &&
+                            !IsInParachuteFreeFall)
                         {
                             float distance = Character.Position.DistanceTo(Position);
                             if (distance <= 0.15f || distance > 7.0f) // Still or too far away

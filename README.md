@@ -8,7 +8,7 @@ GTACoop Remake is not a new multiplayer engine. It is the desktop layer around G
 
 GTACoop Remake is for private Story Mode co-op. It does not touch GTA Online, does not bypass anti-cheat, and does not inject into online sessions.
 
-**Current release:** 2.6.0  
+**Current release:** 2.6.1  
 **Platform:** Windows 10/11, x64  
 **UI:** Turkish, English, and Russian  
 **License:** GNU GPL v3
@@ -288,6 +288,16 @@ This is a tool for playing with friends, not a hardened anti-cheat or privacy sy
 - Server owners are responsible for the mods they distribute. The launcher automates delivery; it does not grant permission to redistribute someone else's work.
 
 ---
+
+## What is new in 2.6.1
+
+Animal peds can **attack** now: while you play an addon or vanilla animal, the attack button plays the vanilla dog bite and hits the ped in front of you.
+
+- **Why it did nothing.** The model swap clears the inventory, and the game's animal control set has no human melee task, so the attack button had nothing to run.
+- **The bite.** The client plays `attack` from `creatures@rottweiler@melee@streamed_core@`, damages the closest ped within 2.6 m in front of the animal for 20 and staggers it. There is a 0.8 s cooldown.
+- **Other players see it.** A new `IsAttacking` bit in the existing `PedData` flags makes remote clients play the same bite on the animal clone. It is an unused bit, so older clients ignore it and the **network protocol is unchanged** (`VERSION_0_9_4`).
+- **Input.** The game's attack control is checked first, with a left-click fallback for animal control sets that do not map it. It is skipped while a menu or chat is open, while in a vehicle, or while dead.
+- 2.6.1 clients can play with 2.6.0, 2.5.9 and older clients.
 
 ## What is new in 2.6.0
 

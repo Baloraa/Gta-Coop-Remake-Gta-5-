@@ -52,6 +52,27 @@ namespace GTACoOp
         // bayrakları model akışında sıfırlayabildiği için her karede
         // yeniden uygulanır.
         private int _ragdollGuardModel;
+
+        // Hayvan modelinde saldırı: vanilla köpek melee animasyonu. Oyunun
+        // hayvan kontrol setinde saldırı görevi olmadığı ve model değişiminde
+        // silahlar temizlendiği için saldırı tuşu bu animasyon olmadan hiçbir
+        // şey yapmıyordu.
+        internal const string AnimalAttackDict = "creatures@rottweiler@melee@streamed_core@";
+        internal const string AnimalAttackClip = "attack";
+
+        // Hayvan kontrol setinde saldırı tuşu eşlenmemiş olabileceği için sol
+        // tık doğrudan da okunur (oyun içi tuş basımı, menü/sohbet kapalıyken).
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern short GetAsyncKeyState(int vKey);
+        private const int VkLeftButton = 0x01;
+
+        private static bool LeftMouseJustPressed() =>
+            (GetAsyncKeyState(VkLeftButton) & 0x0001) != 0;
+
+        private static int _lastAnimalAttackAt;
+        private int _animalAttackReadyAt;
+        private bool _bitePending;
+        private int _biteDeadline;
         private readonly ObjectPool _menuPool;
 
         /// <summary>
@@ -951,6 +972,121 @@ namespace GTACoOp
                 try { Function.Call(Hash.SET_PED_RAGDOLL_ON_COLLISION, ped.Handle, false); }
                 catch { }
             }
+        }
+
+        /// <summary>
+        /// Animal ped attack. The game's animal control set has no melee task and
+        /// the model swap clears the inventory, so the attack button used to do
+        /// nothing at all. The vanilla dog melee animation is played directly and
+        /// the closest ped in front is bitten.
+        /// </summary>
+        private void UpdateAnimalAttack()
+        {
+            var player = Game.Player.Character;
+            if (player == null || !player.Exists())
+            {
+                _bitePending = false;
+                return;
+            }
+
+            var animal = !player.IsHuman || AddonPedVariation.IsAnimalHash(player.Model.Hash);
+            if (!animal || player.IsInVehicle() || player.IsDead ||
+                _menuPool.AreAnyVisible || _chat.IsFocused)
+            {
+                _bitePending = false;
+                return;
+            }
+
+            if (Game.GameTime >= _animalAttackReadyAt &&
+                (Function.Call<bool>(Hash.IS_CONTROL_JUST_PRESSED, 0, 24) ||
+                 Function.Call<bool>(Hash.IS_DISABLED_CONTROL_JUST_PRESSED, 0, 24) ||
+                 LeftMouseJustPressed()))
+            {
+                _bitePending = true;
+                _biteDeadline = Game.GameTime + 600;
+            }
+
+            if (!_bitePending) return;
+            if (Game.GameTime > _biteDeadline)
+            {
+                _bitePending = false;
+                return;
+            }
+
+            // Animasyon sözlüğü hazır olana kadar isteği tekrarla; tuş basımı
+            // kaybolmaz, sözlük yüklenince ısırık oynar.
+            if (!Function.Call<bool>(Hash.HAS_ANIM_DICT_LOADED, AnimalAttackDict))
+            {
+                Function.Call(Hash.REQUEST_ANIM_DICT, AnimalAttackDict);
+                return;
+            }
+
+            _bitePending = false;
+            _animalAttackReadyAt = Game.GameTime + 800;
+            _lastAnimalAttackAt = Game.GameTime;
+            PerformAnimalBite(player);
+        }
+
+        private static void PerformAnimalBite(Ped player)
+        {
+            var target = FindBiteTarget(player, 2.6f);
+            if (target != null)
+            {
+                Function.Call(Hash.TASK_TURN_PED_TO_FACE_ENTITY, player.Handle,
+                    target.Handle, 400, 0);
+            }
+
+            Function.Call(Hash.TASK_PLAY_ANIM, player.Handle, AnimalAttackDict,
+                AnimalAttackClip, 4.0f, -4.0f, -1, 0, 0.0f, false, false, false);
+
+            if (target == null)
+            {
+                Main.Logger.WriteLine("Animal bite: no target in range");
+                return;
+            }
+
+            try { target.ApplyDamage(20); } catch { }
+            try
+            {
+                Function.Call(Hash.SET_PED_TO_RAGDOLL, target.Handle, 1200, 1200, 0,
+                    false, false, false);
+            }
+            catch { }
+
+            Main.Logger.WriteLine("Animal bite: target=" + target.Handle +
+                " model=0x" + target.Model.Hash.ToString("X8") +
+                " human=" + target.IsHuman);
+        }
+
+        /// <summary>Isırık menzilinde, hayvanın önünde duran en yakın ped.</summary>
+        private static Ped FindBiteTarget(Ped player, float distance)
+        {
+            Ped best = null;
+            var bestDistance = distance;
+            var origin = player.Position;
+            var forward = player.ForwardVector;
+            var heading = new Vector3(forward.X, forward.Y, 0f);
+            if (heading.Length() < 0.0001f) return null;
+            heading = Vector3.Normalize(heading);
+
+            foreach (var ped in World.GetNearbyPeds(player, distance + 2f))
+            {
+                if (ped == null || !ped.Exists() || ped.Handle == player.Handle) continue;
+                if (ped.IsDead || ped.IsInVehicle()) continue;
+
+                var to = ped.Position - origin;
+                var flat = new Vector3(to.X, to.Y, 0f);
+                var length = flat.Length();
+                if (length < 0.0001f || length > bestDistance) continue;
+
+                // Yalnızca önünde duran hedefi ısır.
+                if (Vector3.Dot(Vector3.Normalize(flat), heading) < 0.1f) continue;
+
+                best = ped;
+                bestDistance = length;
+            }
+
+            return best;
         }
 
         /// <summary>
@@ -1891,6 +2027,8 @@ namespace GTACoOp
                     obj.Flag |= (byte)PedDataFlags.IsAiming;
                 if (shooting)
                     obj.Flag |= (byte)PedDataFlags.IsShooting;
+                if (!isHuman && Game.GameTime - _lastAnimalAttackAt < 800)
+                    obj.Flag |= (byte)PedDataFlags.IsAttacking;
                 if (Function.Call<bool>(Hash.IS_PED_JUMPING, player.Handle))
                     obj.Flag |= (byte)PedDataFlags.IsJumping;
                 if (isHuman &&
@@ -2111,6 +2249,7 @@ namespace GTACoOp
                 ProcessPendingAddonPed();
                 WatchLocalPlayerAnimal();
                 EnforceRagdollGuard();
+                UpdateAnimalAttack();
                 AddonPedVariation.Process();
                 ProcessServerBrowserQueue();
                 UpdateServerBrowserScan();
@@ -2684,6 +2823,7 @@ namespace GTACoOp
                                     Opponents[data.Id].IsAiming = (data.Flag & (byte)PedDataFlags.IsAiming) > 0;
                                     Opponents[data.Id].IsJumping = (data.Flag & (byte)PedDataFlags.IsJumping) > 0;
                                     Opponents[data.Id].IsShooting = (data.Flag & (byte)PedDataFlags.IsShooting) > 0;
+                                    Opponents[data.Id].IsAttacking = (data.Flag & (byte)PedDataFlags.IsAttacking) > 0;
                                     Opponents[data.Id].Latency = data.Latency;
                                     Opponents[data.Id].IsParachuteOpen = (data.Flag & (byte)PedDataFlags.IsParachuteOpen) > 0;
                                     Opponents[data.Id].IsInParachuteFreeFall = (data.Flag & (byte)PedDataFlags.IsInParachuteFreeFall) > 0;
@@ -2770,6 +2910,7 @@ namespace GTACoOp
                                     Npcs[data.Name].IsAiming = (data.Flag & (byte)PedDataFlags.IsAiming) > 0;
                                     Npcs[data.Name].IsJumping = (data.Flag & (byte)PedDataFlags.IsJumping) > 0;
                                     Npcs[data.Name].IsShooting = (data.Flag & (byte)PedDataFlags.IsShooting) > 0;
+                                    Npcs[data.Name].IsAttacking = (data.Flag & (byte)PedDataFlags.IsAttacking) > 0;
                                     Npcs[data.Name].IsParachuteOpen = (data.Flag & (byte)PedDataFlags.IsParachuteOpen) > 0;
                                     Npcs[data.Name].IsInParachuteFreeFall = (data.Flag & (byte)PedDataFlags.IsInParachuteFreeFall) > 0;
                                 }

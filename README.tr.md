@@ -2,7 +2,7 @@
 
 **Türkçe** | [English](README.md)
 
-2.6.0 sürümü - kendi sunucu yönetimi, otomatik mod indirme, **oturum modu**,
+2.6.1 sürümü - kendi sunucu yönetimi, otomatik mod indirme, **oturum modu**,
 **kısa kod** (ör. `Gel.com`) ile internetten sunucu bulma, **otomatik relay**,
 **UPnP doğrudan bağlantı**, **özel relay sunucusu**, **tanılama kopyalama**,
 **canlı sunucu durumu**, **Sunucu Tarayıcı** sekmesi, **OpenIV (.oiv) paket desteği**,
@@ -14,6 +14,23 @@ yalnızca oyun açıkken kurulu kalır, oyundan çıkınca otomatik kaldırılı
 Oyun başlatma dosyası seçilebilir; varsayılan **PlayGTAV.exe**'dir (GTA5.exe de seçilebilir).
 **Sesli sohbet** (bas-konuş, `[MIC]` göstergesi) ve **host-led hikaye görevi koordinasyonu**
 bu sürümde eklendi; ayrıntılar aşağıda.
+
+### 2.6.1 — Hayvan pediyle saldırma (ısırma) geldi
+
+Addon veya vanilla bir hayvan modelindeyken **saldırı tuşu artık çalışıyor**: karakter
+vanilla köpek melee animasyonunu oynatıp önündeki en yakın pedi ısırıyor.
+
+- **Neden hiçbir şey olmuyordu?** Model değişiminde silahlar temizleniyor ve oyunun hayvan
+  kontrol setinde insan melee görevi yok; saldırı tuşu boşa basılıyordu.
+- **Isırık.** `creatures@rottweiler@melee@streamed_core@` sözlüğündeki `attack` animasyonu
+  oynatılır; hayvanın önünde 2,6 m içindeki en yakın ped 20 hasar alır ve kısa süre
+  sendelemeye girer. 0,8 sn bekleme süresi vardır.
+- **Diğer oyuncular da görür.** `PedData` bayraklarına `IsAttacking` biti eklendi; karşı
+  istemci uzak hayvanda aynı ısırık animasyonunu oynatır. Yeni bir bit olduğu için eski
+  istemciler yok sayar; **ağ protokolü değişmedi** (`VERSION_0_9_4`).
+- **Tuş algılama.** Oyunun saldırı kontrolü ve yedek olarak sol tık okunur; menü/sohbet
+  açıkken, araçtayken veya ölüyken saldırı tetiklenmez.
+- 2.6.1 istemciler 2.6.0, 2.5.9 ve daha eski istemcilerle aynı sunucuda oynayabilir.
 
 ### 2.6.0 — Addon hayvanlarda ragdoll çökmesi düzeltildi
 
