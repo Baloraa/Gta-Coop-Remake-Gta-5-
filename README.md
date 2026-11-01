@@ -8,7 +8,7 @@ GTACoop Remake is not a new multiplayer engine. It is the desktop layer around G
 
 GTACoop Remake is for private Story Mode co-op. It does not touch GTA Online, does not bypass anti-cheat, and does not inject into online sessions.
 
-**Current release:** 2.5.9  
+**Current release:** 2.6.0  
 **Platform:** Windows 10/11, x64  
 **UI:** Turkish, English, and Russian  
 **License:** GNU GPL v3
@@ -288,6 +288,19 @@ This is a tool for playing with friends, not a hardened anti-cheat or privacy sy
 - Server owners are responsible for the mods they distribute. The launcher automates delivery; it does not grant permission to redistribute someone else's work.
 
 ---
+
+## What is new in 2.6.0
+
+This release fixes the **addon animal ragdoll crash**: an animal ped that fell over or was hit by a vehicle took the game down, while replace-style animals were fine.
+
+The reason replace animals never crashed is that the game already knows their ragdoll data; for an addon model we were generating that data ourselves from an invented, incomplete template.
+
+- **The template is now real vanilla animal metadata.** Instead of the hand-written stub, the generated entry is a verbatim copy of the game's own dog ped definition, with only `<Name>` replaced. `PoseMatcherProneName`, `TaskDataName`, `NavCapabilitiesName` (`STANDARD_QUADRUPED`), `DefaultBrawlingStyle`, `DefaultUnarmedWeapon`, `AnimalAudioObject`, `MinActivationImpulse` and the offset fields are all present now. The missing fields were what crashed the game in the ragdoll path.
+- **Unverified metadata keeps ragdoll off.** When the ped's metadata does not come from a real animal definition (the pack ships none and no base model metadata is found), the `auto` setting disables ragdoll for that animal and also disables ragdoll-on-collision. The animal stays visible and animated, it just does not fall over. Selecting **on** forces ragdoll anyway.
+- **Verified metadata keeps ragdoll on.** If the pack provides real animal metadata, or a vanilla `a_c_...` model is set as its **Base model**, ragdoll works exactly like a replace animal.
+- **Stricter validation.** A template-built animal whose required ragdoll fields are missing fails the pack build with a clear error instead of reaching the game.
+- **Old prepared packs are rebuilt.** The prepared-DLC format is bumped, so a cached `dlc.rpf` from an earlier version is regenerated with the new metadata.
+- **No protocol change.** 2.6.0 still uses `VERSION_0_9_4` and can play with 2.5.9 and older clients.
 
 ## What is new in 2.5.9
 

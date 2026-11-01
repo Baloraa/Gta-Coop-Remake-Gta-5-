@@ -2,7 +2,7 @@
 
 **Türkçe** | [English](README.md)
 
-2.5.9 sürümü - kendi sunucu yönetimi, otomatik mod indirme, **oturum modu**,
+2.6.0 sürümü - kendi sunucu yönetimi, otomatik mod indirme, **oturum modu**,
 **kısa kod** (ör. `Gel.com`) ile internetten sunucu bulma, **otomatik relay**,
 **UPnP doğrudan bağlantı**, **özel relay sunucusu**, **tanılama kopyalama**,
 **canlı sunucu durumu**, **Sunucu Tarayıcı** sekmesi, **OpenIV (.oiv) paket desteği**,
@@ -14,6 +14,35 @@ yalnızca oyun açıkken kurulu kalır, oyundan çıkınca otomatik kaldırılı
 Oyun başlatma dosyası seçilebilir; varsayılan **PlayGTAV.exe**'dir (GTA5.exe de seçilebilir).
 **Sesli sohbet** (bas-konuş, `[MIC]` göstergesi) ve **host-led hikaye görevi koordinasyonu**
 bu sürümde eklendi; ayrıntılar aşağıda.
+
+### 2.6.0 — Addon hayvanlarda ragdoll çökmesi düzeltildi
+
+Bu sürüm, addon hayvan pedi **düşünce veya bir araç çarpınca** oluşan çökmeyi iki
+katmanda düzeltir: hayvan meta verisi artık oyunun kendi hayvan tanımından kopyalanıyor
+ve ragdoll verisi doğrulanmamış hayvanlarda çökme koruması devreye giriyor.
+Replace edilen hayvanlarda sorun olmamasının nedeni, oyunun o model için zaten doğru
+ragdoll verisini bilmesiydi; addon modelde bu veriyi biz üretiyorduk.
+
+- **Şablon artık vanilla hayvan meta verisi.** Elle uydurulan kısa şablon yerine oyunun
+  kendi köpek pedi tanımının birebir kopyası kullanılıyor: `PoseMatcherProneName`,
+  `TaskDataName`, `NavCapabilitiesName` (`STANDARD_QUADRUPED`), `DefaultBrawlingStyle`,
+  `DefaultUnarmedWeapon`, `AnimalAudioObject`, `MinActivationImpulse` ve offset alanları
+  artık dolu. Eksik alanlar ragdoll sırasında oyunu çökertiyordu.
+- **Doğrulanmamış meta veride ragdoll kapalı.** Pedin meta verisi gerçek bir hayvan
+  tanımından gelmiyorsa (paket kendi meta verisini sağlamıyor, temel model meta verisi de
+  bulunamıyorsa) `auto` ayarı o hayvanın ragdoll'unu kapatır ve çarpışmada ragdoll'u da
+  kapatır. Hayvan görünür ve animasyonlu kalır, yalnızca düşmez. **on** seçilirse ragdoll
+  zorla açılır.
+- **Gerçek meta veri varsa ragdoll açık kalır.** Paket kendi hayvan meta verisini
+  sağlıyorsa (veya Temel model olarak vanilla bir `a_c_...` pedi seçildiyse) ragdoll
+  replace modellerdeki gibi normal çalışır.
+- **Doğrulama sıkılaştırıldı.** Şablonla üretilen hayvan meta verisinde ragdoll için
+  zorunlu alanlardan biri boşsa paket oyuna ulaşmadan açık hatayla durur.
+- **Eski hazır paketler yeniden üretilir.** Hazır DLC biçim sürümü yükseltildi; önceki
+  sürümden kalan hazır `dlc.rpf` yeniden kullanılmaz.
+- **Ağ protokolü değişmedi.** 2.6.0 istemciler `VERSION_0_9_4` kullanmaya devam eder;
+  2.5.9, 2.5.8, 2.5.7, 2.5.6, 2.5.5, 2.5.4, 2.5.3, 2.5.2, 2.5.1 ve 2.5.0 istemcilerle
+  oynayabilir.
 
 ### 2.5.9 — Addon ped meta verisi ve paket doğrulaması sağlamlaştırıldı
 

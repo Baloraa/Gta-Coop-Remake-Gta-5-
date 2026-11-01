@@ -41,13 +41,21 @@ public sealed class AddonPedInfo
     public string BaseModel { get; set; } = "";
 
     /// <summary>
-    /// "auto" (varsayılan), "on" veya "off". auto: hayvanlarda ragdoll açık,
-    /// insanlarda oyunun varsayılanı korunur.
+    /// "auto" (varsayılan), "on" veya "off". auto: insanlarda oyunun varsayılanı
+    /// korunur, hayvanlarda ragdoll yalnızca meta verisi gerçek bir hayvan
+    /// tanımından kopyalandıysa açılır; şablonla üretilen hayvanda çökme
+    /// koruması olarak kapalı kalır.
     /// </summary>
     public string Ragdoll { get; set; } = "auto";
 
     /// <summary>Teşhis: meta verisinin okunduğu kaynak (dosya, RPF veya şablon).</summary>
     public string MetaSource { get; set; } = "";
+
+    /// <summary>
+    /// Meta verisi gerçek bir hayvan tanımından mı kopyalandı? Şablonla üretilen
+    /// hayvanlarda ragdoll verisi doğrulanamadığı için istemci ragdoll'u kapatır.
+    /// </summary>
+    public bool MetaVerified { get; set; }
 
     /// <summary>Bu pede ait gevşek dosyalar (paket klasörüne göreli, "/" ayraçlı).</summary>
     public List<string> Files { get; set; } = new();
@@ -78,6 +86,12 @@ public sealed class ClientAddonPed
     public int Health { get; set; } = 200;
     public string BaseModel { get; set; } = "";
     public string Ragdoll { get; set; } = "auto";
+
+    /// <summary>
+    /// Meta verisi gerçek bir hayvan tanımından kopyalandı mı? Hayır ise
+    /// istemci ragdoll'u kapatır (çökme koruması).
+    /// </summary>
+    public bool MetaVerified { get; set; }
 }
 
 /// <summary>
@@ -92,7 +106,7 @@ public static class AddonPeds
     public const string PreparedDirectoryName = ".gtacoop-peds";
     public const string ClientConfigFileName = "GTACoop-addonpeds.json";
     public const string EmbeddedMetadataName = "gtacoop_peds.xml";
-    private const int PrepareFormat = 4;
+    private const int PrepareFormat = 5;
     private const string HumanKind = "human";
     private const string FemaleKind = "female";
     private const string AnimalKind = "animal";
@@ -696,6 +710,27 @@ public static class AddonPeds
             else if (!bool.TryParse(streamed.Attribute("value")?.Value, out var flag) ||
                      flag != ped.Streamed)
                 errors.Add($"'{ped.Model}' IsStreamedGfx degeri yanlis.");
+
+            // Şablonla üretilen hayvan meta'sinda ragdoll için gereken alanların
+            // hepsi dolu olmalı. Eksik alan oyunu ragdoll sirasinda cokertiyor.
+            if (kind == AnimalKind && !ped.MetaVerified)
+            {
+                foreach (var field in AnimalTemplateFields)
+                {
+                    var value = item.Element(field)?.Value?.Trim() ?? "";
+                    if (value.Length == 0 ||
+                        value.Equals("null", StringComparison.OrdinalIgnoreCase))
+                        errors.Add($"'{ped.Model}' hayvan meta alani eksik: {field}.");
+                }
+
+                var nav = item.Element("NavCapabilitiesName")?.Value?.Trim() ?? "";
+                if (nav.Equals("STANDARD_PED", StringComparison.OrdinalIgnoreCase))
+                    errors.Add($"'{ped.Model}' hayvan ama NavCapabilitiesName STANDARD_PED.");
+
+                var capsule = item.Element("PedCapsuleName")?.Value?.Trim() ?? "";
+                if (capsule.StartsWith("STANDARD_", StringComparison.OrdinalIgnoreCase))
+                    errors.Add($"'{ped.Model}' hayvan ama PedCapsuleName insan kapsulu ({capsule}).");
+            }
         }
 
         if (errors.Count > 0)
@@ -1030,6 +1065,9 @@ public static class AddonPeds
             if (string.IsNullOrWhiteSpace(ped.Model) || !seen.Add(ped.Model)) continue;
             var item = BuildMetadataItem(ped, metadata, out var source, out var warning);
             ped.MetaSource = source;
+            // Şablonla üretilen meta doğrulanmamıştır: gerçek bir vanilla hayvan
+            // tanımından kopyalanmadığı için ragdoll verisi garanti değildir.
+            ped.MetaVerified = !source.StartsWith("template:", StringComparison.Ordinal);
             result.Sources[ped.Model] = source;
             if (!string.IsNullOrWhiteSpace(warning))
             {
@@ -1131,7 +1169,7 @@ public static class AddonPeds
             item = XElement.Parse(TemplateFor(kind));
             source = "template:" + kind;
             var templateName = kind == AnimalKind
-                ? "Rottweiler hayvan şablonu"
+                ? "vanilla hayvan şablonu (retriever)"
                 : "insan şablonu";
             warning = string.IsNullOrWhiteSpace(ped.BaseModel)
                 ? "pakette ped meta verisi yok; " + templateName + " kullanıldı."
@@ -1223,7 +1261,8 @@ public static class AddonPeds
                     Pack = string.IsNullOrWhiteSpace(addon.DisplayName) ? addon.Id : addon.DisplayName,
                     Health = ped.Health <= 0 ? 200 : ped.Health,
                     BaseModel = ped.BaseModel ?? "",
-                    Ragdoll = NormalizeRagdoll(ped.Ragdoll)
+                    Ragdoll = NormalizeRagdoll(ped.Ragdoll),
+                    MetaVerified = ped.MetaVerified
                 });
             }
         }
@@ -1316,6 +1355,19 @@ public static class AddonPeds
 
     // ---------------------------------------------------------------- şablonlar
 
+    /// <summary>
+    /// Şablonla üretilen hayvan meta'sında ragdoll için zorunlu alanlar.
+    /// Bunlardan biri boş ya da "null" olursa oyun ragdoll sırasında çöküyor.
+    /// </summary>
+    private static readonly string[] AnimalTemplateFields =
+    {
+        "ClipDictionaryName", "MovementClipSet", "GetupSetHash", "PoseMatcherName",
+        "PoseMatcherProneName", "DecisionMakerName", "MotionTaskDataSetName",
+        "DefaultTaskDataSetName", "PedCapsuleName", "TaskDataName",
+        "NavCapabilitiesName", "DefaultBrawlingStyle", "DefaultUnarmedWeapon",
+        "Personality", "CombatInfo", "AnimalAudioObject"
+    };
+
     // AddonPeds ap_m.xml biçimindeki insan pedi şablonu.
     private const string HumanTemplate =
         "<Item><Name>template</Name><PropsName>null</PropsName>" +
@@ -1344,31 +1396,46 @@ public static class AddonPeds
         "<DefaultSpawningPreference>DSP_NORMAL</DefaultSpawningPreference>" +
         "<DefaultRemoveRangeMultiplier value=\"1.000000\" /><AllowCloseSpawning value=\"false\" /></Item>";
 
-    // Çoğu dört ayaklı hayvan için makul bir başlangıç; paket kendi metasını
-    // sağlıyorsa her zaman o kullanılır.
+    // Oyunun kendi dört ayaklı hayvan tanımının birebir kopyası; yalnızca
+    // <Name> değiştirilir. Elle uydurulan kısa şablon ragdoll için gereken
+    // alanları (PoseMatcherProneName, TaskDataName, AnimalAudioObject,
+    // MinActivationImpulse, NavCapabilitiesName ...) eksik bıraktığı için
+    // hayvan düşünce/araca çarpınca oyun çöküyordu. Değerler vanilla bir
+    // retriever pedinin kendi meta verisinin birebir kopyasıdır.
     private const string AnimalTemplate =
         "<Item><Name>template</Name><PropsName>null</PropsName>" +
-        "<ClipDictionaryName>CREATURES@ROTTWEILER@MOVE</ClipDictionaryName><BlendShapeFileName>null</BlendShapeFileName>" +
-        "<ExpressionSetName></ExpressionSetName><ExpressionDictionaryName>A_C_Rottweiler</ExpressionDictionaryName>" +
-        "<ExpressionName>A_C_Rottweiler</ExpressionName><Pedtype>ANIMAL</Pedtype><MovementClipSet>ROTTWEILER@MOVE</MovementClipSet>" +
-        "<StrafeClipSet>move_ped_strafing</StrafeClipSet><MovementToStrafeClipSet>move_ped_to_strafe</MovementToStrafeClipSet>" +
+        "<ClipDictionaryName>creatures@retriever@move</ClipDictionaryName><BlendShapeFileName>null</BlendShapeFileName>" +
+        "<ExpressionSetName /><ExpressionDictionaryName>a_c_retriever</ExpressionDictionaryName>" +
+        "<ExpressionName>a_c_retriever</ExpressionName><Pedtype>ANIMAL</Pedtype><MovementClipSet>retriever@move</MovementClipSet>" +
+        "<StrafeClipSet>MOVE_PED_STRAFING</StrafeClipSet><MovementToStrafeClipSet>MOVE_PED_TO_STRAFE</MovementToStrafeClipSet>" +
         "<InjuredStrafeClipSet>move_strafe_injured</InjuredStrafeClipSet><FullBodyDamageClipSet>dam_ko</FullBodyDamageClipSet>" +
         "<AdditiveDamageClipSet>dam_ad</AdditiveDamageClipSet><DefaultGestureClipSet>ANIM_GROUP_GESTURE_M_GENERIC</DefaultGestureClipSet>" +
         "<FacialClipsetGroupName>facial_clipset_group_gen_male</FacialClipsetGroupName>" +
-        "<DefaultVisemeClipSet>ANIM_GROUP_VISEMES_M_LO</DefaultVisemeClipSet><SidestepClipSet>CREATURES@ROTTWEILER@STEP</SidestepClipSet>" +
-        "<PoseMatcherName>rottweiler</PoseMatcherName><PoseMatcherProneName>null</PoseMatcherProneName>" +
-        "<GetupSetHash>NMBS_ROTTWEILER_GETUPS</GetupSetHash><CreatureMetadataName>null</CreatureMetadataName>" +
-        "<DecisionMakerName>DOG</DecisionMakerName><MotionTaskDataSetName>rottweiler</MotionTaskDataSetName>" +
-        "<DefaultTaskDataSetName>Animal</DefaultTaskDataSetName><PedCapsuleName>Shepherd</PedCapsuleName>" +
-        "<PedLayoutName /><PedComponentSetName>Animal</PedComponentSetName><PedComponentClothName /><PedIKSettingsName>NO_IK</PedIKSettingsName>" +
-        "<TaskDataName>Animal</TaskDataName><IsStreamedGfx value=\"true\" /><AmbulanceShouldRespondTo value=\"true\" />" +
-        "<CanRideBikeWithNoHelmet value=\"false\" /><CanSpawnInCar value=\"true\" /><IsHeadBlendPed value=\"false\" />" +
-        "<bOnlyBulkyItemVariations value=\"false\" /><RelationshipGroup>WILD_ANIMAL</RelationshipGroup>" +
-        "<NavCapabilitiesName>STANDARD_PED</NavCapabilitiesName><PerceptionInfo>DEFAULT_PERCEPTION</PerceptionInfo>" +
-        "<DefaultBrawlingStyle>BS_ANIMAL</DefaultBrawlingStyle><DefaultUnarmedWeapon>WEAPON_ANIMAL</DefaultUnarmedWeapon>" +
-        "<Personality>DOG</Personality><CombatInfo>SCARED_ANIMAL</CombatInfo><VfxInfoName>VFXPEDINFO_DOG_CAT_GENERIC</VfxInfoName>" +
+        "<DefaultVisemeClipSet>ANIM_GROUP_VISEMES_M_LO</DefaultVisemeClipSet><SidestepClipSet>CREATURES@RETRIEVER@STEP</SidestepClipSet>" +
+        "<PoseMatcherName>retriever</PoseMatcherName><PoseMatcherProneName>Male_prone</PoseMatcherProneName>" +
+        "<GetupSetHash>NMBS_RETRIEVER_GETUPS</GetupSetHash><CreatureMetadataName>null</CreatureMetadataName>" +
+        "<DecisionMakerName>DOG</DecisionMakerName><MotionTaskDataSetName>retriever</MotionTaskDataSetName>" +
+        "<DefaultTaskDataSetName>Animal</DefaultTaskDataSetName><PedCapsuleName>retriever</PedCapsuleName>" +
+        "<PedLayoutName /><PedComponentSetName /><PedComponentClothName /><PedIKSettingsName />" +
+        "<TaskDataName>DOG</TaskDataName><IsStreamedGfx value=\"true\" />" +
+        "<AmbulanceShouldRespondTo value=\"false\" /><CanRideBikeWithNoHelmet value=\"false\" />" +
+        "<CanSpawnInCar value=\"true\" /><IsHeadBlendPed value=\"false\" />" +
+        "<bOnlyBulkyItemVariations value=\"false\" /><RelationshipGroup>GUARD_DOG</RelationshipGroup>" +
+        "<NavCapabilitiesName>STANDARD_QUADRUPED</NavCapabilitiesName><PerceptionInfo>DEFAULT_PERCEPTION</PerceptionInfo>" +
+        "<DefaultBrawlingStyle>BS_DOG_RETRIEVER</DefaultBrawlingStyle>" +
+        "<DefaultUnarmedWeapon>WEAPON_ANIMAL_RETRIEVER</DefaultUnarmedWeapon>" +
+        "<Personality>retriever</Personality><CombatInfo>rottweiler</CombatInfo>" +
+        "<VfxInfoName>VFXPEDINFO_DOG_CAT_GENERIC</VfxInfoName>" +
         "<AmbientClipsForFlee>FLEE</AmbientClipsForFlee><Radio1>RADIO_GENRE_PUNK</Radio1><Radio2>RADIO_GENRE_JAZZ</Radio2>" +
-        "<PedVoiceGroup>BAR_PERSON_PVG</PedVoiceGroup><AbilityType>SAT_NONE</AbilityType><ThermalBehaviour>TB_WARM</ThermalBehaviour>" +
+        "<FUpOffset value=\"0.000000\" /><RUpOffset value=\"0.000000\" />" +
+        "<FFrontOffset value=\"0.000000\" /><RFrontOffset value=\"0.147000\" />" +
+        "<MinActivationImpulse value=\"20.000000\" /><Stubble value=\"0.000000\" />" +
+        "<HDDist value=\"3.000000\" /><TargetingThreatModifier value=\"1.000000\" />" +
+        "<KilledPerceptionRangeModifer value=\"-1.000000\" /><Sexiness /><Age value=\"0\" />" +
+        "<MaxPassengersInCar value=\"0\" /><ExternallyDrivenDOFs />" +
+        "<PedVoiceGroup>MALE_BRAVE_PVG</PedVoiceGroup>" +
+        "<AnimalAudioObject>ANIMAL_PARAMS_SHEPHERD</AnimalAudioObject>" +
+        "<AbilityType>SAT_NONE</AbilityType><ThermalBehaviour>TB_WARM</ThermalBehaviour>" +
         "<SuperlodType>SLOD_KEEP_LOWEST</SuperlodType><ScenarioPopStreamingSlot>SCENARIO_POP_STREAMING_NORMAL</ScenarioPopStreamingSlot>" +
         "<DefaultSpawningPreference>DSP_NORMAL</DefaultSpawningPreference>" +
         "<DefaultRemoveRangeMultiplier value=\"1.000000\" /><AllowCloseSpawning value=\"false\" /></Item>";

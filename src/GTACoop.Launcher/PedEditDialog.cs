@@ -108,7 +108,7 @@ public sealed class PedEditDialog : Form
         _ragdoll.DropDownStyle = ComboBoxStyle.DropDownList;
         _ragdoll.Items.AddRange(new object[]
         {
-            T("auto (hayvanlarda açık)"),
+            T("auto (doğrulanmış meta varsa açık)"),
             T("on (açık)"),
             T("off (kapalı)")
         });

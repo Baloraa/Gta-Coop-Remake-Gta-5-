@@ -26,6 +26,13 @@ namespace GTACoOp
 
         /// <summary>"auto" (varsayilan), "on" veya "off".</summary>
         public string Ragdoll { get; set; }
+
+        /// <summary>
+        /// Meta verisi gercek bir hayvan tanimindan kopyalandi mi? Hayir ise
+        /// hayvanin ragdoll verisi dogrulanmamis demektir ve auto modunda
+        /// ragdoll kapali tutulur (cokme korumasi).
+        /// </summary>
+        public bool MetaVerified { get; set; }
     }
 
     internal static class AddonPedsClient

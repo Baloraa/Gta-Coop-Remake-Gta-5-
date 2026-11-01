@@ -47,6 +47,11 @@ namespace GTACoOp
         private int _watchedLocalModel;
         private int _watchedLocalDueAt;
         private bool _watchedLocalDone;
+
+        // Ragdoll'u kapatılmış addon hayvan modeli (0 = koruma yok). Oyun
+        // bayrakları model akışında sıfırlayabildiği için her karede
+        // yeniden uygulanır.
+        private int _ragdollGuardModel;
         private readonly ObjectPool _menuPool;
 
         /// <summary>
@@ -62,6 +67,7 @@ namespace GTACoOp
             public string Name;
             public string BaseModel;
             public string Ragdoll;
+            public bool MetaVerified;
             public int Health;
             public int ApplyAt;
             public int Deadline;
@@ -802,6 +808,7 @@ namespace GTACoOp
                     ApplyAt = now + 100,
                     Deadline = now + 3000,
                     Ragdoll = NormalizeRagdoll(ped.Ragdoll),
+                    MetaVerified = ped.MetaVerified,
                     BaseModel = ped.BaseModel ?? ""
                 };
 
@@ -857,13 +864,22 @@ namespace GTACoOp
                 AddonPedVariation.ScheduleAnimalFix(player);
             }
 
-            // Ragdoll is intentionally not a crash workaround: "auto" keeps it
-            // on for animals (the game default for human peds is untouched),
-            // and only an explicit "off" in the pack manifest disables it.
-            var ragdoll = ResolveRagdoll(pending.Ragdoll, animal);
+            // Ragdoll: humans keep the game default. Animals only get ragdoll
+            // when their metadata was copied from a real animal definition.
+            // A template-built animal has no verified ragdoll data and the game
+            // crashes when it falls or a vehicle hits it, so it is kept
+            // ragdoll-free (crash guard) unless the pack explicitly asks for it.
+            var ragdoll = ResolveRagdoll(pending.Ragdoll, animal, pending.MetaVerified);
             if (ragdoll.HasValue)
             {
-                try { player.CanRagdoll = ragdoll.Value; } catch { }
+                ApplyRagdoll(player, ragdoll.Value, animal);
+            }
+
+            if (animal && ragdoll == false && !pending.MetaVerified &&
+                NormalizeRagdoll(pending.Ragdoll) != "off")
+            {
+                Notification.Show("~o~Ragdoll off: ~w~addon animal has no verified " +
+                                  "metadata (crash guard).");
             }
 
             Main.Logger.WriteLine("Local addon ped ready: " + pending.Name +
@@ -872,6 +888,7 @@ namespace GTACoOp
                 " isPlayerPed=" + Function.Call<bool>(Hash.IS_PED_A_PLAYER, player.Handle) +
                 " baseModel=" + (string.IsNullOrWhiteSpace(pending.BaseModel)
                     ? "-" : pending.BaseModel) +
+                " metaVerified=" + pending.MetaVerified +
                 " ragdoll=" + (ragdoll.HasValue ? ragdoll.Value.ToString() : "default") +
                 " pedType=" + Function.Call<int>(Hash.GET_PED_TYPE, player.Handle));
 
@@ -887,16 +904,75 @@ namespace GTACoOp
         }
 
         /// <summary>
-        /// "auto" keeps the game default for humans and enables ragdoll for
-        /// animals; only an explicit "off" disables it. Ragdoll must not be
-        /// used as a blanket crash workaround.
+        /// "auto" keeps the game default for humans. For animals it enables
+        /// ragdoll only when the ped metadata came from a real animal
+        /// definition; a template-built animal crashes the game on ragdoll, so
+        /// it stays ragdoll-free. "on" forces ragdoll, "off" disables it.
         /// </summary>
-        private static bool? ResolveRagdoll(string setting, bool animal)
+        private static bool? ResolveRagdoll(string setting, bool animal, bool metaVerified)
         {
             var mode = (setting ?? "").Trim().ToLowerInvariant();
             if (mode == "off") return false;
             if (mode == "on") return true;
-            return animal ? true : (bool?)null;
+            if (!animal) return null;
+            return metaVerified;
+        }
+
+        /// <summary>
+        /// Applies the ragdoll setting and keeps a per-frame guard for animals
+        /// whose ragdoll data is not verified.
+        /// </summary>
+        private void ApplyRagdoll(Ped ped, bool enabled, bool animal)
+        {
+            if (ped == null || !ped.Exists()) return;
+
+            try { ped.CanRagdoll = enabled; } catch { }
+
+            if (enabled)
+            {
+                _ragdollGuardModel = 0;
+                return;
+            }
+
+            _ragdollGuardModel = animal ? ped.Model.Hash : 0;
+            DisableCollisionRagdoll(ped);
+        }
+
+        /// <summary>
+        /// The game can force ragdoll on vehicle impacts even when CanRagdoll is
+        /// false. Removing the collision flag keeps the animal on its feet
+        /// instead of crashing in the ragdoll path.
+        /// </summary>
+        private static void DisableCollisionRagdoll(Ped ped)
+        {
+            try { Function.Call(Hash.SET_PED_RAGDOLL_ON_COLLISION, ped.Handle, false, false); }
+            catch
+            {
+                try { Function.Call(Hash.SET_PED_RAGDOLL_ON_COLLISION, ped.Handle, false); }
+                catch { }
+            }
+        }
+
+        /// <summary>
+        /// Re-asserts the crash guard while the guarded animal is active; the
+        /// game resets ped flags when a model is (re)streamed.
+        /// </summary>
+        private void EnforceRagdollGuard()
+        {
+            if (_ragdollGuardModel == 0) return;
+
+            var player = Game.Player.Character;
+            if (player == null || !player.Exists() || player.Model.Hash != _ragdollGuardModel)
+            {
+                _ragdollGuardModel = 0;
+                return;
+            }
+
+            if (player.CanRagdoll)
+            {
+                try { player.CanRagdoll = false; } catch { }
+            }
+            DisableCollisionRagdoll(player);
         }
 
         private static string NormalizeRagdoll(string setting)
@@ -905,23 +981,27 @@ namespace GTACoOp
             return mode == "on" || mode == "off" ? mode : "auto";
         }
 
-        private static string ConfiguredRagdoll(int hash)
+        private static void ConfiguredPedSettings(int hash, out string ragdoll, out bool metaVerified)
         {
+            ragdoll = "auto";
+            metaVerified = false;
             try
             {
                 var config = AddonPedsClient.Load();
-                if (config == null || config.Peds == null) return "auto";
+                if (config == null || config.Peds == null) return;
                 foreach (var ped in config.Peds)
                 {
                     if (ped == null || string.IsNullOrWhiteSpace(ped.Model)) continue;
                     int modelHash;
                     try { modelHash = Game.GenerateHash(ped.Model.Trim().ToLowerInvariant()); }
                     catch { continue; }
-                    if (modelHash == hash) return ped.Ragdoll ?? "auto";
+                    if (modelHash != hash) continue;
+                    ragdoll = string.IsNullOrWhiteSpace(ped.Ragdoll) ? "auto" : ped.Ragdoll;
+                    metaVerified = ped.MetaVerified;
+                    return;
                 }
             }
             catch { }
-            return "auto";
         }
 
         /// <summary>
@@ -953,18 +1033,19 @@ namespace GTACoOp
             try { player.Weapons.RemoveAll(); } catch { }
             try { player.Armor = 0; } catch { }
 
-            var setting = ConfiguredRagdoll(hash);
-            var ragdoll = ResolveRagdoll(setting, true);
+            ConfiguredPedSettings(hash, out var setting, out var metaVerified);
+            var ragdoll = ResolveRagdoll(setting, true, metaVerified);
             if (ragdoll.HasValue)
             {
-                try { player.CanRagdoll = ragdoll.Value; } catch { }
+                ApplyRagdoll(player, ragdoll.Value, true);
             }
 
             Main.Logger.WriteLine("Local animal model detected: handle=" + player.Handle +
                 " model=0x" + hash.ToString("X8") + " isHuman=" + player.IsHuman +
                 " isPlayerPed=" + Function.Call<bool>(Hash.IS_PED_A_PLAYER, player.Handle) +
                 " pedType=" + Function.Call<int>(Hash.GET_PED_TYPE, player.Handle) +
-                " ragdoll=" + setting + " canRagdoll=" + player.CanRagdoll);
+                " ragdoll=" + setting + " metaVerified=" + metaVerified +
+                " canRagdoll=" + player.CanRagdoll);
             AddonPedVariation.ScheduleAnimalFix(player);
         }
 
@@ -983,6 +1064,7 @@ namespace GTACoOp
                     Notification.Show("~r~Default model could not be loaded.");
                     return;
                 }
+                _ragdollGuardModel = 0;
                 Game.Player.ChangeModel(model);
                 Notification.Show("~g~Player model reset.");
             }
@@ -2028,6 +2110,7 @@ namespace GTACoOp
                 Ped player = Game.Player.Character;
                 ProcessPendingAddonPed();
                 WatchLocalPlayerAnimal();
+                EnforceRagdollGuard();
                 AddonPedVariation.Process();
                 ProcessServerBrowserQueue();
                 UpdateServerBrowserScan();
