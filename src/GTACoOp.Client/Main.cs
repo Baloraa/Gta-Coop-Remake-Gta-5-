@@ -66,13 +66,30 @@ namespace GTACoOp
         private static extern short GetAsyncKeyState(int vKey);
         private const int VkLeftButton = 0x01;
 
-        private static bool LeftMouseJustPressed() =>
-            (GetAsyncKeyState(VkLeftButton) & 0x0001) != 0;
+        /// <summary>
+        /// "Basılı" biti (0x8000). Eski kod "son okumadan beri basıldı"
+        /// bitini (0x0001) kullanıyordu; bu bit okunmadan bayatlıyor ve tek
+        /// tıklama ikinci bir ısırık üretiyordu.
+        /// </summary>
+        private static bool LeftMouseDown()
+        {
+            // Her karede çağrılır: eski kenar bitini de tüketir.
+            var state = GetAsyncKeyState(VkLeftButton);
+            return (state & 0x8000) != 0;
+        }
 
         private static int _lastAnimalAttackAt;
         private int _animalAttackReadyAt;
         private bool _bitePending;
         private int _biteDeadline;
+
+        // Saldırı tuşunun önceki karedeki durumu: tek basış = tek ısırık.
+        private bool _attackInputWasDown;
+
+        // Zemin altına düşme kurtarması için son güvenli konum.
+        private Vector3 _lastSafeAnimalPosition;
+        private bool _hasLastSafeAnimalPosition;
+        private int _groundRescueReadyAt;
         private readonly ObjectPool _menuPool;
 
         /// <summary>
@@ -982,10 +999,16 @@ namespace GTACoOp
         /// </summary>
         private void UpdateAnimalAttack()
         {
+            // Tuş durumu her karede, erken çıkışlardan ÖNCE okunur. Aksi hâlde
+            // kısa devre (`||`) yüzünden sol tık okuması atlanır, "basıldı"
+            // biti birikir ve tek tıklama ikinci bir ısırık üretir.
+            var attackDown = AttackInputDown();
+
             var player = Game.Player.Character;
             if (player == null || !player.Exists())
             {
                 _bitePending = false;
+                _attackInputWasDown = attackDown;
                 return;
             }
 
@@ -994,13 +1017,17 @@ namespace GTACoOp
                 _menuPool.AreAnyVisible || _chat.IsFocused)
             {
                 _bitePending = false;
+                _attackInputWasDown = attackDown;
                 return;
             }
 
-            if (Game.GameTime >= _animalAttackReadyAt &&
-                (Function.Call<bool>(Hash.IS_CONTROL_JUST_PRESSED, 0, 24) ||
-                 Function.Call<bool>(Hash.IS_DISABLED_CONTROL_JUST_PRESSED, 0, 24) ||
-                 LeftMouseJustPressed()))
+            // Yalnızca YENİ basış ısırık başlatır: tuş basılı tutulsa da, aynı
+            // basış birden çok karede okunsa da tekrar tetiklenmez. Yeni basış
+            // için tuşun bırakılıp yeniden basılması gerekir.
+            var pressed = attackDown && !_attackInputWasDown;
+            _attackInputWasDown = attackDown;
+
+            if (pressed && Game.GameTime >= _animalAttackReadyAt)
             {
                 _bitePending = true;
                 _biteDeadline = Game.GameTime + 600;
@@ -1022,9 +1049,30 @@ namespace GTACoOp
             }
 
             _bitePending = false;
-            _animalAttackReadyAt = Game.GameTime + 800;
+
+            // Aynı ısırık animasyonu hâlâ oynarken yenisini başlatma; animasyon
+            // kendini kesip baştan oynadığında tek basış iki ısırık gibi
+            // görünüyordu.
+            if (Function.Call<bool>(Hash.IS_ENTITY_PLAYING_ANIM, player.Handle,
+                    AnimalAttackDict, AnimalAttackClip, 3))
+            {
+                return;
+            }
+
+            _animalAttackReadyAt = Game.GameTime + 900;
             _lastAnimalAttackAt = Game.GameTime;
             PerformAnimalBite(player);
+        }
+
+        /// <summary>Saldırı tuşu o an basılı mı?</summary>
+        private static bool AttackInputDown()
+        {
+            var down = Function.Call<bool>(Hash.IS_CONTROL_PRESSED, 0, 24) ||
+                       Function.Call<bool>(Hash.IS_DISABLED_CONTROL_PRESSED, 0, 24);
+
+            // Sol tık her karede okunur (kısa devre yok): eski kenar biti
+            // birikmesin.
+            return LeftMouseDown() || down;
         }
 
         private static void PerformAnimalBite(Ped player)
@@ -1109,6 +1157,78 @@ namespace GTACoOp
                 try { player.CanRagdoll = false; } catch { }
             }
             DisableCollisionRagdoll(player);
+
+            // Ragdoll'u kapalı hayvan yüksekten düşerken bazen zeminden geçip
+            // haritanın altına iniyor ve düşmeye devam ediyordu.
+            RescueFallenAnimal(player);
+        }
+
+        /// <summary>
+        /// Ragdoll'u kapalı bir hayvan zeminden geçtiyse onu geri alır:
+        /// haritanın çok altına indiyse son güvenli konuma, zemine gömüldüyse
+        /// zeminin üstüne taşınır. Yalnızca gerçekten düşerken çalışır, bu
+        /// yüzden köprü/üst geçit altında duran hayvanı yanlışlıkla yukarı
+        /// çekmez.
+        /// </summary>
+        private void RescueFallenAnimal(Ped ped)
+        {
+            if (Game.GameTime < _groundRescueReadyAt) return;
+            _groundRescueReadyAt = Game.GameTime + 250;
+
+            if (ped == null || !ped.Exists() || ped.IsDead || ped.IsInVehicle()) return;
+
+            var position = ped.Position;
+            var inAir = Function.Call<bool>(Hash.IS_ENTITY_IN_AIR, ped.Handle);
+            if (!inAir)
+            {
+                _lastSafeAnimalPosition = position;
+                _hasLastSafeAnimalPosition = true;
+                return;
+            }
+
+            // Haritanın çok altına düştüyse (sonsuz düşüş) son güvenli konuma dön.
+            if (position.Z < -80f && _hasLastSafeAnimalPosition)
+            {
+                RestoreAnimal(ped, _lastSafeAnimalPosition, "below map");
+                return;
+            }
+
+            var velocity = ped.Velocity;
+            if (velocity.Z > -1.0f) return; // yalnızca düşerken
+
+            var ground = new OutputArgument();
+            var below = new OutputArgument();
+            bool groundFound;
+            bool groundBelow;
+            try
+            {
+                groundFound = Function.Call<bool>(Hash.GET_GROUND_Z_FOR_3D_COORD,
+                    position.X, position.Y, 1000f, ground, false);
+                groundBelow = Function.Call<bool>(Hash.GET_GROUND_Z_FOR_3D_COORD,
+                    position.X, position.Y, position.Z - 1.0f, below, false);
+            }
+            catch { return; }
+
+            // Altında zemin varsa normal düşüş (ör. bina kenarından düşme).
+            if (!groundFound || groundBelow) return;
+
+            var groundZ = ground.GetResult<float>();
+            if (position.Z >= groundZ - 3.0f) return;
+
+            RestoreAnimal(ped,
+                new Vector3(position.X, position.Y, groundZ + 0.5f), "under ground");
+        }
+
+        private static void RestoreAnimal(Ped ped, Vector3 target, string reason)
+        {
+            try
+            {
+                ped.Position = target;
+                Function.Call(Hash.SET_ENTITY_VELOCITY, ped.Handle, 0f, 0f, 0f);
+                Main.Logger.WriteLine("Animal ground rescue (" + reason + "): z=" +
+                    target.Z.ToString("F2"));
+            }
+            catch { }
         }
 
         private static string NormalizeRagdoll(string setting)

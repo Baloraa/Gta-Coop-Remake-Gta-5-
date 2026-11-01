@@ -8,7 +8,7 @@ GTACoop Remake is not a new multiplayer engine. It is the desktop layer around G
 
 GTACoop Remake is for private Story Mode co-op. It does not touch GTA Online, does not bypass anti-cheat, and does not inject into online sessions.
 
-**Current release:** 2.6.1  
+**Current release:** 2.6.2  
 **Platform:** Windows 10/11, x64  
 **UI:** Turkish, English, and Russian  
 **License:** GNU GPL v3
@@ -288,6 +288,15 @@ This is a tool for playing with friends, not a hardened anti-cheat or privacy sy
 - Server owners are responsible for the mods they distribute. The launcher automates delivery; it does not grant permission to redistribute someone else's work.
 
 ---
+
+## What is new in 2.6.2
+
+Two animal-attack problems are fixed.
+
+- **One press, one bite.** The attack input was read with short-circuit `||`, so the left-click check was skipped on most frames; Windows' "pressed since last read" bit piled up and produced a spontaneous second bite once the cooldown expired. The input is now read every frame and a bite only starts on a **fresh press** (the button has to be released and pressed again); holding the button no longer repeats.
+- **The animation is not restarted.** A new bite is not started while the same bite animation is still playing, and the cooldown is 0.9 s.
+- **Falling through the map.** A ragdoll-disabled animal sometimes sank through the ground and kept falling under the map. It is now moved back on top of the ground, or back to its last safe position when it drops far below the map, with its velocity cleared. The rescue only runs while the animal is actually falling, so an animal standing under a bridge is not pulled upwards.
+- The 2.6.1 bite synchronisation and the 2.6.0 ragdoll crash guard are unchanged; the **network protocol is unchanged** (`VERSION_0_9_4`), so mixed clients still play together.
 
 ## What is new in 2.6.1
 

@@ -2,7 +2,7 @@
 
 **Türkçe** | [English](README.md)
 
-2.6.1 sürümü - kendi sunucu yönetimi, otomatik mod indirme, **oturum modu**,
+2.6.2 sürümü - kendi sunucu yönetimi, otomatik mod indirme, **oturum modu**,
 **kısa kod** (ör. `Gel.com`) ile internetten sunucu bulma, **otomatik relay**,
 **UPnP doğrudan bağlantı**, **özel relay sunucusu**, **tanılama kopyalama**,
 **canlı sunucu durumu**, **Sunucu Tarayıcı** sekmesi, **OpenIV (.oiv) paket desteği**,
@@ -14,6 +14,25 @@ yalnızca oyun açıkken kurulu kalır, oyundan çıkınca otomatik kaldırılı
 Oyun başlatma dosyası seçilebilir; varsayılan **PlayGTAV.exe**'dir (GTA5.exe de seçilebilir).
 **Sesli sohbet** (bas-konuş, `[MIC]` göstergesi) ve **host-led hikaye görevi koordinasyonu**
 bu sürümde eklendi; ayrıntılar aşağıda.
+
+### 2.6.2 — Çift ısırık ve zeminden geçme düzeltildi
+
+Hayvanla saldırmanın iki sorunu giderildi.
+
+- **Tek basış artık tek ısırık.** Saldırı tuşu kısa devre (`||`) ile okunuyordu; sol tık
+  kontrolü çoğu karede hiç okunmuyor, Windows'un "son okumadan beri basıldı" biti
+  birikiyor ve bekleme süresi bitince kendiliğinden ikinci bir ısırık üretiyordu.
+  Artık tuş durumu her karede okunuyor ve ısırık yalnızca **yeni basışta** (tuş
+  bırakılıp yeniden basıldığında) tetikleniyor; tuş basılı tutulsa bile tekrar etmiyor.
+- **Animasyon kendini kesmiyor.** Aynı ısırık animasyonu hâlâ oynarken yenisi
+  başlatılmıyor, bekleme süresi 0,9 sn'ye çıkarıldı.
+- **Yüksekten düşünce zeminden geçme.** Ragdoll'u kapalı hayvan bazen zeminden geçip
+  haritanın altına iniyor ve düşmeye devam ediyordu. Artık hayvan zemine gömülürse
+  zeminin üstüne, haritanın çok altına inerse son güvenli konumuna geri alınıyor
+  (hız sıfırlanır). Koruma yalnızca gerçekten düşerken çalışır; köprü veya üst geçit
+  altında duran hayvanı yanlışlıkla yukarı çekmez.
+- 2.6.1'in ısırık senkronu ve 2.6.0'ın ragdoll çökme koruması aynen duruyor;
+  **ağ protokolü değişmedi** (`VERSION_0_9_4`), eski istemcilerle birlikte oynanabilir.
 
 ### 2.6.1 — Hayvan pediyle saldırma (ısırma) geldi
 
