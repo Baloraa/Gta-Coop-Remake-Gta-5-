@@ -15,6 +15,8 @@ public sealed class PedEditDialog : Form
     private readonly TextBox _decision = new();
     private readonly TextBox _personality = new();
     private readonly TextBox _combat = new();
+    private readonly TextBox _baseModel = new();
+    private readonly ComboBox _ragdoll = new();
 
     public AddonPedInfo Ped { get; }
 
@@ -33,6 +35,9 @@ public sealed class PedEditDialog : Form
             DecisionMaker = ped.DecisionMaker,
             Personality = ped.Personality,
             CombatInfo = ped.CombatInfo,
+            BaseModel = ped.BaseModel,
+            Ragdoll = AddonPeds.NormalizeRagdoll(ped.Ragdoll),
+            MetaSource = ped.MetaSource,
             Files = new List<string>(ped.Files)
         };
 
@@ -43,7 +48,7 @@ public sealed class PedEditDialog : Form
         MaximizeBox = false;
         ShowInTaskbar = false;
         AutoScaleMode = AutoScaleMode.Dpi;
-        ClientSize = new Size(560, 470);
+        ClientSize = new Size(560, 510);
         Font = new Font("Segoe UI", 9f);
         Padding = new Padding(10);
 
@@ -51,12 +56,12 @@ public sealed class PedEditDialog : Form
         {
             Dock = DockStyle.Fill,
             ColumnCount = 2,
-            RowCount = 12,
+            RowCount = 14,
             Padding = new Padding(4)
         };
         table.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 150));
         table.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        for (int i = 0; i < 11; i++)
+        for (int i = 0; i < 13; i++)
             table.RowStyles.Add(new RowStyle(SizeType.Absolute, 32));
         table.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 
@@ -98,6 +103,21 @@ public sealed class PedEditDialog : Form
         _decision.Text = Ped.DecisionMaker;
         _personality.Text = Ped.Personality;
         _combat.Text = Ped.CombatInfo;
+        _baseModel.Text = Ped.BaseModel;
+        _baseModel.Dock = DockStyle.Fill;
+        _ragdoll.DropDownStyle = ComboBoxStyle.DropDownList;
+        _ragdoll.Items.AddRange(new object[]
+        {
+            T("auto (hayvanlarda açık)"),
+            T("on (açık)"),
+            T("off (kapalı)")
+        });
+        _ragdoll.SelectedIndex = Ped.Ragdoll switch
+        {
+            "on" => 1,
+            "off" => 2,
+            _ => 0
+        };
         foreach (var box in new[] { _clip, _movement, _decision, _personality, _combat })
             box.Dock = DockStyle.Fill;
 
@@ -106,17 +126,19 @@ public sealed class PedEditDialog : Form
         AddRow(table, 2, T("Tür"), _kind);
         AddRow(table, 3, T("Streamed"), streamed);
         AddRow(table, 4, T("Sağlık"), _health);
-        AddRow(table, 5, T("Clip Dictionary"), _clip);
-        AddRow(table, 6, T("Movement Clip Set"), _movement);
-        AddRow(table, 7, T("Decision Maker"), _decision);
-        AddRow(table, 8, T("Personality"), _personality);
-        AddRow(table, 9, T("Combat Info"), _combat);
-        AddRow(table, 10, T("Etkin"), _enabled);
+        AddRow(table, 5, T("Temel Model (meta)"), _baseModel);
+        AddRow(table, 6, T("Ragdoll"), _ragdoll);
+        AddRow(table, 7, T("Clip Dictionary"), _clip);
+        AddRow(table, 8, T("Movement Clip Set"), _movement);
+        AddRow(table, 9, T("Decision Maker"), _decision);
+        AddRow(table, 10, T("Personality"), _personality);
+        AddRow(table, 11, T("Combat Info"), _combat);
+        AddRow(table, 12, T("Etkin"), _enabled);
 
         var files = Ui.Lbl(T("Dosya: {0} • {1}", Ped.Files.Count,
             Ped.Streamed ? T("bileşen klasörü") : T("gevşek dosya")));
         files.ForeColor = Color.DimGray;
-        table.Controls.Add(files, 0, 11);
+        table.Controls.Add(files, 0, 13);
         table.SetColumnSpan(files, 2);
 
         var buttons = Ui.Flow(DockStyle.Bottom);
@@ -170,6 +192,13 @@ public sealed class PedEditDialog : Form
         Ped.DecisionMaker = _decision.Text.Trim();
         Ped.Personality = _personality.Text.Trim();
         Ped.CombatInfo = _combat.Text.Trim();
+        Ped.BaseModel = _baseModel.Text.Trim();
+        Ped.Ragdoll = _ragdoll.SelectedIndex switch
+        {
+            1 => "on",
+            2 => "off",
+            _ => "auto"
+        };
 
         DialogResult = DialogResult.OK;
         Close();

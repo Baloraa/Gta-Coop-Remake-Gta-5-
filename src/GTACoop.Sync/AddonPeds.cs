@@ -34,6 +34,21 @@ public sealed class AddonPedInfo
     public string Personality { get; set; } = "";
     public string CombatInfo { get; set; } = "";
 
+    /// <summary>
+    /// Pedin kendi meta verisi yoksa kullanılacak temel model
+    /// (ör. "a_c_rottweiler"). Boşsa tür şablonu kullanılır.
+    /// </summary>
+    public string BaseModel { get; set; } = "";
+
+    /// <summary>
+    /// "auto" (varsayılan), "on" veya "off". auto: hayvanlarda ragdoll açık,
+    /// insanlarda oyunun varsayılanı korunur.
+    /// </summary>
+    public string Ragdoll { get; set; } = "auto";
+
+    /// <summary>Teşhis: meta verisinin okunduğu kaynak (dosya, RPF veya şablon).</summary>
+    public string MetaSource { get; set; } = "";
+
     /// <summary>Bu pede ait gevşek dosyalar (paket klasörüne göreli, "/" ayraçlı).</summary>
     public List<string> Files { get; set; } = new();
 }
@@ -61,6 +76,8 @@ public sealed class ClientAddonPed
     public string Kind { get; set; } = "human";
     public string Pack { get; set; } = "";
     public int Health { get; set; } = 200;
+    public string BaseModel { get; set; } = "";
+    public string Ragdoll { get; set; } = "auto";
 }
 
 /// <summary>
@@ -75,7 +92,7 @@ public static class AddonPeds
     public const string PreparedDirectoryName = ".gtacoop-peds";
     public const string ClientConfigFileName = "GTACoop-addonpeds.json";
     public const string EmbeddedMetadataName = "gtacoop_peds.xml";
-    private const int PrepareFormat = 3;
+    private const int PrepareFormat = 4;
     private const string HumanKind = "human";
     private const string FemaleKind = "female";
     private const string AnimalKind = "animal";
@@ -97,6 +114,7 @@ public static class AddonPeds
         public string Kind { get; init; } = HumanKind;
         public bool Streamed { get; init; }
         public bool HasModelFile { get; init; }
+        public string MetaSource { get; init; } = "";
         public List<string> Files { get; init; } = new();
     }
 
@@ -264,12 +282,12 @@ public static class AddonPeds
         }
 
         var models = groups.Keys.ToList();
-        var metadata = LoadMetadata(packDir, models);
+        var metadata = LoadMetadata(packDir, models, log);
         var result = new List<LoosePed>();
         foreach (var group in groups.Values)
         {
             group.Files.Sort(StringComparer.OrdinalIgnoreCase);
-            metadata.TryGetValue(group.Model, out var item);
+            metadata.Items.TryGetValue(group.Model, out var item);
             result.Add(new LoosePed
             {
                 Model = group.Model,
@@ -277,6 +295,9 @@ public static class AddonPeds
                 Kind = GuessKind(group.Model, item),
                 Streamed = group.Streamed,
                 HasModelFile = group.HasModelFile,
+                MetaSource = metadata.Sources.TryGetValue(group.Model, out var source)
+                    ? source
+                    : "",
                 Files = group.Files
             });
         }
@@ -333,7 +354,7 @@ public static class AddonPeds
                 ?? remaining.FirstOrDefault(p =>
                     string.Equals(p.Model, loose.Model, StringComparison.OrdinalIgnoreCase));
 
-            existing ??= new AddonPedInfo { Enabled = true };
+            existing ??= new AddonPedInfo { Enabled = true, Kind = loose.Kind };
             remaining.Remove(existing);
 
             existing.Model = loose.Model;
@@ -349,6 +370,10 @@ public static class AddonPeds
             existing.DecisionMaker ??= "";
             existing.Personality ??= "";
             existing.CombatInfo ??= "";
+            existing.BaseModel ??= "";
+            existing.Ragdoll = NormalizeRagdoll(existing.Ragdoll);
+            if (string.IsNullOrWhiteSpace(existing.MetaSource))
+                existing.MetaSource = loose.MetaSource;
             merged.Add(existing);
         }
 
@@ -394,6 +419,23 @@ public static class AddonPeds
 
     public static string GuessKind(string model, XElement? metadata)
     {
+        var sourceKind = MetadataKind(metadata);
+        if (sourceKind != HumanKind) return sourceKind;
+
+        return model.StartsWith("a_c_", StringComparison.OrdinalIgnoreCase) ||
+               model.StartsWith("a_c", StringComparison.OrdinalIgnoreCase) &&
+               model.Length > 3 && !char.IsLetter(model[3])
+            ? AnimalKind
+            : HumanKind;
+    }
+
+    /// <summary>
+    /// Yalnızca meta verideki Pedtype alanına bakar. Model adı öneki burada
+    /// kullanılmaz; kaynak meta ile hedef türün uyuşup uyuşmadığını anlamak
+    /// için güvenilir tek sinyal Pedtype'tır.
+    /// </summary>
+    private static string MetadataKind(XElement? metadata)
+    {
         var pedType = metadata?.Element("Pedtype")?.Value;
         if (!string.IsNullOrWhiteSpace(pedType))
         {
@@ -402,12 +444,7 @@ public static class AddonPeds
             if (pedType.Contains("FEMALE", StringComparison.OrdinalIgnoreCase))
                 return FemaleKind;
         }
-
-        return model.StartsWith("a_c_", StringComparison.OrdinalIgnoreCase) ||
-               model.StartsWith("a_c", StringComparison.OrdinalIgnoreCase) &&
-               model.Length > 3 && !char.IsLetter(model[3])
-            ? AnimalKind
-            : HumanKind;
+        return HumanKind;
     }
 
     public static bool IsAnimal(string kind) =>
@@ -440,8 +477,11 @@ public static class AddonPeds
         if (enabled.Count == 0)
             throw new InvalidDataException("Etkin ped yok.");
 
-        var items = LoadMetadata(packDir, enabled.Select(p => p.Model));
-        var metadataXml = BuildMetadataXml(enabled, items);
+        var items = LoadMetadata(packDir, enabled.Select(p => p.Model), log);
+        var build = BuildMetadata(enabled, items, log);
+        var metadataXml = build.Xml;
+        ValidatePack(packDir, enabled, log);
+        ValidateGeneratedMetadata(metadataXml, enabled);
         var sourceHash = ComputeSourceHash(packDir, enabled, metadataXml);
 
         var stamp = SyncJson.Load<PrepareStamp>(stampPath);
@@ -474,6 +514,10 @@ public static class AddonPeds
                     ?? throw new InvalidDataException("peds.rpf yazılamadı.");
                 if (stream.FileSize == 0 && stream.GetDataSize() == 0)
                     throw new InvalidDataException("peds.rpf boş.");
+
+                var metaEntry = check.Find(EmbeddedMetadataName)!;
+                var generated = Encoding.UTF8.GetString(check.ReadFile(metaEntry));
+                ValidateGeneratedMetadata(generated, enabled);
             }
 
             if (File.Exists(old)) File.Delete(old);
@@ -504,6 +548,161 @@ public static class AddonPeds
         }
     }
 
+    /// <summary>
+    /// Paket dosyalarini ve manifest tutarliligini denetler. Kritik hatalar
+    /// istemciye bozuk DLC gitmesini engellemek icin istisna firlatir;
+    /// supheli durumlar yalnizca loglanir.
+    /// </summary>
+    public static void ValidatePack(string packDir, IReadOnlyCollection<AddonPedInfo> peds,
+        Action<string>? log = null)
+    {
+        var errors = new List<string>();
+        var warnings = new List<string>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var ped in peds)
+        {
+            var model = (ped.Model ?? "").Trim();
+            if (model.Length == 0)
+            {
+                errors.Add("Model adi bos olan ped var.");
+                continue;
+            }
+            if (!seen.Add(model))
+                errors.Add($"'{model}' birden fazla kez tanimli.");
+            if (!model.Equals(model.ToLowerInvariant(), StringComparison.Ordinal) ||
+                model.Any(c => char.IsWhiteSpace(c)))
+                warnings.Add($"'{model}' model adi kucuk harf ve bosluksuz olmali.");
+
+            var files = (ped.Files ?? new List<string>())
+                .Where(f => !string.IsNullOrWhiteSpace(f))
+                .ToList();
+            if (files.Count == 0)
+            {
+                errors.Add($"'{model}' icin dosya listesi bos.");
+                continue;
+            }
+
+            var hasModelFile = false;
+            var matchesModelName = false;
+            foreach (var rel in files)
+            {
+                var full = Path.Combine(packDir, rel.Replace('/', Path.DirectorySeparatorChar));
+                if (!File.Exists(full))
+                {
+                    errors.Add($"'{model}' dosyasi bulunamadi: {rel}");
+                    continue;
+                }
+
+                var ext = Path.GetExtension(full);
+                if (!PedExtensions.Contains(ext, StringComparer.OrdinalIgnoreCase))
+                {
+                    warnings.Add($"'{model}' ped olmayan dosya iceriyor: {rel}");
+                    continue;
+                }
+
+                var header = new byte[16];
+                using (var stream = File.OpenRead(full))
+                {
+                    var read = stream.Read(header, 0, header.Length);
+                    if (read < header.Length || !RpfCrypto.HasResourceHeader(header))
+                        errors.Add($"'{rel}' gecerli bir GTA kaynak dosyasi degil (RSC7 yok).");
+                }
+
+                var name = Path.GetFileNameWithoutExtension(full);
+                var caret = name.IndexOf('^');
+                if (caret > 0) name = name[..caret];
+                if (name.Equals(model, StringComparison.OrdinalIgnoreCase))
+                    matchesModelName = true;
+
+                if (ped.Streamed)
+                {
+                    if (ext.Equals(".ydd", StringComparison.OrdinalIgnoreCase) ||
+                        ext.Equals(".ytd", StringComparison.OrdinalIgnoreCase))
+                        hasModelFile = true;
+                }
+                else if (ext.Equals(".yft", StringComparison.OrdinalIgnoreCase) ||
+                         ext.Equals(".ymt", StringComparison.OrdinalIgnoreCase))
+                {
+                    hasModelFile = true;
+                }
+            }
+
+            if (!hasModelFile)
+                errors.Add(ped.Streamed
+                    ? $"'{model}' streamed ped ama .ydd/.ytd bileseni yok."
+                    : $"'{model}' icin .yft/.ymt model dosyasi yok.");
+            if (!matchesModelName)
+                warnings.Add($"'{model}' adiyla eslesen dosya yok; ad degistirilmis olabilir.");
+        }
+
+        foreach (var warning in warnings)
+            log?.Invoke("Ped uyarisi: " + warning);
+        if (errors.Count > 0)
+            throw new InvalidDataException("Ped paketi dogrulanamadi:\r\n - " +
+                                           string.Join("\r\n - ", errors));
+        log?.Invoke($"Ped paketi dogrulandi: {peds.Count} ped.");
+    }
+
+    /// <summary>
+    /// Uretilen meta XML'inde her etkin ped icin bir Item, gecerli bir
+    /// Pedtype ve IsStreamedGfx alani bulundugunu denetler.
+    /// </summary>
+    public static void ValidateGeneratedMetadata(string metadataXml,
+        IReadOnlyCollection<AddonPedInfo> peds)
+    {
+        XDocument doc;
+        try
+        {
+            doc = XDocument.Parse(metadataXml);
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidDataException("Uretilen ped meta XML'i okunamadi: " + ex.Message);
+        }
+
+        var items = new Dictionary<string, XElement>(StringComparer.OrdinalIgnoreCase);
+        var errors = new List<string>();
+        foreach (var candidate in doc.Descendants("Item"))
+        {
+            var name = candidate.Element("Name")?.Value?.Trim();
+            if (string.IsNullOrWhiteSpace(name)) continue;
+            if (!items.TryAdd(name, candidate))
+                errors.Add($"'{name}' meta veride birden fazla kez tanimli.");
+        }
+
+        foreach (var ped in peds)
+        {
+            if (!items.TryGetValue(ped.Model, out var item))
+            {
+                errors.Add($"'{ped.Model}' icin meta Item eksik.");
+                continue;
+            }
+
+            var pedType = item.Element("Pedtype")?.Value?.Trim() ?? "";
+            if (pedType.Length == 0)
+                errors.Add($"'{ped.Model}' icin Pedtype eksik.");
+            var kind = EffectiveKind(ped);
+            if (kind == AnimalKind &&
+                !pedType.Contains("ANIMAL", StringComparison.OrdinalIgnoreCase))
+                errors.Add($"'{ped.Model}' hayvan ama Pedtype '{pedType}'.");
+            if (kind == FemaleKind &&
+                !pedType.Contains("FEMALE", StringComparison.OrdinalIgnoreCase))
+                errors.Add($"'{ped.Model}' kadin ama Pedtype '{pedType}'.");
+
+            var streamed = item.Element("IsStreamedGfx");
+            if (streamed == null)
+                errors.Add($"'{ped.Model}' icin IsStreamedGfx eksik.");
+            else if (!bool.TryParse(streamed.Attribute("value")?.Value, out var flag) ||
+                     flag != ped.Streamed)
+                errors.Add($"'{ped.Model}' IsStreamedGfx degeri yanlis.");
+        }
+
+        if (errors.Count > 0)
+            throw new InvalidDataException("Uretilen ped meta verisi gecersiz:\r\n - " +
+                                           string.Join("\r\n - ", errors));
+    }
+
     private static string ComputeSourceHash(string packDir, IEnumerable<AddonPedInfo> peds,
         string metadataXml)
     {
@@ -511,7 +710,9 @@ public static class AddonPeds
         foreach (var ped in peds.OrderBy(p => p.Model, StringComparer.OrdinalIgnoreCase))
         {
             sb.Append("P:").Append(ped.Model).Append('|').Append(EffectiveKind(ped)).Append('|')
-              .Append(ped.Streamed ? 1 : 0).Append(';');
+              .Append(ped.Streamed ? 1 : 0).Append('|')
+              .Append(ped.BaseModel ?? "").Append('|')
+              .Append(NormalizeRagdoll(ped.Ragdoll)).Append(';');
             foreach (var rel in ped.Files.OrderBy(f => f, StringComparer.OrdinalIgnoreCase))
             {
                 var full = Path.Combine(packDir, rel.Replace('/', Path.DirectorySeparatorChar));
@@ -647,122 +848,327 @@ public static class AddonPeds
 
     // ---------------------------------------------------------------- meta veri
 
-    private static Dictionary<string, XElement> LoadMetadata(string packDir, IEnumerable<string> models)
+    /// <summary>
+    /// Pakette bulunan tüm ped meta verileri. <see cref="Items"/> yalnızca
+    /// istenen modelleri, <see cref="AllItems"/> ise BaseModel çözümlemesi için
+    /// tüm Item'ları tutar.
+    /// </summary>
+    public sealed class PedMetadata
     {
-        var wanted = new HashSet<string>(models, StringComparer.OrdinalIgnoreCase);
-        var result = new Dictionary<string, XElement>(StringComparer.OrdinalIgnoreCase);
+        public Dictionary<string, XElement> Items { get; } =
+            new(StringComparer.OrdinalIgnoreCase);
+        public Dictionary<string, string> Sources { get; } =
+            new(StringComparer.OrdinalIgnoreCase);
+        public Dictionary<string, XElement> AllItems { get; } =
+            new(StringComparer.OrdinalIgnoreCase);
+        public Dictionary<string, string> AllSources { get; } =
+            new(StringComparer.OrdinalIgnoreCase);
+        public List<string> Files { get; } = new();
+    }
 
-        var candidates = new List<string>();
-        foreach (var name in new[] { "pedmeta.xml", "ap_m.xml", "peds.xml", "pedmodelinfo.meta" })
+    private static readonly string[] MetadataFileNames =
+    {
+        "peds.meta", "pedmeta.xml", "ap_m.xml", "peds.xml",
+        "pedmodelinfo.meta", "pedalternatevariations.meta"
+    };
+
+    private static bool IsMetadataFile(string path)
+    {
+        var name = Path.GetFileName(path);
+        if (MetadataFileNames.Contains(name, StringComparer.OrdinalIgnoreCase)) return true;
+        return name.EndsWith(".meta", StringComparison.OrdinalIgnoreCase) &&
+               name.Contains("ped", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static PedMetadata LoadMetadata(string packDir, IEnumerable<string> models,
+        Action<string>? log = null)
+    {
+        var wanted = new HashSet<string>(models.Where(m => !string.IsNullOrWhiteSpace(m)),
+            StringComparer.OrdinalIgnoreCase);
+        var result = new PedMetadata();
+
+        // 1) Paket içindeki gevşek meta dosyaları (alt klasörler/streamed dahil).
+        try
         {
-            var path = Path.Combine(packDir, name);
-            if (File.Exists(path)) candidates.Add(path);
+            foreach (var file in Directory.EnumerateFiles(packDir, "*", SearchOption.AllDirectories))
+            {
+                if (!IsMetadataFile(file)) continue;
+                AddMetadataFile(result, file, Path.GetRelativePath(packDir, file)
+                    .Replace('\\', '/'), wanted, log);
+            }
+        }
+        catch (Exception ex)
+        {
+            log?.Invoke("Meta dosyaları taranamadı: " + ex.Message);
         }
 
-        // Sunucuda kurulu AddonPeds meta verisi (yalnızca okunur; değiştirilmez).
+        // 2) Paketteki RPF arşivlerindeki gömülü meta (dlc.rpf/peds.rpf).
+        try
+        {
+            foreach (var rpf in Directory.EnumerateFiles(packDir, "*.rpf",
+                         SearchOption.AllDirectories).Take(12))
+                TryReadMetadataFromRpf(result, rpf, wanted, log);
+        }
+        catch (Exception ex)
+        {
+            log?.Invoke("RPF meta taraması atlandı: " + ex.Message);
+        }
+
+        // 3) Sunucuda kurulu AddonPeds ap_m.xml (yalnızca okunur).
         try
         {
             var docs = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
             var apM = Path.Combine(docs, "Rockstar Games", "GTA V", "UserMods", "ap_m.xml");
-            if (File.Exists(apM)) candidates.Add(apM);
+            if (File.Exists(apM)) AddMetadataFile(result, apM, "ap_m.xml", wanted, log);
         }
         catch { }
-
-        foreach (var path in candidates)
-        {
-            try
-            {
-                var doc = XDocument.Load(path);
-                foreach (var item in doc.Descendants("Item"))
-                {
-                    var name = item.Element("Name")?.Value?.Trim();
-                    if (string.IsNullOrWhiteSpace(name) || !wanted.Contains(name)) continue;
-                    if (!result.ContainsKey(name)) result[name] = new XElement(item);
-                }
-            }
-            catch { /* bozuk meta dosyası diğerlerini engellemez */ }
-        }
 
         return result;
     }
 
-    public static string BuildMetadataXml(IEnumerable<AddonPedInfo> peds,
-        IReadOnlyDictionary<string, XElement>? known = null)
+    private static void AddMetadataFile(PedMetadata result, string path, string source,
+        HashSet<string> wanted, Action<string>? log)
     {
-        known ??= new Dictionary<string, XElement>(StringComparer.OrdinalIgnoreCase);
+        if (!result.Files.Contains(source, StringComparer.OrdinalIgnoreCase))
+            result.Files.Add(source);
+        try
+        {
+            using var stream = File.OpenRead(path);
+            AddMetadataDocument(result, XDocument.Load(stream), source, wanted);
+        }
+        catch (Exception ex)
+        {
+            log?.Invoke($"Meta okunamadı ({source}): {ex.Message}");
+        }
+    }
+
+    private static void AddMetadataDocument(PedMetadata result, XDocument doc, string source,
+        HashSet<string> wanted)
+    {
+        foreach (var item in doc.Descendants("Item"))
+        {
+            var name = item.Element("Name")?.Value?.Trim();
+            if (string.IsNullOrWhiteSpace(name)) continue;
+            if (!result.AllItems.ContainsKey(name))
+            {
+                result.AllItems[name] = new XElement(item);
+                result.AllSources[name] = source;
+            }
+            if (!wanted.Contains(name) || result.Items.ContainsKey(name)) continue;
+            result.Items[name] = new XElement(item);
+            result.Sources[name] = source;
+        }
+    }
+
+    private static void TryReadMetadataFromRpf(PedMetadata result, string path,
+        HashSet<string> wanted, Action<string>? log)
+    {
+        try
+        {
+            using var rpf = RpfArchive.OpenReadOnly(path);
+            foreach (var file in rpf.AllFiles())
+            {
+                var name = Path.GetFileName(file.Path);
+                if (!IsMetadataFile(name) &&
+                    !name.Equals(EmbeddedMetadataName, StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                var bytes = rpf.ReadFile(file);
+                using var stream = new MemoryStream(bytes);
+                AddMetadataDocument(result, XDocument.Load(stream),
+                    "rpf:" + Path.GetFileName(path) + ":" + file.Path, wanted);
+            }
+        }
+        catch (NotSupportedException)
+        {
+            // NG/opaque arşiv: diğer meta kaynakları kullanılmaya devam eder.
+        }
+        catch (Exception ex)
+        {
+            log?.Invoke($"RPF meta okunamadı ({Path.GetFileName(path)}): {ex.Message}");
+        }
+    }
+
+    /// <summary>Üretilen meta XML'i ve ped başına kaynak/uyarı bilgisi.</summary>
+    public sealed class MetadataBuild
+    {
+        public string Xml { get; set; } = "";
+        public Dictionary<string, string> Sources { get; } =
+            new(StringComparer.OrdinalIgnoreCase);
+        public List<string> Warnings { get; } = new();
+    }
+
+    private static PedMetadata ToMetadata(IReadOnlyDictionary<string, XElement>? known)
+    {
+        var result = new PedMetadata();
+        if (known == null) return result;
+        foreach (var pair in known)
+        {
+            result.Items[pair.Key] = pair.Value;
+            result.AllItems[pair.Key] = pair.Value;
+            result.Sources[pair.Key] = "known";
+            result.AllSources[pair.Key] = "known";
+        }
+        return result;
+    }
+
+    public static string BuildMetadataXml(IEnumerable<AddonPedInfo> peds,
+        IReadOnlyDictionary<string, XElement>? known = null) =>
+        BuildMetadata(peds, ToMetadata(known)).Xml;
+
+    public static MetadataBuild BuildMetadata(IEnumerable<AddonPedInfo> peds,
+        PedMetadata? metadata, Action<string>? log = null)
+    {
+        metadata ??= new PedMetadata();
         var root = new XElement("CPedModelInfo__InitDataList", new XElement("InitDatas"));
         var datas = root.Element("InitDatas")!;
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var result = new MetadataBuild();
 
         foreach (var ped in peds)
         {
             if (string.IsNullOrWhiteSpace(ped.Model) || !seen.Add(ped.Model)) continue;
-            datas.Add(BuildMetadataItem(ped, known));
+            var item = BuildMetadataItem(ped, metadata, out var source, out var warning);
+            ped.MetaSource = source;
+            result.Sources[ped.Model] = source;
+            if (!string.IsNullOrWhiteSpace(warning))
+            {
+                result.Warnings.Add(ped.Model + ": " + warning);
+                log?.Invoke("Meta uyarısı: " + ped.Model + ": " + warning);
+            }
+            datas.Add(item);
         }
 
         using var ms = new MemoryStream();
         var doc = new XDocument(new XDeclaration("1.0", "utf-8", null), root);
         doc.Save(ms, SaveOptions.DisableFormatting);
-        return Encoding.UTF8.GetString(StripUtf8Bom(ms.ToArray()));
+        result.Xml = Encoding.UTF8.GetString(StripUtf8Bom(ms.ToArray()));
+        return result;
+    }
+
+    public static string NormalizeRagdoll(string? value)
+    {
+        var text = (value ?? "").Trim().ToLowerInvariant();
+        return text is "on" or "off" ? text : "auto";
     }
 
     /// <summary>
-    /// Sunucu manifestosu Kind alan��n�� bo�Y veya "human" b��raksa bile a_c_
-    /// ��nekli modeller hayvand��r. Yanl���� CIVMALE meta verisi pedi g��r��nmez
-    /// b��rak��yor ve ragdoll s��ras��nda oyunu ��kertiyor.
+    /// Sunucu manifestosu Kind alanini bos veya "human" biraksa bile a_c_
+    /// onekli modeller hayvandir. Yanlis CIVMALE meta verisi pedi gorunmez
+    /// birakiyor ve ragdoll sirasinda oyunu cokertiyor.
     /// </summary>
-    public static string EffectiveKind(AddonPedInfo ped)
+    public static string EffectiveKind(AddonPedInfo ped) => EffectiveKind(ped, null);
+
+    public static string EffectiveKind(AddonPedInfo ped, XElement? metadata)
     {
+        // a_c_ öneki güvenlik sinyalidir: meta yanlış olsa bile hayvan kalır.
+        if (!string.IsNullOrWhiteSpace(ped.Model) &&
+            ped.Model.StartsWith("a_c_", StringComparison.OrdinalIgnoreCase))
+            return AnimalKind;
+
         var kind = (ped.Kind ?? string.Empty).Trim();
         if (kind.Equals(AnimalKind, StringComparison.OrdinalIgnoreCase))
             return AnimalKind;
         if (kind.Equals(FemaleKind, StringComparison.OrdinalIgnoreCase))
             return FemaleKind;
-        if (!string.IsNullOrWhiteSpace(ped.Model) &&
-            ped.Model.StartsWith("a_c_", StringComparison.OrdinalIgnoreCase))
-            return AnimalKind;
+
+        if (metadata != null)
+        {
+            var sourceKind = GuessKind(ped.Model, metadata);
+            if (sourceKind == AnimalKind) return AnimalKind;
+            if (sourceKind == FemaleKind) return FemaleKind;
+        }
         return HumanKind;
     }
 
     public static XElement BuildMetadataItem(AddonPedInfo ped,
-        IReadOnlyDictionary<string, XElement>? known = null)
+        IReadOnlyDictionary<string, XElement>? known = null) =>
+        BuildMetadataItem(ped, ToMetadata(known), out _, out _);
+
+    public static XElement BuildMetadataItem(AddonPedInfo ped, PedMetadata? metadata,
+        out string source, out string? warning)
     {
-        var kind = EffectiveKind(ped);
-        XElement item;
-        if (known != null && known.TryGetValue(ped.Model, out var source))
+        metadata ??= new PedMetadata();
+        source = "";
+        warning = null;
+
+        XElement? sourceItem = null;
+        if (!string.IsNullOrWhiteSpace(ped.Model) &&
+            metadata.Items.TryGetValue(ped.Model, out var own))
         {
-            var sourceKind = GuessKind(ped.Model, source);
+            sourceItem = own;
+            source = metadata.Sources.TryGetValue(ped.Model, out var ownSource)
+                ? ownSource : "pack";
+        }
+        else if (!string.IsNullOrWhiteSpace(ped.BaseModel) &&
+                 metadata.AllItems.TryGetValue(ped.BaseModel.Trim(), out var baseItem))
+        {
+            sourceItem = baseItem;
+            var baseSource = metadata.AllSources.TryGetValue(ped.BaseModel.Trim(), out var bs)
+                ? bs : "?";
+            source = "base:" + ped.BaseModel.Trim() + " (" + baseSource + ")";
+        }
+
+        var kind = EffectiveKind(ped, sourceItem);
+        XElement item;
+        if (sourceItem != null)
+        {
+            var sourceKind = MetadataKind(sourceItem);
             if ((kind == AnimalKind) == (sourceKind == AnimalKind))
-                item = new XElement(source);
+            {
+                item = new XElement(sourceItem);
+            }
             else
+            {
                 item = XElement.Parse(TemplateFor(kind));
+                source = "template:" + kind + " (meta türü uyuşmadı)";
+                warning = "kaynak meta türü (" + sourceKind + "), ped türü (" + kind +
+                          ") ile uyuşmuyor; şablon kullanıldı.";
+            }
         }
         else
         {
             item = XElement.Parse(TemplateFor(kind));
+            source = "template:" + kind;
+            var templateName = kind == AnimalKind
+                ? "Rottweiler hayvan şablonu"
+                : "insan şablonu";
+            warning = string.IsNullOrWhiteSpace(ped.BaseModel)
+                ? "pakette ped meta verisi yok; " + templateName + " kullanıldı."
+                : "BaseModel '" + ped.BaseModel + "' meta içinde bulunamadı; " +
+                  templateName + " kullanıldı.";
         }
 
         item.SetElementValue("Name", ped.Model);
 
+        // Kaynak meta türü doğruysa mümkün olduğunca korunur. Şablon
+        // kullanıldığında veya tür uyuşmadığında tür alanları garanti edilir.
+        var sourceIsFemale = sourceItem != null &&
+                             MetadataKind(sourceItem) == FemaleKind;
         if (kind == FemaleKind)
         {
+            if (!sourceIsFemale)
+            {
+                item.SetElementValue("ClipDictionaryName", "move_f@generic");
+                item.SetElementValue("MovementClipSet", "move_f@generic");
+                item.SetElementValue("ExpressionSetName", "expr_set_ambient_female");
+                item.SetElementValue("DefaultGestureClipSet", "ANIM_GROUP_GESTURE_F_GENERIC");
+                item.SetElementValue("FacialClipsetGroupName", "facial_clipset_group_gen_female");
+                item.SetElementValue("DefaultVisemeClipSet", "ANIM_GROUP_VISEMES_F_LO");
+                item.SetElementValue("PoseMatcherName", "Female");
+                item.SetElementValue("PoseMatcherProneName", "Female_prone");
+                item.SetElementValue("PedCapsuleName", "STANDARD_FEMALE");
+                item.SetElementValue("RelationshipGroup", "CIVFEMALE");
+            }
             item.SetElementValue("Pedtype", "CIVFEMALE");
-            item.SetElementValue("ClipDictionaryName", "move_f@generic");
-            item.SetElementValue("MovementClipSet", "move_f@generic");
-            item.SetElementValue("ExpressionSetName", "expr_set_ambient_female");
-            item.SetElementValue("DefaultGestureClipSet", "ANIM_GROUP_GESTURE_F_GENERIC");
-            item.SetElementValue("FacialClipsetGroupName", "facial_clipset_group_gen_female");
-            item.SetElementValue("DefaultVisemeClipSet", "ANIM_GROUP_VISEMES_F_LO");
-            item.SetElementValue("PoseMatcherName", "Female");
-            item.SetElementValue("PoseMatcherProneName", "Female_prone");
-            item.SetElementValue("PedCapsuleName", "STANDARD_FEMALE");
-            item.SetElementValue("RelationshipGroup", "CIVFEMALE");
         }
         else if (kind == AnimalKind)
         {
+            // a_c_ önekli modellerde ped türü her koşulda ANIMAL olmalı;
+            // aksi hâlde oyun hayvan iskeletinde insan kodu çalıştırır.
             item.SetElementValue("Pedtype", "ANIMAL");
         }
-        else
+        else if (sourceItem == null)
         {
             item.SetElementValue("Pedtype", "CIVMALE");
         }
@@ -815,7 +1221,9 @@ public static class AddonPeds
                     Name = string.IsNullOrWhiteSpace(ped.Name) ? ped.Model : ped.Name,
                     Kind = EffectiveKind(ped),
                     Pack = string.IsNullOrWhiteSpace(addon.DisplayName) ? addon.Id : addon.DisplayName,
-                    Health = ped.Health <= 0 ? 200 : ped.Health
+                    Health = ped.Health <= 0 ? 200 : ped.Health,
+                    BaseModel = ped.BaseModel ?? "",
+                    Ragdoll = NormalizeRagdoll(ped.Ragdoll)
                 });
             }
         }

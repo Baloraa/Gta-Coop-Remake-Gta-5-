@@ -715,6 +715,8 @@ public sealed class AddonPedsTab : UserControl
             stored.DecisionMaker = dlg.Ped.DecisionMaker;
             stored.Personality = dlg.Ped.Personality;
             stored.CombatInfo = dlg.Ped.CombatInfo;
+            stored.BaseModel = dlg.Ped.BaseModel;
+            stored.Ragdoll = AddonPeds.NormalizeRagdoll(dlg.Ped.Ragdoll);
             SyncJson.Save(path, file);
             AppEnv.Log($"Ped güncellendi: {stored.Name} ({stored.Model})");
             RefreshList();

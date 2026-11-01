@@ -8,7 +8,7 @@ GTACoop Remake is not a new multiplayer engine. It is the desktop layer around G
 
 GTACoop Remake is for private Story Mode co-op. It does not touch GTA Online, does not bypass anti-cheat, and does not inject into online sessions.
 
-**Current release:** 2.5.8  
+**Current release:** 2.5.9  
 **Platform:** Windows 10/11, x64  
 **UI:** Turkish, English, and Russian  
 **License:** GNU GPL v3
@@ -288,6 +288,19 @@ This is a tool for playing with friends, not a hardened anti-cheat or privacy sy
 - Server owners are responsible for the mods they distribute. The launcher automates delivery; it does not grant permission to redistribute someone else's work.
 
 ---
+
+## What is new in 2.5.9
+
+This release hardens the **addon ped metadata pipeline** behind the remaining animal-ped crash: a pack could describe an `a_c_*` animal with human metadata, and the game then built a human ped on an animal skeleton.
+
+- **Real metadata is used when it exists.** The sync server now reads ped metadata from the pack itself (loose `peds.meta`, `pedmeta.xml`, `ap_m.xml` and similar files, metadata embedded in the pack's RPF archives, and `Documents\Rockstar Games\GTA V\UserMods\ap_m.xml`) instead of always rebuilding it from a fixed template.
+- **Metadata is kept only when the type matches.** A source item is reused only when its `Pedtype` agrees with the ped's kind. An `a_c_*` model with human metadata now falls back to the animal template instead of inheriting human capsule and component fields. Humans and female peds keep `CIVMALE`/`CIVFEMALE`.
+- **Base model per ped.** A new **Base model** field in the ped editor lets a retextured ped reuse the metadata of the model it was built from.
+- **Ragdoll is a per-ped setting.** `auto` (default) keeps ragdoll on for animals and leaves the game default for humans; only an explicit `off` disables it.
+- **Packs are validated before they ship.** Missing files, non-RSC7 files, a missing model, duplicate models, and generated metadata whose `Pedtype` or `IsStreamedGfx` does not match the ped fail the build with a clear error instead of reaching the game.
+- **Old prepared packs are rebuilt.** The prepared-DLC format is bumped, so a cached pack from an earlier version is rebuilt with the new metadata instead of being reused.
+- **More diagnostics.** `error.log` records `isPlayerPed`, `pedType`, `isHuman`, `ragdoll`, and `baseModel` for local addon peds, the animal watcher, and remote animal clones. The sync tool also gained `peds-prepare`, `peds-meta`, and `rsc-dump` commands.
+- **No protocol change.** 2.5.9 still uses `VERSION_0_9_4` and can play with 2.5.8, 2.5.7, 2.5.6, 2.5.5, 2.5.4, 2.5.3, 2.5.2, 2.5.1, and 2.5.0 clients.
 
 ## What is new in 2.5.8
 

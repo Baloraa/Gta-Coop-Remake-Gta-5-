@@ -20,6 +20,12 @@ namespace GTACoOp
         public string Kind { get; set; }
         public string Pack { get; set; }
         public int Health { get; set; }
+
+        /// <summary>Meta verisi bulunamazsa kullanilan temel model.</summary>
+        public string BaseModel { get; set; }
+
+        /// <summary>"auto" (varsayilan), "on" veya "off".</summary>
+        public string Ragdoll { get; set; }
     }
 
     internal static class AddonPedsClient

@@ -260,13 +260,23 @@ namespace GTACoOp
                     // World.CreatePed always uses ped type 4 (CIVMALE). An
                     // animal model created as a human ped runs human ped code
                     // on an animal skeleton, which crashes on vehicle impacts.
-                    // Ped type 28 keeps the clone on the animal path.
+                    // Ped type 28 keeps the clone on the animal path. Addon
+                    // animals may report IsAnimalPed=false when their metadata
+                    // is missing, so the server-reported hash list is used too.
                     var cloneModel = new Model(ModelHash);
-                    if (cloneModel.IsAnimalPed)
+                    var isAnimalModel = cloneModel.IsAnimalPed ||
+                                        AddonPedVariation.IsAnimalHash(cloneModel.Hash);
+                    if (isAnimalModel)
                     {
                         var handle = Function.Call<int>(Hash.CREATE_PED, 28, cloneModel.Hash,
                             gPos.X, gPos.Y, gPos.Z, Rotation.Z, false, true);
                         Character = handle != 0 ? Entity.FromHandle(handle) as Ped : null;
+                        if (Character != null)
+                            Main.Logger.WriteLine("Remote animal clone: handle=" + Character.Handle +
+                                " model=0x" + cloneModel.Hash.ToString("X8") +
+                                " isAnimalPed=" + cloneModel.IsAnimalPed +
+                                " isPlayerPed=" + Function.Call<bool>(Hash.IS_PED_A_PLAYER, Character.Handle) +
+                                " pedType=" + Function.Call<int>(Hash.GET_PED_TYPE, Character.Handle));
                     }
                     else
                     {
@@ -296,8 +306,15 @@ namespace GTACoOp
 
                     // A freshly cloned addon animal has no resolved variation
                     // until one is explicitly applied locally.
-                    if (!Character.IsHuman)
+                    if (isAnimalModel)
+                    {
+                        Main.Logger.WriteLine("Remote animal clone: handle=" + Character.Handle +
+                            " model=0x" + Character.Model.Hash.ToString("X8") +
+                            " pedType=" + Function.Call<int>(Hash.GET_PED_TYPE, Character.Handle) +
+                            " isHuman=" + Character.IsHuman +
+                            " isPlayerPed=" + Function.Call<bool>(Hash.IS_PED_A_PLAYER, Character.Handle));
                         AddonPedVariation.ScheduleAnimalFix(Character);
+                    }
 
                     return;
                 }

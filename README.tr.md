@@ -2,7 +2,7 @@
 
 **Türkçe** | [English](README.md)
 
-2.5.8 sürümü - kendi sunucu yönetimi, otomatik mod indirme, **oturum modu**,
+2.5.9 sürümü - kendi sunucu yönetimi, otomatik mod indirme, **oturum modu**,
 **kısa kod** (ör. `Gel.com`) ile internetten sunucu bulma, **otomatik relay**,
 **UPnP doğrudan bağlantı**, **özel relay sunucusu**, **tanılama kopyalama**,
 **canlı sunucu durumu**, **Sunucu Tarayıcı** sekmesi, **OpenIV (.oiv) paket desteği**,
@@ -14,6 +14,35 @@ yalnızca oyun açıkken kurulu kalır, oyundan çıkınca otomatik kaldırılı
 Oyun başlatma dosyası seçilebilir; varsayılan **PlayGTAV.exe**'dir (GTA5.exe de seçilebilir).
 **Sesli sohbet** (bas-konuş, `[MIC]` göstergesi) ve **host-led hikaye görevi koordinasyonu**
 bu sürümde eklendi; ayrıntılar aşağıda.
+
+### 2.5.9 — Addon ped meta verisi ve paket doğrulaması sağlamlaştırıldı
+
+Bu sürüm, addon hayvan çökmesinin arkasındaki **ped meta verisi hattını** sağlamlaştırır:
+bir paket `a_c_*` hayvanını insan meta verisiyle tanımlayabiliyor, oyun da hayvan iskeleti
+üzerine insan pedi kuruyordu.
+
+- **Gerçek meta veri varsa kullanılır.** Sync sunucusu ped meta verisini artık paketin
+  kendisinden okur (gevşek `peds.meta`, `pedmeta.xml`, `ap_m.xml` ve benzeri dosyalar,
+  paketin RPF arşivlerine gömülü meta ve `Belgeler\Rockstar Games\GTA V\UserMods\ap_m.xml`);
+  her zaman sabit şablondan yeniden oluşturmaz.
+- **Meta veri yalnızca tür uyuşuyorsa korunur.** Kaynak Item yalnızca `Pedtype` değeri pedin
+  türüyle uyuşuyorsa yeniden kullanılır. İnsan meta verili `a_c_*` modeli artık insan kapsül
+  ve komponent alanlarını devralmaz; hayvan şablonuna düşer. İnsan ve kadın pedler
+  `CIVMALE`/`CIVFEMALE` olarak kalır.
+- **Ped başına temel model.** Ped düzenleyicisine eklenen **Temel model** alanı, yeniden
+  dokulanmış bir pedin meta verisini türetildiği modelden almasını sağlar.
+- **Ragdoll artık ped başına ayar.** `auto` (varsayılan) hayvanlarda ragdoll'u açık tutar,
+  insanlarda oyunun varsayılanını bırakır; yalnızca açıkça `off` seçilirse kapatılır.
+- **Paketler oyuna gitmeden doğrulanır.** Eksik dosya, RSC7 olmayan dosya, eksik model,
+  yinelenen model ve `Pedtype` veya `IsStreamedGfx` değeri pedle uyuşmayan üretilmiş meta
+  verisi, oyuna ulaşmak yerine açık bir hatayla paket oluşturmayı durdurur.
+- **Eski hazır paketler yeniden oluşturulur.** Hazır DLC biçim sürümü yükseltildi; önceki
+  sürümden kalan önbellek yeniden kullanılmak yerine yeni meta veriyle oluşturulur.
+- **Daha fazla tanılama.** `error.log` yerel addon pedler, hayvan denetleyicisi ve uzak hayvan
+  kopyaları için `isPlayerPed`, `pedType`, `isHuman`, `ragdoll` ve `baseModel` kaydeder.
+  Sync aracına `peds-prepare`, `peds-meta` ve `rsc-dump` komutları eklendi.
+- **Ağ protokolü değişmedi.** 2.5.9 istemciler `VERSION_0_9_4` kullanmaya devam eder;
+  2.5.8, 2.5.7, 2.5.6, 2.5.5, 2.5.4, 2.5.3, 2.5.2, 2.5.1 ve 2.5.0 istemcilerle oynayabilir.
 
 ### 2.5.8 — Addon hayvan görünmezliği ve ragdoll çökmesi düzeltildi
 

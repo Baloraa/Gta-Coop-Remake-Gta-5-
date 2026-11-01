@@ -86,6 +86,28 @@ public sealed class RpfArchive : IDisposable
     }
 
     /// <summary>
+    /// Arşivi yalnızca okuma modunda açar. Oyun dosyaları ve salt okunur
+    /// paketler için kullanılır; içerik değiştirilemez.
+    /// </summary>
+    public static RpfArchive OpenReadOnly(string path, byte[]? aesKey = null)
+    {
+        Exception? last = null;
+        for (int attempt = 0; attempt < 4; attempt++)
+        {
+            try
+            {
+                return OpenCore(path, aesKey, readOnly: true);
+            }
+            catch (IOException ex)
+            {
+                last = ex;
+                Thread.Sleep(400 * (attempt + 1));
+            }
+        }
+        throw last!;
+    }
+
+    /// <summary>
     /// Yeni, boş bir RPF7 arşivi oluşturur. <paramref name="headerReserve"/>
     /// baytlık başlangıç alanı TOC/isim tablosunun büyümesi için ayrılır;
     /// böylece çok sayıda dosya eklerken veri blokları yeniden taşınmaz.
@@ -122,12 +144,13 @@ public sealed class RpfArchive : IDisposable
         return Open(path);
     }
 
-    private static RpfArchive OpenCore(string path, byte[]? aesKey)
+    private static RpfArchive OpenCore(string path, byte[]? aesKey, bool readOnly = false)
     {
         FileStream? fs = null;
         try
         {
-            fs = new FileStream(path, FileMode.Open, FileAccess.ReadWrite, FileShare.ReadWrite);
+            fs = new FileStream(path, FileMode.Open,
+                readOnly ? FileAccess.Read : FileAccess.ReadWrite, FileShare.ReadWrite);
 
             var header = new byte[16];
             fs.ReadExactly(header, 0, 16);

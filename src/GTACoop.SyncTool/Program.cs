@@ -23,6 +23,9 @@ if (args.Length == 0)
     Console.WriteLine("  uninstall-all <oyunKlasörü> <veriKlasörü>");
     Console.WriteLine("  session-watch --data <veriKlasörü> [--process-name X] [--timeout-min N]");
     Console.WriteLine("  session-cleanup <oyunKlasörü> <veriKlasörü>");
+    Console.WriteLine("  peds-prepare <paketKlasörü> <çıktıKlasörü> [eklentiKimliği]");
+    Console.WriteLine("  peds-meta <dlc.rpf>");
+    Console.WriteLine("  rsc-dump <dosya> [çıktı]");
     return 1;
 }
 
@@ -253,6 +256,83 @@ try
 
             my.StopAll();
             Console.WriteLine("SELFTEST TAMAM.");
+            return 0;
+        }
+
+        case "peds-prepare":
+        {
+            if (args.Length < 3) { Console.Error.WriteLine("Eksik parametre."); return 1; }
+            var packDir = Path.GetFullPath(args[1]);
+            var outDir = Path.GetFullPath(args[2]);
+            var addonId = args.Length > 3 ? args[3] : Path.GetFileName(packDir.TrimEnd('\\', '/'));
+
+            Console.WriteLine($"Ped paketi: {packDir}");
+            Console.WriteLine($"Çıktı: {outDir}");
+            AddonPeds.EnsureLooseSource(packDir, s => Console.WriteLine("  " + s));
+            var loose = AddonPeds.DiscoverLoosePeds(packDir, s => Console.WriteLine("  " + s));
+            var packFile = AddonPeds.LoadOrCreatePackFile(packDir, loose);
+            foreach (var ped in packFile.Peds)
+                Console.WriteLine($"  ped: {ped.Model} kind={ped.Kind} streamed={ped.Streamed} " +
+                                  $"ragdoll={AddonPeds.NormalizeRagdoll(ped.Ragdoll)} " +
+                                  $"base={ped.BaseModel} meta={ped.MetaSource}");
+
+            var target = AddonPeds.PrepareSelfContained(packDir, addonId, outDir, packFile,
+                s => Console.WriteLine("  " + s));
+            Console.WriteLine($"Hazır DLC: {target} ({new FileInfo(target).Length} bayt)");
+
+            using (var rpf = GTACoop.Rpf.RpfArchive.Open(target))
+            {
+                var entry = rpf.Find(AddonPeds.EmbeddedMetadataName)
+                            ?? throw new InvalidDataException("Gömülü meta bulunamadı.");
+                Console.WriteLine("--- " + AddonPeds.EmbeddedMetadataName + " ---");
+                Console.WriteLine(System.Text.Encoding.UTF8.GetString(rpf.ReadFile(entry)));
+            }
+
+            Console.WriteLine("--- peds.json ---");
+            Console.WriteLine(File.ReadAllText(Path.Combine(packDir, AddonPeds.PackFileName)));
+            return 0;
+        }
+
+        case "peds-meta":
+        {
+            if (args.Length < 2) { Console.Error.WriteLine("Eksik parametre."); return 1; }
+            var path = Path.GetFullPath(args[1]);
+            using var rpf = GTACoop.Rpf.RpfArchive.OpenReadOnly(path);
+            var entry = rpf.Find(AddonPeds.EmbeddedMetadataName)
+                        ?? throw new InvalidDataException("Gömülü ped meta verisi bulunamadı.");
+            Console.WriteLine(System.Text.Encoding.UTF8.GetString(rpf.ReadFile(entry)));
+            return 0;
+        }
+
+        case "rsc-dump":
+        {
+            if (args.Length < 2) { Console.Error.WriteLine("Eksik parametre."); return 1; }
+            var input = Path.GetFullPath(args[1]);
+            var output = args.Length > 2
+                ? Path.GetFullPath(args[2])
+                : input + ".bin";
+            var bytes = File.ReadAllBytes(input);
+            if (!GTACoop.Rpf.RpfCrypto.HasResourceHeader(bytes))
+                throw new InvalidDataException("Dosyada RSC7 başlığı yok.");
+            var systemFlags = BitConverter.ToUInt32(bytes, 8);
+            var graphicsFlags = BitConverter.ToUInt32(bytes, 12);
+            var expected = GTACoop.Rpf.RpfCrypto.GetResourceTotalSize(systemFlags, graphicsFlags);
+            byte[] data;
+            GTACoop.Rpf.RpfCompression mode;
+            try
+            {
+                data = GTACoop.Rpf.RpfCrypto.Inflate(bytes[16..],
+                    (int)Math.Min(expected, int.MaxValue), out mode);
+            }
+            catch
+            {
+                data = bytes[16..];
+                mode = GTACoop.Rpf.RpfCompression.None;
+            }
+            File.WriteAllBytes(output, data);
+            Console.WriteLine($"{input}: {data.Length} bayt, sıkıştırma={mode}, " +
+                              $"beklenen={expected}");
+            Console.WriteLine($"Çıktı: {output}");
             return 0;
         }
 
