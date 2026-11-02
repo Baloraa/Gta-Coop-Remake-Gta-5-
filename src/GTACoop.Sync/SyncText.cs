@@ -171,6 +171,17 @@ public static partial class SyncText
             "WARNING: update.rpf is large; only an in-place dlclist edit will be attempted.",
         ["update.rpf çok büyük ve dlclist.xml yerinde güncellenemedi; mevcut dosya korundu."] =
             "update.rpf is too large and dlclist.xml could not be updated in place; the existing file was preserved.",
+        ["UYARI: update.rpf sağlık kontrolü: {0} — yazma yine denenecek."] =
+            "WARNING: update.rpf health check: {0} — the write will still be attempted.",
+        ["update.rpf açılamıyor (bozuk/kesik olabilir); otomatik geri yükleme yapılmadı. " +
+         "OpenIV ile mods klasörünü onarın veya Launcher > Yedekler bölümünden geri dönün."] =
+            "update.rpf cannot be opened (it may be corrupt or truncated); no automatic restore was performed. " +
+            "Repair the mods folder with OpenIV or restore a backup from Launcher > Backups.",
+        ["dlclist: başlık alanı yetmedi, mevcut alana yerinde yazma denenecek."] =
+            "dlclist: header area was too small, trying an in-place write into the existing block.",
+        ["dlclist doğrulaması yapılamadı: {0}"] = "dlclist verification could not run: {0}",
+        ["dlclist yazıldı ama doğrulanamadı; eksik girdiler: {0}"] =
+            "dlclist was written but could not be verified; missing entries: {0}",
         ["dlclist: '{0}' zaten kayıtlı, değişiklik yok."] =
             "dlclist: '{0}' is already listed; no change.",
         ["dlclist: '{0}' kayıtlı değil, değişiklik yok."] =

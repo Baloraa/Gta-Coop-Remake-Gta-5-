@@ -165,15 +165,17 @@ public sealed class AddonApplier
             return false;
         }
 
-        bool healthy = BackupService.IsUpdateRpfHealthy(UpdateRpfPath, out _);
-        if (!healthy &&
-            !BackupService.IsUpdateRpfStructurallyHealthy(UpdateRpfPath, out var structuralWhy))
+        // Boyut/sağlık sezgileri artık kurulumu ENGELLEMEZ. Yazma yolu zaten
+        // yedek alır, gerekirse arşivi büyütür ve sonucu geri okuyup doğrular.
+        // Bu yüzden yalnızca arşiv gerçekten açılamıyorsa veya yazma hiçbir
+        // biçimde sığmıyorsa engellenir. Eski build'lerden kalan büyük/yoğun
+        // update.rpf dosyaları Legacy'de yanlışlıkla "düzenlemeye uygun değil"
+        // diye bloklanıyordu.
+        if (!BackupService.IsUpdateRpfHealthy(UpdateRpfPath, out var healthWhy))
         {
-            reason = SyncText.T(
-                "update.rpf düzenlemeye uygun değil: {0}. OpenIV ile mods klasörünü onarın " +
-                "veya Launcher > Yedekler bölümünden geri dönün.",
-                SyncText.Translate(structuralWhy));
-            return false;
+            _log(SyncText.T(
+                "UYARI: update.rpf sağlık kontrolü: {0} — yazma yine denenecek.",
+                SyncText.Translate(healthWhy)));
         }
 
         try
@@ -192,23 +194,24 @@ public sealed class AddonApplier
             // güncellenebilir, mevcut (sağlıksız/büyük) arşive dokunulmaz.
             if (missing.Count == 0) return true;
 
-            // Küçük ve sağlıklı arşivlerde normal (gerekirse sona ekleyen) yazma yolu.
-            if (healthy) return true;
-
-            // Yalnızca büyük ama yapısal olarak sağlıklı arşiv: yerinde yazma şart.
             var updated = Dlclist.AddPackNames(xml, missing);
             ValidateXml(updated);
             var writeEnc = Dlclist.Normalize(updated, enc);
             var bytes = Dlclist.Encode(updated, writeEnc);
-            if (!archive.CanReplaceInPlace(file, bytes, out var why))
-            {
-                reason = SyncText.T(
-                    "update.rpf çok büyük ve dlclist.xml yerinde güncellenemiyor: {0}",
-                    SyncText.Translate(why));
-                return false;
-            }
 
-            return true;
+            // 1) Yerinde yazma sığıyorsa en güvenli yol budur.
+            if (archive.CanReplaceInPlace(file, bytes, out _)) return true;
+
+            // 2) Sığmıyorsa yeni blok arşivin sonuna eklenir. RPF7'de 24 bit
+            //    sektör adreslemesi 3,9 GB'ta taştığı için yalnızca altındaki
+            //    arşivlerde bu yol kullanılabilir.
+            if (new FileInfo(UpdateRpfPath).Length <= BackupService.MaxEditableUpdateRpfBytes)
+                return true;
+
+            reason = SyncText.T(
+                "update.rpf çok büyük ve dlclist.xml yerinde güncellenemiyor: {0}",
+                SyncText.Translate("mevcut alan yetersiz (yerinde yazma için boşluk yok)."));
+            return false;
         }
         catch (Exception ex)
         {
@@ -1982,22 +1985,32 @@ public sealed class AddonApplier
             throw new SyncException(SyncText.T(
                 "mods/update/update.rpf bulunamadı. DLC paketleri için OpenIV ile mods klasörü oluşturulmalı."));
 
+        // NG (Gen9) arşivlerinde TOC yazma tablosu oyunun exe'sinde yoktur;
+        // burada durmak gerekir, hiçbir yazma denenmez.
+        if (global::GTACoop.Sync.GameFolder.ProbeArchiveEncryption(UpdateRpfPath) == RpfEncryption.Ng)
+            throw new SyncException(SyncText.T(
+                "mods/update/update.rpf NG (Gen9) şifreli; bu arşiv yazılamaz. GTA V Enhanced'da " +
+                "addon DLC paketleri için şifresiz (OPEN) bir mods kopyası ve RageOpenV/OpenRPF " +
+                "gerekir. Diğer modlar kurulmaya devam eder."));
+
         if (BackupService.IsUpdateRpfHealthy(UpdateRpfPath, out var reason))
             return;
 
-        // 4 GB'a yakın olsa bile yapısal olarak sağlıklıysa yalnızca yerinde
-        // yazma denenecek. ReplaceFile(requireInPlace: true) sığmazsa hata verir.
-        if (BackupService.IsUpdateRpfStructurallyHealthy(UpdateRpfPath, out _) &&
-            new FileInfo(UpdateRpfPath).Length > BackupService.MaxEditableUpdateRpfBytes)
+        // Sağlık sezgisi düşükse artık kurulum durdurulmaz: yazma yolu yedek
+        // alır, yerinde sığmazsa sona ekler ve sonucu geri okuyup doğrular.
+        // Yalnızca arşiv hiç açılamıyorsa (bozuk/kesik dosya) dururuz.
+        if (BackupService.IsUpdateRpfStructurallyHealthy(UpdateRpfPath, out _))
         {
-            _log(SyncText.T("UYARI: update.rpf büyük; yalnızca yerinde dlclist düzenlemesi denenecek."));
+            _log(SyncText.T(
+                "UYARI: update.rpf sağlık kontrolü: {0} — yazma yine denenecek.",
+                SyncText.Translate(reason)));
             return;
         }
 
         _log(SyncText.T("UYARI: update.rpf düzenlemeye uygun değil: {0}",
             SyncText.Translate(reason)));
         throw new SyncException(SyncText.T(
-            "update.rpf sağlıksız/çok büyük; otomatik geri yükleme yapılmadı. " +
+            "update.rpf açılamıyor (bozuk/kesik olabilir); otomatik geri yükleme yapılmadı. " +
             "OpenIV ile mods klasörünü onarın veya Launcher > Yedekler bölümünden geri dönün."));
     }
 
@@ -2185,8 +2198,53 @@ public sealed class AddonApplier
         var writeEnc = Dlclist.Normalize(updated, enc);
         if (writeEnc != enc)
             _log(SyncText.T("dlclist: kodlama beyana uygun UTF-16'ya düzeltildi (OpenIV uyumu)."));
-        archive.ReplaceFile(file, Dlclist.Encode(updated, writeEnc),
-            requireInPlace: requireInPlace);
+
+        var bytes = Dlclist.Encode(updated, writeEnc);
+        try
+        {
+            archive.ReplaceFile(file, bytes, requireInPlace: requireInPlace);
+        }
+        catch (RpfHeaderSpaceException) when (!requireInPlace)
+        {
+            // TOC/isim tablosu büyüdüğünde başlık alanı veri bölgesine taşabilir.
+            // Bu durumda içerik arşivi büyütmeden mevcut alana yazılır; Legacy
+            // retail update.rpf dosyalarında görülen bir durumdur.
+            _log(SyncText.T(
+                "dlclist: başlık alanı yetmedi, mevcut alana yerinde yazma denenecek."));
+            archive.ReplaceFile(file, bytes, requireInPlace: true);
+        }
+
+        // Yazma "başarılı" görünse bile TOC/isim tablosu tutarsız kalmış
+        // olabilir. Gerçekten okunup aynı paket adlarını verdiğini doğrula.
+        VerifyDlclistWritten(updated);
+    }
+
+    /// <summary>
+    /// dlclist yazımını arşivi yeniden açıp doğrular. Beklenen paket adları
+    /// okunan dosyada yoksa yazma başarısız sayılır; çağıran akış paketi
+    /// "kuruldu" diye kaydetmez.
+    /// </summary>
+    private void VerifyDlclistWritten(string expectedXml)
+    {
+        List<string> expected;
+        try { expected = Dlclist.GetPackNames(expectedXml); }
+        catch (Exception ex)
+        {
+            throw new SyncException(SyncText.T(
+                "dlclist doğrulaması yapılamadı: {0}", ex.Message), ex);
+        }
+
+        using var check = RpfArchive.Open(UpdateRpfPath);
+        var file = check.Find(Dlclist.RelativePath)
+            ?? throw new SyncException(SyncText.T("update.rpf içinde dlclist.xml bulunamadı."));
+        var (xml, _) = Dlclist.Decode(check.ReadFile(file));
+
+        var got = new HashSet<string>(Dlclist.GetPackNames(xml), StringComparer.OrdinalIgnoreCase);
+        var lost = expected.Where(n => !got.Contains(n)).ToList();
+        if (lost.Count > 0)
+            throw new SyncException(SyncText.T(
+                "dlclist yazıldı ama doğrulanamadı; eksik girdiler: {0}",
+                string.Join(", ", lost)));
     }
 
     /// <summary>dlclist'te gcs_ ile başlayan sahipsiz girdileri ve klasörleri temizler.</summary>

@@ -158,6 +158,19 @@ public static class GameFolder
             RpfEncryption.Ng => "NG (Gen9)",
             _ => "?"
         };
+
+        // Boyut, kurulumun hangi yazma yolunu kullanacağını belirler: RPF7
+        // 24 bit sektör adreslemesi 3,9 GB üstünde yeni blok eklemeye izin
+        // vermez. Destek loglarında bu bilgi eksikti.
+        try
+        {
+            var gb = new FileInfo(path).Length / 1_000_000_000.0;
+            if (gb >= 0.1)
+                state += ", " + gb.ToString("0.00",
+                    System.Globalization.CultureInfo.InvariantCulture) + " GB";
+        }
+        catch { }
+
         return SyncText.T("Oyun: {0}; mods/update/update.rpf: {1}.", edition, state);
     }
 

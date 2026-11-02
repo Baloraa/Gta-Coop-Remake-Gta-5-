@@ -8,7 +8,7 @@ GTACoop Remake is not a new multiplayer engine. It is the desktop layer around G
 
 GTACoop Remake is for private Story Mode co-op. It does not touch GTA Online, does not bypass anti-cheat, and does not inject into online sessions.
 
-**Current release:** 2.6.2  
+**Current release:** 2.7  
 **Platform:** Windows 10/11, x64  
 **UI:** Turkish, English, and Russian  
 **License:** GNU GPL v3
@@ -289,6 +289,17 @@ This is a tool for playing with friends, not a hardened anti-cheat or privacy sy
 - Server owners are responsible for the mods they distribute. The launcher automates delivery; it does not grant permission to redistribute someone else's work.
 
 ---
+
+## What is new in 2.7
+
+This release targets the two remaining complaints: add-on DLC packs that refused to install on **Legacy**, and crashes while switching addon peds. It also adds an animal animation menu.
+
+- **Legacy RPF installs again.** The health/size heuristics around `mods/update/update.rpf` used to block the whole pack when they produced a false positive. They no longer decide the outcome: if the archive opens, the dlclist is written, backed up, appended when the old block is too small, and then **re-opened to verify** the entries really landed. A pack is skipped only when the archive cannot be opened at all or when the RPF7 3.9 GB limit leaves no room for any write. A genuinely corrupt archive is still never written.
+- **Header overflow handled.** When the TOC/name table grew into the first data block, the write failed with `RpfHeaderSpaceException`. The content now goes into the existing block without growing the archive, which is what retail `update.rpf` copies hit.
+- **Write verification.** After writing, the archive is re-opened and every expected pack name is read back; if one is missing the pack is not recorded as installed.
+- **Addon ped switching no longer crashes.** `SET_PLAYER_MODEL` destroys and recreates the player ped, so rapid switching left stale handles behind. A new request is now refused while a switch is pending or within 0.9 s of the previous one, switching while dead is refused, tasks and the ragdoll flag are cleared first, the model must pass `IS_MODEL_A_PED`, and **selecting the ped you already wear no longer swaps the model** (only the variation is repaired).
+- **Animal animation menu.** The main menu has a new **Animal Animations** entry. It lists a set per model: **Rottweiler (all dogs)**, **Retriever**, and **Cat**. Dog breeds share one skeleton, so shepherd, husky and pug models use the rottweiler dictionaries instead of a made-up one; cat models never get dog clips. Actions are sit, bark, lie down, bite, get up and stop. If a dictionary does not load, the client falls back to the safe dictionary and says so. The `victim_*` clips in `melee@streamed_core@` belong to the attacked human and are never played on the animal.
+- No protocol change: 2.7 still speaks `VERSION_0_9_4` and plays with 2.6.x and older clients.
 
 ## What is new in 2.6.2
 

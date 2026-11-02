@@ -2,7 +2,7 @@
 
 **Türkçe** | [English](README.md)
 
-2.6.2 sürümü - kendi sunucu yönetimi, otomatik mod indirme, **oturum modu**,
+2.7 sürümü - kendi sunucu yönetimi, otomatik mod indirme, **oturum modu**,
 **kısa kod** (ör. `Gel.com`) ile internetten sunucu bulma, **otomatik relay**,
 **UPnP doğrudan bağlantı**, **özel relay sunucusu**, **tanılama kopyalama**,
 **canlı sunucu durumu**, **Sunucu Tarayıcı** sekmesi, **OpenIV (.oiv) paket desteği**,
@@ -14,6 +14,36 @@ yalnızca oyun açıkken kurulu kalır, oyundan çıkınca otomatik kaldırılı
 Oyun başlatma dosyası seçilebilir; varsayılan **PlayGTAV.exe**'dir (GTA5.exe de seçilebilir).
 **Sesli sohbet** (bas-konuş, `[MIC]` göstergesi) ve **host-led hikaye görevi koordinasyonu**
 bu sürümde eklendi; ayrıntılar aşağıda.
+
+### 2.7 — Legacy RPF kurulumu, hayvan animasyonları ve ped değişimi çökmesi
+
+Bu sürüm, addon DLC paketlerinin **Legacy** kurulumda kurulamaması sorununu ve addon
+ped değiştirirken oluşan çökmeleri hedefler.
+
+- **Legacy'de RPF artık kuruluyor.** `mods/update/update.rpf` için sağlık/boyut
+  sezgileri kurulumu **engellemiyordu ama yanlış pozitif verdiğinde paketi tamamen
+  blokluyordu**. Artık engel kaldırıldı: arşiv açılabiliyorsa dlclist yazılır, yedek
+  alınır, gerekirse içerik arşivin sonuna eklenir ve **sonuç arşiv yeniden açılıp
+  doğrulanır**. Yalnızca arşiv hiç açılamıyorsa veya 3,9 GB sınırı yüzünden hiçbir
+  yazma sığmıyorsa paket atlanır. Bozuk arşive yine yazılmaz.
+- **Başlık alanı taşması düzeltildi.** TOC/isim tablosu büyüdüğünde yazma
+  `RpfHeaderSpaceException` ile düşüyordu; artık içerik arşivi büyütmeden mevcut
+  alana yazılır. Bu, retail `update.rpf` kopyalarında görülen bir durumdur.
+- **Yazma doğrulaması.** dlclist yazıldıktan sonra arşiv yeniden açılır ve beklenen
+  tüm paket adları okunur; eksik varsa paket "kuruldu" diye kaydedilmez.
+- **Addon ped değiştirirken çökme düzeltildi.** `SET_PLAYER_MODEL` pedi yeniden
+  yarattığı için art arda değişimler eski handle'ları geçersiz bırakıyordu. Artık:
+  değişim sürerken veya son 0,9 sn içinde değişim yapıldıysa yeni istek reddedilir,
+  ölmüşken/ragdoll'dayken değişim yapılmaz, değişimden önce görevler ve ragdoll
+  bayrağı temizlenir, model ped değilse (`IS_MODEL_A_PED`) hiç denenmez ve **aynı
+  pedi tekrar seçmek modeli yeniden yaratmaz** (yalnızca varyant onarılır).
+- **Hayvan animasyon menüsü.** Ana menüye **Animal Animations** eklendi. Seçili
+  hayvan modeline göre set listelenir: **Rottweiler (tüm köpekler)**, **Retriever**
+  ve **Kedi**. Köpek ırkları aynı iskeleti paylaştığı için shepherd/husky/pug gibi
+  kendi sözlüğü olmayan modellerde rottweiler sözlükleri kullanılır; kedi
+  modellerine köpek animasyonu oynatılmaz. Animasyonlar: otur, havla, yat, ısır,
+  kalk ve durdur. Sözlük yüklenemezse güvenli sözlüğe düşülür ve bildirim gösterilir;
+  `melee@streamed_core@` içindeki `victim_*` klipleri (insan içindir) kullanılmaz.
 
 ### 2.6.2 — Çift ısırık ve zeminden geçme düzeltildi
 

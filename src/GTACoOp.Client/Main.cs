@@ -39,8 +39,15 @@ namespace GTACoOp
         private readonly NativeMenu _settingsMenu;
         private readonly NativeMenu _teleportMenu;
         private NativeMenu _addonPedsMenu;
+        private readonly NativeMenu _animalAnimMenu;
         private int _defaultPlayerModel;
         private PendingAddonPed _pendingAddonPed;
+
+        // Model değişimleri sıraya konur. SET_PLAYER_MODEL pedi yok edip yeniden
+        // yarattığı için art arda çağrılar eski handle'ları geçersiz bırakıyor ve
+        // oyun çökebiliyordu (ör. menüde hızlı ped değiştirme).
+        private int _lastModelChangeAt;
+        private const int ModelChangeCooldownMs = 900;
 
         // Watches the local player model even when it was changed by Menyoo,
         // Ped Selector or another trainer instead of our own menu.
@@ -370,6 +377,19 @@ namespace GTACoOp
                 _addonPedsMenu.Clear();
             };
 
+            _animalAnimMenu = new NativeMenu("GTA CooP", "Animal Animations");
+            _animalAnimMenu.Width += 150;
+            _animalAnimMenu.MouseBehavior = LemonUI.Menus.MenuMouseBehavior.Disabled;
+            _animalAnimMenu.ItemCount = CountVisibility.Always;
+            _animalAnimMenu.Opening += (object sender, System.ComponentModel.CancelEventArgs e) =>
+            {
+                RebuildAnimalAnimMenu();
+            };
+            _animalAnimMenu.Closing += (object sender, System.ComponentModel.CancelEventArgs e) =>
+            {
+                _animalAnimMenu.Clear();
+            };
+
             RegisterConfiguredAnimalModels();
 
             var listenItem = new NativeItem("Server IP");
@@ -467,6 +487,7 @@ namespace GTACoOp
             _mainMenu.Add(portItem);
             _mainMenu.Add(_passItem);
             _mainMenu.AddSubMenu(_addonPedsMenu);
+            _mainMenu.AddSubMenu(_animalAnimMenu);
             _mainMenu.AddSubMenu(_teleportMenu);
             _mainMenu.AddSubMenu(_settingsMenu);
             _mainMenu.Add(aboutItem);
@@ -689,6 +710,7 @@ namespace GTACoOp
             _menuPool.Add(_serverBrowserMenu);
             _menuPool.Add(_teleportMenu);
             _menuPool.Add(_addonPedsMenu);
+            _menuPool.Add(_animalAnimMenu);
             _menuPool.Add(_settingsMenu);
 
             _storyMissions = new StoryMissionCoop(_mainMenu, _menuPool);
@@ -782,6 +804,56 @@ namespace GTACoOp
             }
         }
 
+        /// <summary>
+        /// Hayvan animasyon menüsü. Model iskeletine uygun set seçilir; kedi
+        /// modellerinde köpek sözlükleri listelenmez (iskelet uyuşmaz).
+        /// </summary>
+        private void RebuildAnimalAnimMenu()
+        {
+            _animalAnimMenu.Clear();
+
+            var player = Game.Player.Character;
+            var animal = AnimalAnimations.IsAnimalModel(player);
+            var set = AnimalAnimations.SetForModel(player);
+
+            var header = new NativeItem(
+                animal ? "Set: " + set.Label : "Hayvan modeli gerekli",
+                animal
+                    ? "Sözlükler modele göre seçilir; köpek ırkları aynı iskeleti kullanır."
+                    : "Önce Addon Peds menüsünden bir hayvan modeli seçin.");
+            header.Enabled = false;
+            _animalAnimMenu.Add(header);
+
+            foreach (var option in AnimalAnimations.AllSets)
+            {
+                var key = option.Key;
+                var pick = new NativeItem("Set: " + option.Label,
+                    string.Equals(option.Key, AnimalAnimations.SelectedSet,
+                        StringComparison.OrdinalIgnoreCase)
+                        ? "~g~Seçili"
+                        : "Bu setin animasyonlarını kullan");
+                pick.Activated += (sender, item) =>
+                {
+                    AnimalAnimations.SelectedSet = key;
+                    RebuildAnimalAnimMenu();
+                };
+                _animalAnimMenu.Add(pick);
+            }
+
+            if (!animal) return;
+
+            foreach (var action in set.Actions)
+            {
+                var entry = action;
+                var item = new NativeItem(entry.Label,
+                    string.IsNullOrEmpty(entry.Dict)
+                        ? "Görevi temizler"
+                        : entry.Dict + " / " + entry.Clip);
+                item.Activated += (sender, selected) => AnimalAnimations.Play(entry);
+                _animalAnimMenu.Add(item);
+            }
+        }
+
         private void ApplyAddonPed(ClientAddonPed ped)
         {
             if (ped == null || string.IsNullOrWhiteSpace(ped.Model)) return;
@@ -795,6 +867,43 @@ namespace GTACoOp
             if (!model.IsInCdImage)
             {
                 Notification.Show("~r~Ped model not found: ~w~" + ped.Model);
+                return;
+            }
+
+            // Model adı ped değilse (ör. araç/nesne) oyuncu modeli olarak
+            // atanamaz; oyun bu durumda çöker.
+            if (!Function.Call<bool>(Hash.IS_MODEL_A_PED, model.Hash))
+            {
+                Notification.Show("~r~Model is not a ped: ~w~" + ped.Model);
+                return;
+            }
+
+            // Aynı modeli tekrar seçmek pedi boşuna yok edip yeniden yaratıyordu;
+            // bu da çökme riskini artırıyordu.
+            var current = Game.Player.Character;
+            if (current != null && current.Exists() && current.Model.Hash == model.Hash)
+            {
+                AddonPedVariation.ScheduleAnimalFix(current);
+                Notification.Show("~g~Ped already active: ~w~" +
+                    (string.IsNullOrWhiteSpace(ped.Name) ? ped.Model : ped.Name));
+                return;
+            }
+
+            // Değişim sürerken veya çok kısa süre önce değiştiyse yenisini
+            // başlatma: yarım kalmış ped değişimi çökmenin başlıca nedeni.
+            if (_pendingAddonPed != null)
+            {
+                Notification.Show("~o~Ped değişimi sürüyor, bir saniye bekleyin.");
+                return;
+            }
+            if (Game.GameTime - _lastModelChangeAt < ModelChangeCooldownMs)
+            {
+                Notification.Show("~o~Çok hızlı; bir saniye bekleyip tekrar deneyin.");
+                return;
+            }
+            if (current != null && current.Exists() && current.IsDead)
+            {
+                Notification.Show("~o~Ölmüşken ped değiştirilemez; önce yeniden doğun.");
                 return;
             }
 
@@ -827,6 +936,22 @@ namespace GTACoOp
 
             try
             {
+                // Değişimden önce eski pedin görevlerini ve ragdoll bayrağını
+                // bırak: animasyon/ragdoll sürerken model değiştirmek yeni pede
+                // geçersiz varyant devredip çökmeye yol açabiliyor.
+                try
+                {
+                    if (current != null && current.Exists())
+                    {
+                        Function.Call(Hash.CLEAR_PED_TASKS_IMMEDIATELY, current.Handle);
+                        Function.Call(Hash.SET_PED_CAN_RAGDOLL, current.Handle, false);
+                    }
+                }
+                catch { }
+                AnimalAnimations.Stop();
+                _ragdollGuardModel = 0;
+
+                _lastModelChangeAt = Game.GameTime;
                 if (!Game.Player.ChangeModel(model))
                 {
                     Notification.Show("~r~Could not change ped model.");
@@ -1309,18 +1434,52 @@ namespace GTACoOp
         {
             try
             {
+                var current = Game.Player.Character;
+                if (_pendingAddonPed != null)
+                {
+                    Notification.Show("~o~Ped değişimi sürüyor, bir saniye bekleyin.");
+                    return;
+                }
+                if (Game.GameTime - _lastModelChangeAt < ModelChangeCooldownMs)
+                {
+                    Notification.Show("~o~Çok hızlı; bir saniye bekleyip tekrar deneyin.");
+                    return;
+                }
+                if (current != null && current.Exists() && current.IsDead)
+                {
+                    Notification.Show("~o~Ölmüşken ped değiştirilemez; önce yeniden doğun.");
+                    return;
+                }
+
                 var hash = _defaultPlayerModel != 0 ? _defaultPlayerModel : (int)PedHash.Michael;
                 var model = new Model(hash);
                 if (!model.IsInCdImage)
                 {
                     model = new Model(PedHash.Michael);
                 }
+                if (current != null && current.Exists() && current.Model.Hash == model.Hash)
+                {
+                    Notification.Show("~g~Player model already reset.");
+                    return;
+                }
                 if (!model.IsLoaded && !model.Request(1000))
                 {
                     Notification.Show("~r~Default model could not be loaded.");
                     return;
                 }
+
+                AnimalAnimations.Stop();
+                try
+                {
+                    if (current != null && current.Exists())
+                    {
+                        Function.Call(Hash.CLEAR_PED_TASKS_IMMEDIATELY, current.Handle);
+                        Function.Call(Hash.SET_PED_CAN_RAGDOLL, current.Handle, false);
+                    }
+                }
+                catch { }
                 _ragdollGuardModel = 0;
+                _lastModelChangeAt = Game.GameTime;
                 Game.Player.ChangeModel(model);
                 Notification.Show("~g~Player model reset.");
             }
@@ -2371,6 +2530,7 @@ namespace GTACoOp
                 EnforceRagdollGuard();
                 UpdateAnimalAttack();
                 AddonPedVariation.Process();
+                AnimalAnimations.Process();
                 ProcessServerBrowserQueue();
                 UpdateServerBrowserScan();
                 _menuPool.Process();
