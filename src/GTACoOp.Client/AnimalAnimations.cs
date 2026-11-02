@@ -37,6 +37,18 @@ namespace GTACoOp
             public List<Action> Actions = new List<Action>();
         }
 
+        /// <summary>
+        /// Hayvan pedinde varsayılan klip sözlüğü. Hareket clipset'i
+        /// (ROTTWEILER@MOVE) bu sözlüğü kullanır; sözlük yüklü olmadan
+        /// klipler sessizce oynatılmaz.
+        /// </summary>
+        public const string DefaultClipDictionary = "CREATURES@ROTTWEILER@MOVE";
+
+        /// <summary>
+        /// Hayvan pedine varsayılan olarak atanan movement clipset.
+        /// </summary>
+        public const string DefaultMovementClipset = "ROTTWEILER@MOVE";
+
         private static readonly List<Set> Sets = BuildSets();
 
         /// <summary>Seçili set anahtarı ("rottweiler" / "retriever" / "cat").</summary>
@@ -52,6 +64,9 @@ namespace GTACoOp
 
         private static string _playingDict;
         private static int _playingUntil;
+
+        private static int _defaultsModelHash;
+        private static bool _defaultsApplied;
 
         private static List<Set> BuildSets()
         {
@@ -190,6 +205,50 @@ namespace GTACoOp
             return chosen;
         }
 
+        /// <summary>
+        /// Hayvan pedine varsayılan hareket setini uygular: klip sözlüğü
+        /// CREATURES@ROTTWEILER@MOVE ve movement clipset ROTTWEILER@MOVE.
+        /// İnsan modelinde uygulanmış seti geri alır.
+        /// </summary>
+        public static void ApplyDefaults(Ped ped)
+        {
+            if (ped == null || !ped.Exists()) return;
+
+            if (!IsAnimalModel(ped))
+            {
+                ResetDefaults(ped);
+                return;
+            }
+
+            RequestDict(DefaultClipDictionary);
+            try
+            {
+                Function.Call(Hash.SET_PED_MOVEMENT_CLIPSET, ped.Handle,
+                    DefaultMovementClipset, 1.0f);
+                _defaultsModelHash = ped.Model.Hash;
+                _defaultsApplied = true;
+                Main.Logger.WriteLine("Animal default movement: " +
+                    DefaultMovementClipset + " (dict " + DefaultClipDictionary + ")");
+            }
+            catch { }
+        }
+
+        /// <summary>Varsayılan hareket setini geri alır (insan modeline dönüşte).</summary>
+        public static void ResetDefaults(Ped ped = null)
+        {
+            if (!_defaultsApplied) return;
+            _defaultsApplied = false;
+            _defaultsModelHash = 0;
+            try
+            {
+                var target = ped;
+                if (target == null || !target.Exists()) target = Game.Player.Character;
+                if (target != null && target.Exists())
+                    Function.Call(Hash.RESET_PED_MOVEMENT_CLIPSET, target.Handle, 1.0f);
+            }
+            catch { }
+        }
+
         public static void Play(Action action)
         {
             var player = Game.Player.Character;
@@ -240,8 +299,14 @@ namespace GTACoOp
             if (!alive || !IsAnimalModel(player))
             {
                 if (_playingDict != null || _pendingDict != null) Stop();
+                ResetDefaults(player);
                 return;
             }
+
+            // Model değiştiğinde varsayılan sözlük/clipset yeniden uygulanır;
+            // oyun bazı durumlarda (ragdoll, araçtan inme) clipset'i sıfırlar.
+            if (!_defaultsApplied || _defaultsModelHash != player.Model.Hash)
+                ApplyDefaults(player);
 
             // Tek seferlik animasyon bittiğinde tutamacı bırak.
             if (_playingUntil != 0 && Game.GameTime > _playingUntil)

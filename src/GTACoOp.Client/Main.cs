@@ -842,6 +842,20 @@ namespace GTACoOp
 
             if (!animal) return;
 
+            // Varsayılan hareket seti: klip sözlüğü CREATURES@ROTTWEILER@MOVE,
+            // movement clipset ROTTWEILER@MOVE. Otomatik uygulanır; bu giriş
+            // oyun clipset'i sıfırladığında elle geri almak için.
+            var defaults = new NativeItem("Varsayılan hareket",
+                "~b~Dict:~w~ " + AnimalAnimations.DefaultClipDictionary +
+                "~n~~b~Clipset:~w~ " + AnimalAnimations.DefaultMovementClipset);
+            defaults.Activated += (sender, item) =>
+            {
+                AnimalAnimations.ApplyDefaults(Game.Player.Character);
+                Notification.Show("~g~Varsayılan hareket uygulandı: ~w~" +
+                    AnimalAnimations.DefaultMovementClipset);
+            };
+            _animalAnimMenu.Add(defaults);
+
             foreach (var action in set.Actions)
             {
                 var entry = action;
@@ -1469,6 +1483,7 @@ namespace GTACoOp
                 }
 
                 AnimalAnimations.Stop();
+                AnimalAnimations.ResetDefaults(current);
                 try
                 {
                     if (current != null && current.Exists())
