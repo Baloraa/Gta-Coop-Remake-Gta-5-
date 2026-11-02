@@ -72,6 +72,15 @@ KURULUM
    dosyanızı değiştirmez; script/ASI modları kurulmaya devam eder.
    Onarım için Launcher > Yedekler bölümünü kullanabilirsiniz.
 
+   NOT: GTA V Enhanced sürümünde addon DLC (araç/ped) paketleri
+   kurulamaz. Enhanced arşivleri NG şifreli olduğu için
+   mods\update\update.rpf yazılamaz; launcher bu dosyayı kopyalamaz
+   veya değiştirmez. Script ve ASI modları normal kurulur. Addon
+   DLC paketleri için klasik (Legacy) GTA V ya da şifresiz (OPEN)
+   bir mods kopyası + RageOpenV/OpenRPF gerekir. FiveM'de
+   çalışmasının nedeni, FiveM'in dosyaları oyun açıkken belleğe
+   kaydetmesidir; Hikaye Modu'nda böyle bir yol yoktur.
+
    İndirme çok yavaşsa veya bağlantı koparsa launcher otomatik
    yeniden dener ve kaldığı yerden devam eder. Büyük dosyalar
    (4 MB üstü 2, 12 MB üstü 4 paralel bağlantı) parçalı indirilir;

@@ -138,8 +138,16 @@ public sealed class GameTab : UserControl
         AddRow("ScriptHookV.dll", s.HasScriptHookV, s.HasScriptHookV ? T("var") : T("YOK - oyun modlanamaz"));
         AddRow("ScriptHookVDotNet.asi", s.HasShvdn, s.HasShvdn ? T("var") : T("YOK - scriptler çalışmaz"));
         AddRow(T("OpenIV.asi / RageOpenV.asi"), s.HasOpenIvAsi, s.HasOpenIvAsi ? T("var") : T("YOK - mods klasörü okunmaz"));
-        AddRow("mods/update/update.rpf", s.HasModsUpdateRpf,
-            s.HasModsUpdateRpf ? T("var") : T("YOK - dlc paketleri kurulamaz"));
+        var modsArchive = !s.HasModsUpdateRpf
+            ? T("YOK - dlc paketleri kurulamaz")
+            : s.ModsUpdateRpfEncryption switch
+            {
+                GTACoop.Rpf.RpfEncryption.Open => T("var (OPEN - düzenlenebilir)"),
+                GTACoop.Rpf.RpfEncryption.Aes => T("var (AES - düzenlenebilir)"),
+                GTACoop.Rpf.RpfEncryption.Ng => T("var (NG - düzenlenemez)"),
+                _ => T("var")
+            };
+        AddRow("mods/update/update.rpf", s.HasModsUpdateRpf, modsArchive);
         AddRow(T("scripts klasörü"), s.HasScriptsFolder, s.HasScriptsFolder ? T("var") : T("yok (oluşturulur)"));
         AddRow(T("GTACoOp.dll (istemci)"), s.HasGtaCoopClient, s.HasGtaCoopClient ? T("kurulu") : T("kurulu değil"));
 

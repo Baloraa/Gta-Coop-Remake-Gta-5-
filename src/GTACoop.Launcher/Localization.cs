@@ -75,6 +75,10 @@ public static partial class Loc
         ["{0}:{1} (oyun) / {2}:{3} (sync)"] = "{0}:{1} (game) / {2}:{3} (sync)",
         ["✔ Bağlantı başarılı: {0}"] = "✔ Connection successful: {0}",
         ["✔ Oyun mod için hazır."] = "✔ Game is ready for mods.",
+        ["var (OPEN - düzenlenebilir)"] = "present (OPEN - editable)",
+        ["var (AES - düzenlenebilir)"] = "present (AES - editable)",
+        ["var (NG - düzenlenemez)"] =
+            "present (NG - GTA V Enhanced archive, cannot be edited)",
         ["⚠ Eksikler: "] = "⚠ Missing: ",
         ["⚠ GTA V klasörü seçilmedi (üstteki 'Gözat...' düğmesini kullanın)."] = "⚠ GTA V folder not selected (use the 'Browse...' button above).",
         ["Addons Klasörünü Aç"] = "Open Addons Folder",

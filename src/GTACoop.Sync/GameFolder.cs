@@ -1,3 +1,4 @@
+using GTACoop.Rpf;
 using Microsoft.Win32;
 
 namespace GTACoop.Sync;
@@ -101,9 +102,64 @@ public static class GameFolder
             HasRageOpenVAsi = File.Exists(Path.Combine(folder, "RageOpenV.asi")),
             HasModsFolder = Directory.Exists(Path.Combine(folder, "mods")),
             HasModsUpdateRpf = File.Exists(Path.Combine(folder, "mods", "update", "update.rpf")),
+            ModsUpdateRpfEncryption = ProbeArchiveEncryption(
+                Path.Combine(folder, "mods", "update", "update.rpf")),
+            IsEnhanced = File.Exists(Path.Combine(folder, "GTA5_Enhanced.exe")) ||
+                         ProbeArchiveEncryption(Path.Combine(folder, "update", "update.rpf")) ==
+                         RpfEncryption.Ng,
             HasScriptsFolder = Directory.Exists(Path.Combine(folder, "scripts")),
             HasGtaCoopClient = File.Exists(Path.Combine(folder, "scripts", "GTACoOp.dll"))
         };
+
+    /// <summary>
+    /// Bir RPF arşivinin başlık şifrelemesini okur. null: dosya yok, çok küçük veya RPF değil.
+    /// Gen9 (GTA V Enhanced) arşivleri <see cref="RpfEncryption.Ng"/> döner; bunlar yazılamaz.
+    /// </summary>
+    public static RpfEncryption? ProbeArchiveEncryption(string path)
+    {
+        try
+        {
+            if (!File.Exists(path)) return null;
+            using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+            if (fs.Length < 16) return null;
+            var header = new byte[16];
+            fs.ReadExactly(header, 0, 16);
+            if (BitConverter.ToUInt32(header, 0) != RpfArchive.Magic) return null;
+            var encryption = (RpfEncryption)BitConverter.ToUInt32(header, 12);
+            // "None" yazan arşivler OpenIV'nin şifresiz (OPEN) biçimidir.
+            return encryption == RpfEncryption.None ? RpfEncryption.Open : encryption;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>Oyun GTA V Enhanced (Gen9) mi?</summary>
+    public static bool IsEnhanced(string folder) =>
+        File.Exists(Path.Combine(folder, "GTA5_Enhanced.exe")) ||
+        ProbeArchiveEncryption(Path.Combine(folder, "update", "update.rpf")) == RpfEncryption.Ng;
+
+    /// <summary>Günlük için tek satırlık oyun sürümü + mods arşivi özeti.</summary>
+    public static string DescribeModsArchive(string folder)
+    {
+        var edition = SyncText.T(IsEnhanced(folder) ? "GTA V Enhanced" : "GTA V Legacy");
+        var path = Path.Combine(folder, "mods", "update", "update.rpf");
+        if (!File.Exists(path))
+            return SyncText.T(
+                "Oyun: {0}; mods/update/update.rpf: yok. Addon DLC paketleri kurulamaz, " +
+                "diğer modlar kurulur. Launcher oyun dosyalarını kopyalamaz veya değiştirmez.",
+                edition);
+
+        var state = ProbeArchiveEncryption(path) switch
+        {
+            RpfEncryption.Open => "OPEN",
+            RpfEncryption.Aes => "AES",
+            RpfEncryption.Ng => "NG (Gen9)",
+            _ => "?"
+        };
+        return SyncText.T("Oyun: {0}; mods/update/update.rpf: {1}.", edition, state);
+    }
 
     /// <summary>
     /// Varsayılan başlatma dosyası: önce PlayGTAV.exe, sonra Enhanced, sonra klasik GTA5.exe.
@@ -157,15 +213,23 @@ public sealed class GameFolderStatus
     public bool HasRageOpenVAsi;
     public bool HasModsFolder;
     public bool HasModsUpdateRpf;
+    public bool IsEnhanced;
+    public RpfEncryption? ModsUpdateRpfEncryption;
     public bool HasScriptsFolder;
     public bool HasGtaCoopClient;
 
     public bool IsUsable => HasGameExe && HasScriptsFolder;
     public bool IsModReady => IsUsable && HasScriptHookV && HasShvdn && HasOpenIvAsi;
 
+    /// <summary>mods kopyası yazılabilir mi? NG/Gen9 arşivler yazılamaz.</summary>
+    public bool CanEditModsArchive =>
+        HasModsUpdateRpf &&
+        ModsUpdateRpfEncryption is RpfEncryption.Open or RpfEncryption.Aes;
+
     public override string ToString() =>
         $"GTA5.exe: {HasGameExe}, PlayGTAV.exe: {HasPlayGtaVExe}, " +
         $"ScriptHookV: {HasScriptHookV}, SHVDN: {HasShvdn}, " +
-        $"OpenIV.asi: {HasOpenIvAsi}, mods/update.rpf: {HasModsUpdateRpf}, " +
+        $"OpenIV.asi: {HasOpenIvAsi}, mods/update.rpf: {HasModsUpdateRpf} " +
+        $"({ModsUpdateRpfEncryption}), Enhanced: {IsEnhanced}, " +
         $"GTACoOp.dll: {HasGtaCoopClient}";
 }

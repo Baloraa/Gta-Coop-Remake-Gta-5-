@@ -383,6 +383,17 @@ sunucuda oynayabilir.
   yapısı bozuksa DLC paketleri **kurulmaz/atlanır**; dosyanız değiştirilmez, otomatik yedekle
   ezilmez. Diğer script/ASI modları kurulmaya devam eder. Onarım için **Yedekler** bölümünü
   kullanabilirsiniz.
+- **GTA V Enhanced (Gen9) ve addon DLC paketleri**: Addon araç/ped paketleri `update.rpf`
+  içindeki `dlclist.xml` girdisine ihtiyaç duyar. GTA V Enhanced arşivleri **NG şifreli**dir ve
+  yazılamaz; bu yüzden launcher sizin `mods/update/update.rpf` dosyanızı **kopyalamaz, değiştirmez
+  ve silmez**. Böyle bir kurulumda script/ASI modları kurulur, addon DLC paketleri atlanır ve
+  günlüğe nedeni yazılır (`Oyun: GTA V Enhanced; mods/update/update.rpf: NG (Gen9)`).
+  FiveM aynı paketleri sorunsuz çalıştırır çünkü FiveM istemcisi `stream/` dosyalarını
+  **oyun çalışırken belleğe kaydeder**; Hikaye Modu'nda böyle bir kayıt mekanizması yoktur ve
+  `dlclist.xml` yalnızca açılışta, `update.rpf` içinden okunur. Enhanced'da addon DLC kullanmak
+  için `mods/update/update.rpf` dosyasının **şifresiz (OPEN)** bir kopyası ve RageOpenV/OpenRPF
+  gerekir; bu kopya GB boyutundadır ve launcher bunu sizin yerinize oluşturmaz. Legacy (klasik)
+  GTA V kurulumunda aynı paketler normal çalışır.
 - **Gerekirse elle yenileme**: bir sunucunun indirdiği dosyaları bozuk/eksik bulursanız
   **Sunucular** sekmesinde sunucuyu seçip **Yeniden İndir...** deyin; yalnızca o sunucunun
   önbelleği silinip baştan indirilir. Bu sunucunun modları oyuna kuruluyken yenileme

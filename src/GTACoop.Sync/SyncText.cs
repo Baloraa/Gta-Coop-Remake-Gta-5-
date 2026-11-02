@@ -263,6 +263,26 @@ public static partial class SyncText
             "This server cannot be reached directly: the address is on a private network (e.g. hotspot/ICS) and no automatic relay information is available.\r\n" +
             "Ask the server owner for the current short code or long GTC1 code and add it again with 'Join with Code...'.",
         ["Modsuz bağlantı hazırlanıyor..."] = "Preparing a mod-free connection...",
+
+        // GTA V sürümü ve mods arşivi (Gen9/NG) teşhisi.
+        ["GTA V Enhanced algılandı ve mods/update/update.rpf yok. Addon DLC paketleri " +
+         "için mods klasöründe şifresiz (OPEN) bir update.rpf kopyası gerekir; launcher " +
+         "oyun dosyalarını kopyalamaz veya değiştirmez."] =
+            "GTA V Enhanced detected and mods/update/update.rpf is missing. Add-on DLC packs need " +
+            "an unencrypted (OPEN) update.rpf copy inside the mods folder; the launcher does not " +
+            "copy or change game files.",
+        ["mods/update/update.rpf NG (Gen9) şifreli; bu arşiv yazılamaz. GTA V Enhanced'da " +
+         "addon DLC paketleri için şifresiz (OPEN) bir mods kopyası ve RageOpenV/OpenRPF " +
+         "gerekir. Diğer modlar kurulmaya devam eder."] =
+            "mods/update/update.rpf is NG (Gen9) encrypted and cannot be written. On GTA V Enhanced, " +
+            "add-on DLC packs need an unencrypted (OPEN) mods copy plus RageOpenV/OpenRPF. " +
+            "The other mods are still installed.",
+        ["Oyun: {0}; mods/update/update.rpf: {1}."] =
+            "Game: {0}; mods/update/update.rpf: {1}.",
+        ["Oyun: {0}; mods/update/update.rpf: yok. Addon DLC paketleri kurulamaz, " +
+         "diğer modlar kurulur. Launcher oyun dosyalarını kopyalamaz veya değiştirmez."] =
+            "Game: {0}; mods/update/update.rpf: missing. Add-on DLC packs cannot be installed; " +
+            "the other mods are. The launcher does not copy or change game files.",
     };
 
     // Dinamik iletilerde geçen Türkçe kalıplar. Uzun olanlar önce denenir.

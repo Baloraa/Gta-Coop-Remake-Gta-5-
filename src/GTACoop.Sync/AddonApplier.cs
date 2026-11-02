@@ -145,8 +145,23 @@ public sealed class AddonApplier
 
         if (!File.Exists(UpdateRpfPath))
         {
+            reason = global::GTACoop.Sync.GameFolder.IsEnhanced(_gameFolder)
+                ? SyncText.T(
+                    "GTA V Enhanced algılandı ve mods/update/update.rpf yok. Addon DLC paketleri " +
+                    "için mods klasöründe şifresiz (OPEN) bir update.rpf kopyası gerekir; launcher " +
+                    "oyun dosyalarını kopyalamaz veya değiştirmez.")
+                : SyncText.T(
+                    "mods/update/update.rpf bulunamadı. DLC/OIV paketleri için OpenIV ile mods klasörü oluşturulmalı.");
+            return false;
+        }
+
+        // GTA V Enhanced (Gen9) arşivleri NG şifreli: TOC yazılamaz, dosya olduğu gibi bırakılır.
+        if (global::GTACoop.Sync.GameFolder.ProbeArchiveEncryption(UpdateRpfPath) == RpfEncryption.Ng)
+        {
             reason = SyncText.T(
-                "mods/update/update.rpf bulunamadı. DLC/OIV paketleri için OpenIV ile mods klasörü oluşturulmalı.");
+                "mods/update/update.rpf NG (Gen9) şifreli; bu arşiv yazılamaz. GTA V Enhanced'da " +
+                "addon DLC paketleri için şifresiz (OPEN) bir mods kopyası ve RageOpenV/OpenRPF " +
+                "gerekir. Diğer modlar kurulmaya devam eder.");
             return false;
         }
 
@@ -432,6 +447,10 @@ public sealed class AddonApplier
         var state = SyncStateStore.Load(dataFolder, manifest.ServerId);
         state.ServerId = manifest.ServerId;
         state.ServerName = manifest.ServerName;
+
+        // Hangi sürümde olduğumuzu ve mods arşivinin yazılabilirliğini baştan yaz:
+        // destek logunda "neden DLC kurulmadı" sorusunun cevabı hazır olsun.
+        _log(global::GTACoop.Sync.GameFolder.DescribeModsArchive(_gameFolder));
 
         var plan = BuildPlan(manifest, state);
         _log(SyncText.T(
