@@ -8,7 +8,7 @@ GTACoop Remake is not a new multiplayer engine. It is the desktop layer around G
 
 GTACoop Remake is for private Story Mode co-op. It does not touch GTA Online, does not bypass anti-cheat, and does not inject into online sessions.
 
-**Current release:** 2.7  
+**Current release:** 2.7.1  
 **Platform:** Windows 10/11, x64  
 **UI:** Turkish, English, and Russian  
 **License:** GNU GPL v3
@@ -290,6 +290,10 @@ This is a tool for playing with friends, not a hardened anti-cheat or privacy sy
 
 ---
 
+## What is new in 2.7.1
+
+Animal peds no longer fall back to a stand animation. The default dictionary is now the rottweiler move dictionary plus the `ROTTWEILER@MOVE` clipset, which every dog model inherits, so a shepherd, husky or pug wears a dog that can actually walk. If both fail to load, the client still falls back to the safe dictionary and says so.
+
 ## What is new in 2.7
 
 This release targets the two remaining complaints: add-on DLC packs that refused to install on **Legacy**, and crashes while switching addon peds. It also adds an animal animation menu.
@@ -299,7 +303,7 @@ This release targets the two remaining complaints: add-on DLC packs that refused
 - **Write verification.** After writing, the archive is re-opened and every expected pack name is read back; if one is missing the pack is not recorded as installed.
 - **Addon ped switching no longer crashes.** `SET_PLAYER_MODEL` destroys and recreates the player ped, so rapid switching left stale handles behind. A new request is now refused while a switch is pending or within 0.9 s of the previous one, switching while dead is refused, tasks and the ragdoll flag are cleared first, the model must pass `IS_MODEL_A_PED`, and **selecting the ped you already wear no longer swaps the model** (only the variation is repaired).
 - **Animal animation menu.** The main menu has a new **Animal Animations** entry. It lists a set per model: **Rottweiler (all dogs)**, **Retriever**, and **Cat**. Dog breeds share one skeleton, so shepherd, husky and pug models use the rottweiler dictionaries instead of a made-up one; cat models never get dog clips. Actions are sit, bark, lie down, bite, get up and stop. If a dictionary does not load, the client falls back to the safe dictionary and says so. The `victim_*` clips in `melee@streamed_core@` belong to the attacked human and are never played on the animal.
-- No protocol change: 2.7 still speaks `VERSION_0_9_4` and plays with 2.6.x and older clients.
+- No protocol change: 2.7.1 still speaks `VERSION_0_9_4` and plays with 2.6.x and older clients.
 
 ## What is new in 2.6.2
 

@@ -2,7 +2,7 @@
 
 **Türkçe** | [English](README.md)
 
-2.7 sürümü - kendi sunucu yönetimi, otomatik mod indirme, **oturum modu**,
+2.7.1 sürümü - kendi sunucu yönetimi, otomatik mod indirme, **oturum modu**,
 **kısa kod** (ör. `Gel.com`) ile internetten sunucu bulma, **otomatik relay**,
 **UPnP doğrudan bağlantı**, **özel relay sunucusu**, **tanılama kopyalama**,
 **canlı sunucu durumu**, **Sunucu Tarayıcı** sekmesi, **OpenIV (.oiv) paket desteği**,
@@ -14,6 +14,13 @@ yalnızca oyun açıkken kurulu kalır, oyundan çıkınca otomatik kaldırılı
 Oyun başlatma dosyası seçilebilir; varsayılan **PlayGTAV.exe**'dir (GTA5.exe de seçilebilir).
 **Sesli sohbet** (bas-konuş, `[MIC]` göstergesi) ve **host-led hikaye görevi koordinasyonu**
 bu sürümde eklendi; ayrıntılar aşağıda.
+
+### 2.7.1 — Hayvan pedi varsayılan hareketi
+
+Hayvan pedi artık duruş animasyonunda kalmıyor. Varsayılan sözlük **rottweiler
+hareket sözlüğü** ve `ROTTWEILER@MOVE` klip seti; tüm köpek modelleri bu iskeleti
+paylaştığı için shepherd, husky ve pug da yürüyebiliyor. İkisi de yüklenemezse
+istemci güvenli sözlüğe düşüp bunu bildiriyor.
 
 ### 2.7 — Legacy RPF kurulumu, hayvan animasyonları ve ped değişimi çökmesi
 
