@@ -816,45 +816,45 @@ namespace GTACoOp
             var animal = AnimalAnimations.IsAnimalModel(player);
             var set = AnimalAnimations.SetForModel(player);
 
+            var move = AnimalAnimations.MoveForModel(player);
             var header = new NativeItem(
-                animal ? "Set: " + set.Label : "Hayvan modeli gerekli",
+                animal ? "Hareket: " + move.Label : "Hayvan modeli gerekli",
                 animal
-                    ? "Sözlükler modele göre seçilir; köpek ırkları aynı iskeleti kullanır."
+                    ? "~b~Clipset:~w~ " + move.Clipset + "~n~~b~Dict:~w~ " + move.Dict
                     : "Önce Addon Peds menüsünden bir hayvan modeli seçin.");
             header.Enabled = false;
             _animalAnimMenu.Add(header);
 
-            foreach (var option in AnimalAnimations.AllSets)
+            if (!animal) return;
+
+            // Hareket setleri: ırkın kendi yürüme/koşma clipset'i. Oyunun ped
+            // meta verisinde her ırk için <irk>@move olarak tanımlıdır.
+            var moveHeader = new NativeItem("Hareket seti (yürüme / koşma)",
+                "Irkın kendi movement clipset'i; oyuncuya anında uygulanır.");
+            moveHeader.Enabled = false;
+            _animalAnimMenu.Add(moveHeader);
+
+            foreach (var option in AnimalAnimations.AllMoveSets)
             {
                 var key = option.Key;
-                var pick = new NativeItem("Set: " + option.Label,
-                    string.Equals(option.Key, AnimalAnimations.SelectedSet,
-                        StringComparison.OrdinalIgnoreCase)
-                        ? "~g~Seçili"
-                        : "Bu setin animasyonlarını kullan");
+                var isSelected = string.Equals(option.Key, AnimalAnimations.SelectedMoveKey,
+                    StringComparison.OrdinalIgnoreCase);
+                var pick = new NativeItem(option.Label + (isSelected ? "  ~g~[seçili]" : ""),
+                    "~b~Clipset:~w~ " + option.Clipset +
+                    "~n~~b~Dict:~w~ " + option.Dict);
                 pick.Activated += (sender, item) =>
                 {
-                    AnimalAnimations.SelectedSet = key;
+                    AnimalAnimations.SelectMove(key);
+                    Notification.Show("~g~Hareket seti: ~w~" + option.Clipset);
                     RebuildAnimalAnimMenu();
                 };
                 _animalAnimMenu.Add(pick);
             }
 
-            if (!animal) return;
-
-            // Varsayılan hareket seti: klip sözlüğü CREATURES@ROTTWEILER@MOVE,
-            // movement clipset ROTTWEILER@MOVE. Otomatik uygulanır; bu giriş
-            // oyun clipset'i sıfırladığında elle geri almak için.
-            var defaults = new NativeItem("Varsayılan hareket",
-                "~b~Dict:~w~ " + AnimalAnimations.DefaultClipDictionary +
-                "~n~~b~Clipset:~w~ " + AnimalAnimations.DefaultMovementClipset);
-            defaults.Activated += (sender, item) =>
-            {
-                AnimalAnimations.ApplyDefaults(Game.Player.Character);
-                Notification.Show("~g~Varsayılan hareket uygulandı: ~w~" +
-                    AnimalAnimations.DefaultMovementClipset);
-            };
-            _animalAnimMenu.Add(defaults);
+            var poseHeader = new NativeItem("Duruş animasyonları",
+                "Set: " + set.Label + " (otur, havla, ısır...)");
+            poseHeader.Enabled = false;
+            _animalAnimMenu.Add(poseHeader);
 
             foreach (var action in set.Actions)
             {

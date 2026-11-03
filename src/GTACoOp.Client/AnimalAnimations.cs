@@ -7,18 +7,22 @@ using GTA.UI;
 namespace GTACoOp
 {
     /// <summary>
-    /// Hayvan pedlerinde oynatılabilecek vanilla animasyonlar.
+    /// Hayvan pedlerinde oynatılabilecek vanilla animasyonlar ve ırk bazlı
+    /// hareket (movement) setleri.
     ///
-    /// Önemli: köpek ırkları (rottweiler, shepherd, husky, retriever, pug,
-    /// westy, poodle) aynı iskeleti paylaşır. Vanilla oyunda kendi adıyla
-    /// sözlüğü olmayan ırklar için rottweiler sözlükleri sorunsuz çalışır;
-    /// bu yüzden "Shepherd" için ayrı bir sözlük icat etmek yerine aynı set
-    /// kullanılır. Kedi iskeleti farklıdır ve köpek sözlükleri kediye
-    /// oynatılmaz.
+    /// Köpek ırkları (rottweiler, shepherd, husky, retriever, pug, westy,
+    /// poodle) aynı iskeleti paylaşır; her ırkın kendi hareket clipset'i
+    /// vardır ve clipset adı oyunun ped meta verisinde `&lt;irk&gt;@move`
+    /// biçiminde geçer (ör. retriever pedi: MovementClipSet = retriever@move,
+    /// ClipDictionaryName = creatures@retriever@move). Kedi iskeleti farklıdır
+    /// ve köpek hareket setleri kediye uygulanmaz.
+    ///
+    /// Bir ırkın sözlüğü bu oyun sürümünde yoksa istemci rottweiler setine
+    /// düşer; oyun clipset'i tanımadığında çökmesin diye clipset yalnızca
+    /// klip sözlüğü gerçekten yüklendikten sonra uygulanır.
     ///
     /// `melee@streamed_core@` içindeki `victim_*` klipleri kurbana (insan
-    /// pede) aittir; hayvanın kendisine oynatılmaz. Burada yalnızca hayvan
-    /// klipleri listelenir.
+    /// pede) aittir; hayvanın kendisine oynatılmaz.
     /// </summary>
     internal static class AnimalAnimations
     {
@@ -38,21 +42,31 @@ namespace GTACoOp
         }
 
         /// <summary>
-        /// Hayvan pedinde varsayılan klip sözlüğü. Hareket clipset'i
-        /// (ROTTWEILER@MOVE) bu sözlüğü kullanır; sözlük yüklü olmadan
-        /// klipler sessizce oynatılmaz.
+        /// Irk bazlı hareket seti. Klip sözlüğü yürüme/koşma kliplerini taşır,
+        /// clipset ise oyunun peds'e uyguladığı movement setidir.
         /// </summary>
+        internal sealed class MoveSet
+        {
+            public string Key;
+            public string Label;    // menüde görünen ad, ör. "Rottweiler (Chop)"
+            public string Dict;     // ör. CREATURES@ROTTWEILER@MOVE
+            public string Clipset;  // ör. ROTTWEILER@MOVE
+            public bool Cat;
+        }
+
+        /// <summary>Varsayılan klip sözlüğü (rottweiler hareket klipleri).</summary>
         public const string DefaultClipDictionary = "CREATURES@ROTTWEILER@MOVE";
 
-        /// <summary>
-        /// Hayvan pedine varsayılan olarak atanan movement clipset.
-        /// </summary>
+        /// <summary>Varsayılan movement clipset.</summary>
         public const string DefaultMovementClipset = "ROTTWEILER@MOVE";
 
+        private static readonly List<MoveSet> MoveSets = BuildMoveSets();
         private static readonly List<Set> Sets = BuildSets();
 
-        /// <summary>Seçili set anahtarı ("rottweiler" / "retriever" / "cat").</summary>
+        /// <summary>Duruş animasyonları için seçili set ("rottweiler" / "retriever" / "cat").</summary>
         public static string SelectedSet = "rottweiler";
+
+        private static string _selectedMoveKey = "rottweiler";
 
         private static int _catHash;
         private static int _mtlionHash;
@@ -65,8 +79,43 @@ namespace GTACoOp
         private static string _playingDict;
         private static int _playingUntil;
 
+        private static MoveSet _pendingMove;
+        private static int _pendingMoveDeadline;
+        private static MoveSet _appliedMove;
+        private static int _appliedMoveModelHash;
+        private static int _moveFallbackWarned;
+
         private static int _defaultsModelHash;
         private static bool _defaultsApplied;
+
+        private static List<MoveSet> BuildMoveSets()
+        {
+            // Clipset adları oyunun kendi ped meta verisindeki
+            // <MovementClipSet> değerleriyle aynıdır (küçük harf de kabul edilir).
+            return new List<MoveSet>
+            {
+                NewMove("rottweiler", "Rottweiler (Chop)", "ROTTWEILER@MOVE", false),
+                NewMove("shepherd", "Shepherd", "SHEPHERD@MOVE", false),
+                NewMove("husky", "Husky", "HUSKY@MOVE", false),
+                NewMove("retriever", "Retriever", "RETRIEVER@MOVE", false),
+                NewMove("pug", "Pug", "PUG@MOVE", false),
+                NewMove("westy", "Westy", "WESTY@MOVE", false),
+                NewMove("poodle", "Poodle", "POODLE@MOVE", false),
+                NewMove("cat", "Kedi", "CAT@MOVE", true)
+            };
+        }
+
+        private static MoveSet NewMove(string key, string label, string clipset, bool cat)
+        {
+            return new MoveSet
+            {
+                Key = key,
+                Label = label,
+                Clipset = clipset,
+                Dict = "CREATURES@" + clipset.Replace("@MOVE", "") + "@MOVE",
+                Cat = cat
+            };
+        }
 
         private static List<Set> BuildSets()
         {
@@ -166,10 +215,26 @@ namespace GTACoOp
 
         public static IReadOnlyList<Set> AllSets => Sets;
 
+        public static IReadOnlyList<MoveSet> AllMoveSets => MoveSets;
+
+        public static string SelectedMoveKey
+        {
+            get { return _selectedMoveKey; }
+        }
+
         public static Set SetByKey(string key)
         {
             if (string.IsNullOrWhiteSpace(key)) return null;
             foreach (var set in Sets)
+                if (string.Equals(set.Key, key, StringComparison.OrdinalIgnoreCase))
+                    return set;
+            return null;
+        }
+
+        public static MoveSet MoveByKey(string key)
+        {
+            if (string.IsNullOrWhiteSpace(key)) return null;
+            foreach (var set in MoveSets)
                 if (string.Equals(set.Key, key, StringComparison.OrdinalIgnoreCase))
                     return set;
             return null;
@@ -193,7 +258,7 @@ namespace GTACoOp
             return hash == _catHash || (hash != 0 && hash == _mtlionHash);
         }
 
-        /// <summary>Modelin iskeletine uygun seti döner.</summary>
+        /// <summary>Modelin iskeletine uygun duruş setini döner.</summary>
         public static Set SetForModel(Ped ped)
         {
             if (ped == null || !ped.Exists()) return SetByKey("rottweiler");
@@ -205,38 +270,44 @@ namespace GTACoOp
             return chosen;
         }
 
+        /// <summary>Modelin iskeletine uygun hareket setini döner.</summary>
+        public static MoveSet MoveForModel(Ped ped)
+        {
+            var chosen = MoveByKey(_selectedMoveKey) ?? MoveByKey("rottweiler");
+            if (ped == null || !ped.Exists()) return chosen;
+            if (IsCat(ped.Model.Hash)) return MoveByKey("cat");
+            if (chosen != null && chosen.Cat) return MoveByKey("rottweiler");
+            return chosen;
+        }
+
         /// <summary>
-        /// Hayvan pedine varsayılan hareket setini uygular: klip sözlüğü
-        /// CREATURES@ROTTWEILER@MOVE ve movement clipset ROTTWEILER@MOVE.
-        /// İnsan modelinde uygulanmış seti geri alır.
+        /// Menüden bir hareket seti seçer. Clipset hemen uygulanmaz: klip
+        /// sözlüğü yüklendikten sonra Process() uygular, böylece oyun
+        /// tanımadığı bir clipset adıyla karşılaşmaz.
         /// </summary>
+        public static void SelectMove(string key)
+        {
+            _selectedMoveKey = string.IsNullOrWhiteSpace(key) ? "rottweiler" : key;
+            _pendingMove = null;
+            _pendingMoveDeadline = 0;
+            _appliedMove = null;
+            _defaultsApplied = false;
+            _moveFallbackWarned = 0;
+        }
+
+        /// <summary>Varsayılan hareket setine (rottweiler) döner.</summary>
         public static void ApplyDefaults(Ped ped)
         {
-            if (ped == null || !ped.Exists()) return;
-
-            if (!IsAnimalModel(ped))
-            {
-                ResetDefaults(ped);
-                return;
-            }
-
-            RequestDict(DefaultClipDictionary);
-            try
-            {
-                Function.Call(Hash.SET_PED_MOVEMENT_CLIPSET, ped.Handle,
-                    DefaultMovementClipset, 1.0f);
-                _defaultsModelHash = ped.Model.Hash;
-                _defaultsApplied = true;
-                Main.Logger.WriteLine("Animal default movement: " +
-                    DefaultMovementClipset + " (dict " + DefaultClipDictionary + ")");
-            }
-            catch { }
+            SelectMove("rottweiler");
         }
 
         /// <summary>Varsayılan hareket setini geri alır (insan modeline dönüşte).</summary>
         public static void ResetDefaults(Ped ped = null)
         {
-            if (!_defaultsApplied) return;
+            _pendingMove = null;
+            _pendingMoveDeadline = 0;
+            _appliedMove = null;
+            _appliedMoveModelHash = 0;
             _defaultsApplied = false;
             _defaultsModelHash = 0;
             try
@@ -290,7 +361,7 @@ namespace GTACoOp
             _playingUntil = 0;
         }
 
-        /// <summary>Her karede çağrılır: animasyon sözlüğü yüklenince görevi başlatır.</summary>
+        /// <summary>Her karede çağrılır: hareket setini ve bekleyen animasyonu uygular.</summary>
         public static void Process()
         {
             var player = Game.Player.Character;
@@ -303,10 +374,7 @@ namespace GTACoOp
                 return;
             }
 
-            // Model değiştiğinde varsayılan sözlük/clipset yeniden uygulanır;
-            // oyun bazı durumlarda (ragdoll, araçtan inme) clipset'i sıfırlar.
-            if (!_defaultsApplied || _defaultsModelHash != player.Model.Hash)
-                ApplyDefaults(player);
+            EnsureMove(player, MoveForModel(player));
 
             // Tek seferlik animasyon bittiğinde tutamacı bırak.
             if (_playingUntil != 0 && Game.GameTime > _playingUntil)
@@ -363,6 +431,87 @@ namespace GTACoOp
                 " model=0x" + player.Model.Hash.ToString("X8"));
         }
 
+        /// <summary>
+        /// Hareket clipset'ini uygular. Sözlük yüklenmeden uygulanmaz; sözlük
+        /// yoksa rottweiler setine düşülür (kedide kedi setine geri dönülür).
+        /// </summary>
+        private static void EnsureMove(Ped ped, MoveSet set)
+        {
+            if (ped == null || !ped.Exists() || set == null) return;
+            var hash = ped.Model.Hash;
+
+            if (_appliedMove != null && _appliedMoveModelHash == hash &&
+                string.Equals(_appliedMove.Key, set.Key, StringComparison.OrdinalIgnoreCase))
+            {
+                _defaultsApplied = true;
+                _defaultsModelHash = hash;
+                return;
+            }
+
+            if (_pendingMove == null ||
+                !string.Equals(_pendingMove.Key, set.Key, StringComparison.OrdinalIgnoreCase))
+            {
+                _pendingMove = set;
+                _pendingMoveDeadline = Game.GameTime + 2500;
+                RequestDict(set.Dict);
+            }
+
+            if (Function.Call<bool>(Hash.HAS_ANIM_DICT_LOADED, set.Dict))
+            {
+                try
+                {
+                    Function.Call(Hash.SET_PED_MOVEMENT_CLIPSET, ped.Handle, set.Clipset, 1.0f);
+                    _appliedMove = set;
+                    _appliedMoveModelHash = hash;
+                    _pendingMove = null;
+                    _defaultsApplied = true;
+                    _defaultsModelHash = hash;
+                    Main.Logger.WriteLine("Animal movement: " + set.Clipset +
+                        " (dict " + set.Dict + ") model=0x" + hash.ToString("X8"));
+                }
+                catch (Exception ex)
+                {
+                    Main.Logger.WriteLine("Animal movement failed: " + set.Clipset +
+                        " - " + ex.Message);
+                }
+                return;
+            }
+
+            if (Game.GameTime <= _pendingMoveDeadline)
+            {
+                RequestDict(set.Dict);
+                return;
+            }
+
+            // Irkın hareket sözlüğü yok: kedi ise kedi, köpek ise rottweiler.
+            var fallback = set.Cat ? null : MoveByKey("rottweiler");
+            if (set.Cat) fallback = MoveByKey("cat");
+            _pendingMove = null;
+
+            if (fallback != null && !string.Equals(fallback.Key, set.Key,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                if (_moveFallbackWarned == 0)
+                {
+                    _moveFallbackWarned = 1;
+                    Main.Logger.WriteLine("Animal movement fallback: " + set.Clipset +
+                        " -> " + fallback.Clipset);
+                    Notification.Show("~o~" + set.Label + " hareket seti yok, ~w~" +
+                        fallback.Label + " kullaniliyor.");
+                }
+                _selectedMoveKey = fallback.Key;
+                RequestDict(fallback.Dict);
+                return;
+            }
+
+            if (_moveFallbackWarned == 0)
+            {
+                _moveFallbackWarned = 1;
+                Main.Logger.WriteLine("Animal movement unavailable: " + set.Clipset);
+                Notification.Show("~o~Hareket seti bu surumde yok: ~w~" + set.Clipset);
+            }
+        }
+
         private static string FallbackFor(string dict)
         {
             if (string.IsNullOrEmpty(dict)) return null;
@@ -374,6 +523,7 @@ namespace GTACoOp
 
         private static void RequestDict(string dict)
         {
+            if (string.IsNullOrEmpty(dict)) return;
             try { Function.Call(Hash.REQUEST_ANIM_DICT, dict); } catch { }
         }
 

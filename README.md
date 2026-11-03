@@ -8,7 +8,7 @@ GTACoop Remake is not a new multiplayer engine. It is the desktop layer around G
 
 GTACoop Remake is for private Story Mode co-op. It does not touch GTA Online, does not bypass anti-cheat, and does not inject into online sessions.
 
-**Current release:** 2.7.1  
+**Current release:** 2.7.2  
 **Platform:** Windows 10/11, x64  
 **UI:** Turkish, English, and Russian  
 **License:** GNU GPL v3
@@ -289,6 +289,12 @@ This is a tool for playing with friends, not a hardened anti-cheat or privacy sy
 - Server owners are responsible for the mods they distribute. The launcher automates delivery; it does not grant permission to redistribute someone else's work.
 
 ---
+
+## What is new in 2.7.2
+
+The animal menu now offers **movement** sets, not only poses. Every line is a breed — Rottweiler (Chop), Shepherd, Husky, Retriever, Pug, Westy, Poodle and cat — and it applies that breed's own movement clipset (`ROTTWEILER@MOVE`, `SHEPHERD@MOVE`, …) together with its `CREATURES@<BREED>@MOVE` clip dictionary, so the animal walks and runs the way that breed does instead of standing in a scripted pose. The clipset and dictionary names are written on each menu line.
+
+A clipset is applied only after its clip dictionary actually loads. If a breed's dictionary is missing from the installed game build, the client falls back to the rottweiler set (cat models stay on `CAT@MOVE`), logs it and says so in a notification, rather than handing the game an unknown clipset. Cat models never receive dog clipsets and dog models never receive the cat one, because the skeletons differ. Sit, bark, bite and get-up poses are still available under the *Duruş animasyonları* section. No protocol change.
 
 ## What is new in 2.7.1
 

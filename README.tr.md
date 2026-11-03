@@ -2,7 +2,7 @@
 
 **Türkçe** | [English](README.md)
 
-2.7.1 sürümü - kendi sunucu yönetimi, otomatik mod indirme, **oturum modu**,
+2.7.2 sürümü - kendi sunucu yönetimi, otomatik mod indirme, **oturum modu**,
 **kısa kod** (ör. `Gel.com`) ile internetten sunucu bulma, **otomatik relay**,
 **UPnP doğrudan bağlantı**, **özel relay sunucusu**, **tanılama kopyalama**,
 **canlı sunucu durumu**, **Sunucu Tarayıcı** sekmesi, **OpenIV (.oiv) paket desteği**,
@@ -14,6 +14,20 @@ yalnızca oyun açıkken kurulu kalır, oyundan çıkınca otomatik kaldırılı
 Oyun başlatma dosyası seçilebilir; varsayılan **PlayGTAV.exe**'dir (GTA5.exe de seçilebilir).
 **Sesli sohbet** (bas-konuş, `[MIC]` göstergesi) ve **host-led hikaye görevi koordinasyonu**
 bu sürümde eklendi; ayrıntılar aşağıda.
+
+### 2.7.2 — Hayvan hareket (yürüme/koşma) setleri
+
+Hayvan menüsü artık yalnızca duruş değil **hareket** seti listeliyor. Her satır bir ırk:
+Rottweiler (Chop), Shepherd, Husky, Retriever, Pug, Westy, Poodle ve kedi. Seçilen ırkın
+kendi movement clipset'i (`ROTTWEILER@MOVE`, `SHEPHERD@MOVE`, …) ve
+`CREATURES@<IRK>@MOVE` klip sözlüğü uygulanıyor; hayvan scriptli bir pozda durmak yerine o
+ırk gibi yürüyüp koşuyor. Clipset ve sözlük adı her menü satırında yazılı.
+
+Clipset ancak klip sözlüğü gerçekten yüklendikten sonra uygulanıyor. Kurulu oyun sürümünde
+bir ırkın sözlüğü yoksa istemci rottweiler setine düşüyor (kedi modelleri `CAT@MOVE`
+üzerinde kalır), loga yazıp bildirim gösteriyor; tanınmayan bir clipset oyuna hiç
+gönderilmiyor. Kedi iskeleti farklı olduğu için köpek setleri kediye, kedi seti köpeğe
+uygulanmıyor. Otur/havla/ısır/kalk duruşları **Duruş animasyonları** başlığı altında duruyor.
 
 ### 2.7.1 — Hayvan pedi varsayılan hareketi
 
