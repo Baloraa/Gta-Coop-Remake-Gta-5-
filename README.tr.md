@@ -2,7 +2,7 @@
 
 **Türkçe** | [English](README.md)
 
-2.7.2 sürümü - kendi sunucu yönetimi, otomatik mod indirme, **oturum modu**,
+2.7.3 sürümü - kendi sunucu yönetimi, otomatik mod indirme, **oturum modu**,
 **kısa kod** (ör. `Gel.com`) ile internetten sunucu bulma, **otomatik relay**,
 **UPnP doğrudan bağlantı**, **özel relay sunucusu**, **tanılama kopyalama**,
 **canlı sunucu durumu**, **Sunucu Tarayıcı** sekmesi, **OpenIV (.oiv) paket desteği**,
@@ -14,6 +14,19 @@ yalnızca oyun açıkken kurulu kalır, oyundan çıkınca otomatik kaldırılı
 Oyun başlatma dosyası seçilebilir; varsayılan **PlayGTAV.exe**'dir (GTA5.exe de seçilebilir).
 **Sesli sohbet** (bas-konuş, `[MIC]` göstergesi) ve **host-led hikaye görevi koordinasyonu**
 bu sürümde eklendi; ayrıntılar aşağıda.
+
+### 2.7.3 — Eklenen köpek ped meta'sıyla yürüyor
+
+Launcher'ın hayvan pedi için yazdığı ped meta'sı hareket verisini kendisi taşıyor:
+`<ClipDictionaryName>creatures@<ırk>@move` ve `<MovementClipSet><ırk>@move`. Böylece launcher'dan
+eklenen köpek doğduğu anda yürüyor; oyun içi menüden bir şey seçmek gerekmiyor.
+
+Meta'nın arkasındaki şablon vanilla retriever tanımıydı; ped retriever setiyle kalıyor ve kendi
+hareketi olmuyordu. Artık varsayılan rottweiler (Chop) seti ve ırk model adından okunuyor:
+shepherd, husky, retriever, pug, westy, poodle ve kedi kendi clipset'ini alıyor, tanınmayan
+modeller rottweiler'a düşüyor. Paket kendi meta'sını getiriyorsa yalnızca boş / `null` hareket
+alanları doldurulur, mod yapımcısının clipset'i ezilmez. Clipset verilip sözlük verilmezse
+sözlük clipset'ten türetilir. Protokol değişmedi.
 
 ### 2.7.2 — Hayvan hareket (yürüme/koşma) setleri
 

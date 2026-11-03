@@ -8,7 +8,7 @@ GTACoop Remake is not a new multiplayer engine. It is the desktop layer around G
 
 GTACoop Remake is for private Story Mode co-op. It does not touch GTA Online, does not bypass anti-cheat, and does not inject into online sessions.
 
-**Current release:** 2.7.2  
+**Current release:** 2.7.3  
 **Platform:** Windows 10/11, x64  
 **UI:** Turkish, English, and Russian  
 **License:** GNU GPL v3
@@ -289,6 +289,12 @@ This is a tool for playing with friends, not a hardened anti-cheat or privacy sy
 - Server owners are responsible for the mods they distribute. The launcher automates delivery; it does not grant permission to redistribute someone else's work.
 
 ---
+
+## What is new in 2.7.3
+
+Add-on dog peds now walk on their own. The ped metadata the launcher writes for an animal ped carries the movement data itself - `<ClipDictionaryName>creatures@<breed>@move` and `<MovementClipSet><breed>@move` - so a dog added from the launcher moves the moment it spawns, without picking anything from the in-game menu.
+
+The template behind that metadata used to be the vanilla retriever definition, which left the ped on the retriever set with no movement of its own. It now defaults to the rottweiler (Chop) set, and the breed is read from the model name: shepherd, husky, retriever, pug, westy, poodle and cat get their own clipset, anything else falls back to rottweiler. When a pack ships its own metadata only empty or `null` movement fields are filled, so a modder's clipset is never overwritten. If a clipset is set without a dictionary, the dictionary is derived from it. No protocol change.
 
 ## What is new in 2.7.2
 

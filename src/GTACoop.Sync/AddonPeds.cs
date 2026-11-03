@@ -1205,6 +1205,24 @@ public static class AddonPeds
             // a_c_ önekli modellerde ped türü her koşulda ANIMAL olmalı;
             // aksi hâlde oyun hayvan iskeletinde insan kodu çalıştırır.
             item.SetElementValue("Pedtype", "ANIMAL");
+
+            // Hareket seti ped meta'sına yazılır: oyun pedi bu clipset ile
+            // yürütür, oyun içi menüden seçmeye gerek kalmaz. Şablondan gelen
+            // pedlerde ırk model adından çıkarılır; pakette hazır meta varsa
+            // yalnızca boş / "null" alanlar doldurulur.
+            var breed = DefaultAnimalBreed(ped.Model);
+            var fromTemplate = source != null &&
+                source.StartsWith("template", StringComparison.OrdinalIgnoreCase);
+            var dictValue = item.Element("ClipDictionaryName")?.Value?.Trim();
+            var moveValue = item.Element("MovementClipSet")?.Value?.Trim();
+
+            if (fromTemplate || string.IsNullOrEmpty(dictValue) ||
+                dictValue.Equals("null", StringComparison.OrdinalIgnoreCase))
+                item.SetElementValue("ClipDictionaryName", "creatures@" + breed + "@move");
+
+            if (fromTemplate || string.IsNullOrEmpty(moveValue) ||
+                moveValue.Equals("null", StringComparison.OrdinalIgnoreCase))
+                item.SetElementValue("MovementClipSet", breed + "@move");
         }
         else if (sourceItem == null)
         {
@@ -1214,7 +1232,20 @@ public static class AddonPeds
         if (!string.IsNullOrWhiteSpace(ped.ClipDictionary))
             item.SetElementValue("ClipDictionaryName", ped.ClipDictionary.Trim());
         if (!string.IsNullOrWhiteSpace(ped.MovementClipSet))
-            item.SetElementValue("MovementClipSet", ped.MovementClipSet.Trim());
+        {
+            var clipset = ped.MovementClipSet.Trim();
+            item.SetElementValue("MovementClipSet", clipset);
+
+            // Sözlük ayrıca verilmediyse clipset'ten türet. Sözlüksüz kalan
+            // clipset oyunda yüklenmez ve hayvan yerinde durur.
+            if (kind == AnimalKind && string.IsNullOrWhiteSpace(ped.ClipDictionary))
+            {
+                var at = clipset.LastIndexOf('@');
+                var breedPart = at > 0 ? clipset.Substring(0, at) : clipset;
+                item.SetElementValue("ClipDictionaryName",
+                    ("creatures@" + breedPart + "@move").ToLowerInvariant());
+            }
+        }
         if (!string.IsNullOrWhiteSpace(ped.DecisionMaker))
             item.SetElementValue("DecisionMakerName", ped.DecisionMaker.Trim());
         if (!string.IsNullOrWhiteSpace(ped.Personality))
@@ -1234,6 +1265,27 @@ public static class AddonPeds
 
     private static string TemplateFor(string kind) =>
         IsAnimal(kind) ? AnimalTemplate : HumanTemplate;
+
+    // Varsayılan hareket seti seçilebilen hayvan ırkları. Köpek ırkları aynı
+    // iskeleti paylaşır; her ırkın kendi clipset'i vardır
+    // (shepherd -> SHEPHERD@MOVE / creatures@shepherd@move).
+    private static readonly string[] AnimalBreeds =
+    {
+        "rottweiler", "shepherd", "husky", "retriever", "pug", "westy", "poodle", "cat"
+    };
+
+    /// <summary>
+    /// Hayvan modelinin hareket ırkını döner. Tanınmayan addon hayvanlarında
+    /// rottweiler (Chop) seti kullanılır.
+    /// </summary>
+    private static string DefaultAnimalBreed(string model)
+    {
+        var name = (model ?? string.Empty).ToLowerInvariant();
+        if (name.Contains("chop")) return "rottweiler";
+        foreach (var breed in AnimalBreeds)
+            if (name.Contains(breed)) return breed;
+        return "rottweiler";
+    }
 
     // ---------------------------------------------------------------- istemci yapılandırması
 
@@ -1396,17 +1448,22 @@ public static class AddonPeds
         "<DefaultSpawningPreference>DSP_NORMAL</DefaultSpawningPreference>" +
         "<DefaultRemoveRangeMultiplier value=\"1.000000\" /><AllowCloseSpawning value=\"false\" /></Item>";
 
-    // Oyunun kendi dört ayaklı hayvan tanımının birebir kopyası; yalnızca
-    // <Name> değiştirilir. Elle uydurulan kısa şablon ragdoll için gereken
-    // alanları (PoseMatcherProneName, TaskDataName, AnimalAudioObject,
-    // MinActivationImpulse, NavCapabilitiesName ...) eksik bıraktığı için
-    // hayvan düşünce/araca çarpınca oyun çöküyordu. Değerler vanilla bir
-    // retriever pedinin kendi meta verisinin birebir kopyasıdır.
+    // Oyunun dört ayaklı hayvan tanımının kopyası. Elle uydurulan kısa şablon
+    // ragdoll için gereken alanları (PoseMatcherProneName, TaskDataName,
+    // AnimalAudioObject, MinActivationImpulse, NavCapabilitiesName ...) eksik
+    // bıraktığı için hayvan düşünce/araca çarpınca oyun çöküyordu; o alanlar
+    // vanilla retriever pedinden aynen alınır.
+    //
+    // Hareket alanları rottweiler (Chop): ClipDictionaryName
+    // creatures@rottweiler@move + MovementClipSet rottweiler@move. Retriever
+    // setiyle eklenen köpek yerinde duruyordu ve oyun içi menüden clipset
+    // değiştirmek gerekiyordu; artık hareket seti ped meta'sıyla birlikte
+    // geliyor ve köpek eklendiği gibi yürüyor.
     private const string AnimalTemplate =
         "<Item><Name>template</Name><PropsName>null</PropsName>" +
-        "<ClipDictionaryName>creatures@retriever@move</ClipDictionaryName><BlendShapeFileName>null</BlendShapeFileName>" +
+        "<ClipDictionaryName>creatures@rottweiler@move</ClipDictionaryName><BlendShapeFileName>null</BlendShapeFileName>" +
         "<ExpressionSetName /><ExpressionDictionaryName>a_c_retriever</ExpressionDictionaryName>" +
-        "<ExpressionName>a_c_retriever</ExpressionName><Pedtype>ANIMAL</Pedtype><MovementClipSet>retriever@move</MovementClipSet>" +
+        "<ExpressionName>a_c_retriever</ExpressionName><Pedtype>ANIMAL</Pedtype><MovementClipSet>rottweiler@move</MovementClipSet>" +
         "<StrafeClipSet>MOVE_PED_STRAFING</StrafeClipSet><MovementToStrafeClipSet>MOVE_PED_TO_STRAFE</MovementToStrafeClipSet>" +
         "<InjuredStrafeClipSet>move_strafe_injured</InjuredStrafeClipSet><FullBodyDamageClipSet>dam_ko</FullBodyDamageClipSet>" +
         "<AdditiveDamageClipSet>dam_ad</AdditiveDamageClipSet><DefaultGestureClipSet>ANIM_GROUP_GESTURE_M_GENERIC</DefaultGestureClipSet>" +
