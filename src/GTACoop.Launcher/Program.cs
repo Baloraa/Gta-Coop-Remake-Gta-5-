@@ -29,6 +29,9 @@ internal static class Program
             return;
         }
 
+        // Önceki güncellemeden kalan exe.old dosyasını temizle.
+        SelfUpdater.CleanupOld();
+
         // Dil: ilk açılışta sorulur; sonra üst çubuktaki kutudan değiştirilebilir.
         if (string.IsNullOrEmpty(AppEnv.Settings.Language))
         {

@@ -12,6 +12,9 @@ public sealed class AboutTab : UserControl
     private const string UrlGitHub = "https://github.com/oldnapalm/GTACoop";
 
     private readonly ToolTip _tips = new();
+    private readonly Label _updateStatus = Ui.StatusLbl();
+    private readonly Button _updateBtn;
+    private readonly Button _installBtn;
 
     public AboutTab()
     {
@@ -54,6 +57,26 @@ public sealed class AboutTab : UserControl
         links.Controls.Add(MakeLink(T("gta5-mods profilim: Turkish Mods"), UrlGta5Mods));
         links.Controls.Add(MakeLink(T("GTACoop kaynak kodu (GitHub)"), UrlGitHub));
         linksGroup.Controls.Add(links);
+
+        // ---- Güncelleme
+        var updateGroup = new GroupBox
+        {
+            Text = T("Güncelleme"),
+            Dock = DockStyle.Top,
+            Height = 98,
+            Padding = new Padding(10, 6, 10, 6)
+        };
+
+        _updateStatus.Text = T("Sürüm {0}. Güncelleme kontrol ediliyor...", AppVersion());
+
+        var updateRow = Ui.Flow(DockStyle.Fill);
+        updateRow.Controls.Add(_updateStatus);
+        _updateBtn = Ui.Btn(T("Güncellemeyi Kontrol Et"), (_, _) => CheckForUpdates());
+        updateRow.Controls.Add(_updateBtn);
+        _installBtn = Ui.Btn(T("İndir ve Kur"), (_, _) => InstallUpdate());
+        _installBtn.Visible = false;
+        updateRow.Controls.Add(_installBtn);
+        updateGroup.Controls.Add(updateRow);
 
         // ---- Üst bölüm: avatar + başlık
         var header = new TableLayoutPanel
@@ -152,13 +175,111 @@ public sealed class AboutTab : UserControl
 
         Controls.Add(infoGroup);
         Controls.Add(linksGroup);
+        Controls.Add(updateGroup);
         Controls.Add(header);
+
+        // Açılışta sessiz sürüm kontrolü: kullanıcı sekmeyi açmasa da haber
+        // vermek için arka planda çalışır, hata durumunda sessiz kalır.
+        _ = AutoCheckAsync();
     }
 
     private static string AppVersion()
     {
         var v = typeof(AboutTab).Assembly.GetName().Version;
         return v == null ? "2.2.2" : $"{v.Major}.{v.Minor}.{v.Build}";
+    }
+
+    // ------------------------------------------------------------- güncelleme
+
+    /// <summary>Açılışta çalışan sessiz kontrol; hiçbir pencere açmaz.</summary>
+    private async Task AutoCheckAsync()
+    {
+        try
+        {
+            ApplyUpdateInfo(await SelfUpdater.CheckAsync(), silent: true);
+        }
+        catch
+        {
+            // Sessiz kontrol kullanıcıyı rahatsız etmez.
+        }
+    }
+
+    private async void CheckForUpdates()
+    {
+        _updateBtn.Enabled = false;
+        _updateStatus.ForeColor = Color.DimGray;
+        _updateStatus.Text = T("Güncelleme kontrol ediliyor...");
+        try
+        {
+            ApplyUpdateInfo(await SelfUpdater.CheckAsync(), silent: false);
+        }
+        finally
+        {
+            _updateBtn.Enabled = true;
+        }
+    }
+
+    private void ApplyUpdateInfo(SelfUpdater.ReleaseInfo? info, bool silent)
+    {
+        var owner = FindForm();
+
+        if (info == null)
+        {
+            _updateStatus.Text = T("Sürüm {0}. Güncelleme sunucusuna ulaşılamadı.", AppVersion());
+            _installBtn.Visible = false;
+            if (!silent && owner != null)
+                Ui.Warn(owner, T("Güncelleme sunucusuna ulaşılamadı. İnternet bağlantınızı kontrol edin."));
+            return;
+        }
+
+        if (!SelfUpdater.IsNewer(info))
+        {
+            _updateStatus.ForeColor = Ui.OkColor;
+            _updateStatus.Text = T("Sürüm {0}. En son sürümü kullanıyorsunuz.", AppVersion());
+            _installBtn.Visible = false;
+            if (!silent && owner != null)
+                Ui.Info(owner, T("En son sürümü kullanıyorsunuz ({0}).", AppVersion()));
+            return;
+        }
+
+        _updateStatus.ForeColor = Ui.WarnColor;
+        _updateStatus.Text = T("Yeni sürüm: {0} (kurulu {1}).", info.Tag, AppVersion());
+        _installBtn.Text = T("Sürüm {0} - İndir ve Kur", info.Tag);
+        _installBtn.Visible = !string.IsNullOrWhiteSpace(info.ExeUrl);
+
+        if (!silent && owner != null)
+            Ui.Info(owner, T("Yeni sürüm hazır: {0}\r\n\r\n'İndir ve Kur' ile güncelleyebilirsiniz.\r\nLauncher kapanıp yeniden açılır; oyun dosyalarınız, modlarınız ve ayarlarınız değişmez.", info.Name));
+    }
+
+    private async void InstallUpdate()
+    {
+        var info = SelfUpdater.Latest;
+        var owner = FindForm();
+        if (info == null || owner == null) return;
+
+        if (!Ui.Confirm(owner, T("Sürüm {0} indirilip kurulacak.\r\nLauncher kapanıp yeniden açılacak; oyun dosyalarınız, modlarınız ve ayarlarınız değişmez. Devam edilsin mi?", info.Tag)))
+            return;
+
+        _installBtn.Enabled = false;
+        _updateBtn.Enabled = false;
+        var progress = new Progress<int>(p => _updateStatus.Text = T("Güncelleme indiriliyor... %{0}", p));
+
+        try
+        {
+            var path = await SelfUpdater.DownloadAsync(info.ExeUrl, progress);
+            _updateStatus.Text = T("Güncelleme kuruluyor...");
+            SelfUpdater.ApplyAndRestart(path);
+            Application.Exit();
+        }
+        catch (Exception ex)
+        {
+            AppEnv.LogError("Güncelleme kurulamadı: " + ex.Message);
+            _installBtn.Enabled = true;
+            _updateBtn.Enabled = true;
+            _updateStatus.ForeColor = Ui.ErrColor;
+            _updateStatus.Text = T("Güncelleme kurulamadı.");
+            Ui.Error(owner, T("Güncelleme kurulamadı:\r\n") + ex.Message);
+        }
     }
 
     private LinkLabel MakeLink(string text, string url)

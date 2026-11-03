@@ -1,0 +1,19 @@
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.6.0.schema.json
+PackageIdentifier: Baloraa.GTACoopRemake
+PackageVersion: 2.7.4
+PackageLocale: en-US
+Publisher: Baloraa
+PublisherUrl: https://github.com/Baloraa
+PackageName: GTACoop Remake
+PackageUrl: https://github.com/Baloraa/Gta-Coop-Remake-Gta-5-
+License: GPL-3.0
+LicenseUrl: https://github.com/Baloraa/Gta-Coop-Remake-Gta-5-/blob/main/LICENSE.md
+ShortDescription: Launcher and server manager for GTA V story-mode co-op (GTACoOp based).
+Description: GTACoop Remake sets up a co-op session between friends in GTA V story mode, installs the server's mods only while you play and removes them on exit. Requires the original GTA V.
+Tags:
+  - gta5
+  - coop
+  - multiplayer
+  - launcher
+ManifestType: defaultLocale
+ManifestVersion: 1.6.0

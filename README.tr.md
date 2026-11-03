@@ -2,7 +2,7 @@
 
 **Türkçe** | [English](README.md)
 
-2.7.3 sürümü - kendi sunucu yönetimi, otomatik mod indirme, **oturum modu**,
+2.7.4 sürümü - kendi sunucu yönetimi, otomatik mod indirme, **oturum modu**,
 **kısa kod** (ör. `Gel.com`) ile internetten sunucu bulma, **otomatik relay**,
 **UPnP doğrudan bağlantı**, **özel relay sunucusu**, **tanılama kopyalama**,
 **canlı sunucu durumu**, **Sunucu Tarayıcı** sekmesi, **OpenIV (.oiv) paket desteği**,
@@ -14,6 +14,25 @@ yalnızca oyun açıkken kurulu kalır, oyundan çıkınca otomatik kaldırılı
 Oyun başlatma dosyası seçilebilir; varsayılan **PlayGTAV.exe**'dir (GTA5.exe de seçilebilir).
 **Sesli sohbet** (bas-konuş, `[MIC]` göstergesi) ve **host-led hikaye görevi koordinasyonu**
 bu sürümde eklendi; ayrıntılar aşağıda.
+
+### 2.7.4 — Güncelleme, destek paketi, sunucu yedeği, favoriler ve HUD
+
+Protokol değişmedi; hepsi launcher/istemci tarafında:
+
+- **Kendi kendini güncelleme.** Açılışta GitHub'daki en son sürüm sorulur ve Hakkında sekmesinde
+  gösterilir; *İndir ve Kur* yeni exe'yi indirip yerine koyar ve launcher'ı yeniden başlatır.
+  Yalnızca launcher exe'si değişir — oyun dosyaları, ayarlar, önbellek ve sunucu klasörleri
+  ellenmez; değiştirme başarısız olursa eski exe geri konur.
+- **Destek paketi.** Günlük / Araçlar sekmesinde *Destek Paketi (.zip)*: sürüm, sistem, oyun
+  klasörü durumu, launcher günlükleri ve oyun tarafı günlükleri (ScriptHookVDotNet, asiloader,
+  GTACoOp) masaüstünde tek zip. Parola ve token yazılmaz.
+- **Sunucu yedeği.** Sunucum sekmesinden sunucu ayarları, Addons klasörü ve sunucuya özel mod
+  klasörleri tek zip'e alınır; başka makinede geri yüklenir. Geri yüklemeden önce mevcut durumun
+  güvenlik yedeği alınır, oyun klasörüne dokunulmaz.
+- **Sunucu listesinde favoriler.** *Favori ★* ile işaretlenen sunucular üstte listelenir;
+  *Sadece favoriler* diğerlerini gizler.
+- **Oyun içi HUD.** F9 > Ayarlar > *HUD (FPS / Ping)* köşede FPS, ortalama ping ve oyuncu
+  sayısını gösterir (varsayılan açık).
 
 ### 2.7.3 — Eklenen köpek ped meta'sıyla yürüyor
 

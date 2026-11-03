@@ -32,6 +32,7 @@ public sealed class LogTab : UserControl
 
         var row2 = Ui.Flow();
         row2.Controls.Add(Ui.Btn(T("Tanılama Kopyala"), (_, _) => CopyDiagnostics()));
+        row2.Controls.Add(Ui.Btn(T("Destek Paketi (.zip)"), (_, _) => MakeSupportBundle()));
         row2.Controls.Add(Ui.Btn(T("gcs_ Kalıntılarını Temizle"), (_, _) => PruneOrphans()));
         row2.Controls.Add(Ui.Btn(T("AutoConnect Kapat"), (_, _) => DisableAutoConnect()));
         row2.Controls.Add(Ui.Btn(T("Günlük Dosyasını Aç"), (_, _) => OpenLogFile()));
@@ -272,6 +273,31 @@ public sealed class LogTab : UserControl
         {
             AppEnv.LogError("Tanılama kopyalanamadı: " + ex.Message);
             Ui.Error(FindForm()!, T("Tanılama kopyalanamadı:\r\n") + ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// Sürüm, sistem, oyun durumu, launcher ve oyun tarafı günlüklerini tek bir
+    /// .zip içinde masaüstüne bırakır. Parola/token pakete eklenmez.
+    /// </summary>
+    private void MakeSupportBundle()
+    {
+        try
+        {
+            UseWaitCursor = true;
+            var path = SupportBundle.Create();
+            try { Clipboard.SetText(path); } catch { }
+
+            Ui.Info(FindForm()!, T("Destek paketi oluşturuldu:\r\n{0}\r\n\r\nYolu panoya da kopyaladım. Sorun bildirirken bu dosyayı paylaşabilirsiniz.\r\nParola ve token bilgileri pakete eklenmez.", path));
+        }
+        catch (Exception ex)
+        {
+            AppEnv.LogError("Destek paketi oluşturulamadı: " + ex.Message);
+            Ui.Error(FindForm()!, T("Destek paketi oluşturulamadı:\r\n") + ex.Message);
+        }
+        finally
+        {
+            UseWaitCursor = false;
         }
     }
 }

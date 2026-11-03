@@ -15,6 +15,7 @@ public sealed class ServersTab : UserControl
     private readonly Button _cancelBtn;
     private readonly CheckBox _sessionMode = new();
     private readonly CheckBox _lowDesync = new();
+    private readonly CheckBox _favoritesOnly = new();
     private readonly Label _sessionInfo = new();
     private readonly Button _endSessionBtn;
     private readonly System.Windows.Forms.Timer _sessionTimer = new();
@@ -45,7 +46,7 @@ public sealed class ServersTab : UserControl
         };
 
         Ui.StyleList(_list,
-            (T("Sunucu"), 220), (T("Adres"), 190), (T("Oyun Portu"), 85), ("Sync", 70),
+            (T("Favori"), 55), (T("Sunucu"), 220), (T("Adres"), 190), (T("Oyun Portu"), 85), ("Sync", 70),
             (T("Şifre"), 65), (T("Durum"), 180));
         _list.Height = 190;
         _list.Dock = DockStyle.Top;
@@ -59,6 +60,13 @@ public sealed class ServersTab : UserControl
         listButtons.Controls.Add(Ui.Btn(T("Yukarı"), (_, _) => MoveServer(-1)));
         listButtons.Controls.Add(Ui.Btn(T("Aşağı"), (_, _) => MoveServer(1)));
         listButtons.Controls.Add(Ui.Btn(T("kendi sunucum (127.0.0.1) ekle"), (_, _) => AddLocalServer()));
+        listButtons.Controls.Add(Ui.Btn(T("Favori ★"), (_, _) => ToggleFavorite()));
+
+        _favoritesOnly.Text = T("Sadece favoriler");
+        _favoritesOnly.AutoSize = true;
+        _favoritesOnly.Margin = new Padding(10, 8, 4, 4);
+        _favoritesOnly.CheckedChanged += (_, _) => RefreshList();
+        listButtons.Controls.Add(_favoritesOnly);
 
         // Bağlantı grubu
         var connectGroup = new GroupBox
@@ -331,16 +339,39 @@ public sealed class ServersTab : UserControl
 
     // ------------------------------------------------------------------ liste
 
+    /// <summary>Seçili sunucuyu favori olarak işaretler veya işareti kaldırır.</summary>
+    private void ToggleFavorite()
+    {
+        if (_list.SelectedItems.Count == 0)
+        {
+            Ui.Warn(FindForm()!, T("Önce listeden bir sunucu seçin."));
+            return;
+        }
+
+        if (_list.SelectedItems[0].Tag is not ServerEntry server) return;
+
+        server.Favorite = !server.Favorite;
+        AppEnv.SaveSettings();
+        AppEnv.Log($"Sunucu favori: {server.Name} -> {(server.Favorite ? "açık" : "kapalı")}");
+        RefreshList();
+    }
+
     public void RefreshList()
     {
         _list.BeginUpdate();
         _list.Items.Clear();
-        foreach (var s in AppEnv.Settings.Servers)
+
+        // Favoriler her zaman üstte; "sadece favoriler" işaretliyse diğerleri gizlenir.
+        var servers = AppEnv.Settings.Servers.AsEnumerable();
+        if (_favoritesOnly.Checked) servers = servers.Where(s => s.Favorite);
+
+        foreach (var s in servers.OrderByDescending(s => s.Favorite))
         {
             var key = StatusKey(s);
             var status = _statusCache.TryGetValue(key, out var cached) ? cached : default;
             var item = new ListViewItem(new[]
             {
+                s.Favorite ? "★" : "",
                 s.Name,
                 s.UsesRelay ? T("{0} (relay)", s.Host) : s.Host,
                 s.UsesRelay ? s.RelayGamePort.ToString() : s.GamePort.ToString(),
@@ -354,7 +385,8 @@ public sealed class ServersTab : UserControl
             });
             item.Tag = s;
             item.UseItemStyleForSubItems = false;
-            item.SubItems[5].ForeColor = !status.Known
+            if (s.Favorite) item.SubItems[0].ForeColor = Ui.WarnColor;
+            item.SubItems[6].ForeColor = !status.Known
                 ? Color.DimGray
                 : status.Online ? Ui.OkColor : Ui.ErrColor;
             _list.Items.Add(item);

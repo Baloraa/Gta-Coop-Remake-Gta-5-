@@ -8,7 +8,7 @@ GTACoop Remake is not a new multiplayer engine. It is the desktop layer around G
 
 GTACoop Remake is for private Story Mode co-op. It does not touch GTA Online, does not bypass anti-cheat, and does not inject into online sessions.
 
-**Current release:** 2.7.3  
+**Current release:** 2.7.4  
 **Platform:** Windows 10/11, x64  
 **UI:** Turkish, English, and Russian  
 **License:** GNU GPL v3
@@ -289,6 +289,16 @@ This is a tool for playing with friends, not a hardened anti-cheat or privacy sy
 - Server owners are responsible for the mods they distribute. The launcher automates delivery; it does not grant permission to redistribute someone else's work.
 
 ---
+
+## What is new in 2.7.4
+
+Launcher-side conveniences, no protocol change:
+
+- **Self-update.** On start the launcher asks GitHub for the latest release and shows it on the About tab; *Download and install* fetches the new exe, swaps it in and restarts. Only the launcher exe is replaced - game files, settings, caches and server folders are untouched, and the old exe is restored if the swap fails.
+- **Support bundle.** Log / Tools now has *Support bundle (.zip)*: version, system, game-folder status, the launcher logs and the game-side logs (ScriptHookVDotNet, asiloader, GTACoOp) in one zip on the desktop. Passwords and sync tokens are never written into it.
+- **Server backup.** My Server can export the server settings, the Addons folder and per-server mod folders to one zip, and restore it on another machine. Restoring takes a safety backup of the current state first and never touches the game folder.
+- **Favourites in the server list.** Mark servers with *Favourite*; they sort to the top and *Only favourites* hides the rest.
+- **In-game HUD.** F9 > Settings > *HUD (FPS / Ping)* shows FPS, average ping and player count in the corner (on by default).
 
 ## What is new in 2.7.3
 

@@ -213,6 +213,9 @@ public sealed class ServerEntry
     public string SyncToken { get; set; } = "";
     public bool AutoConnect { get; set; } = true;
 
+    /// <summary>Sunucular listesinde favori olarak işaretlendi mi? Favoriler üstte listelenir.</summary>
+    public bool Favorite { get; set; }
+
     /// <summary>
     /// Sunucuyu eklerken kullanılan kısa kod (varsa). Relay bilgisi eskirse
     /// bağlantı öncesinde bu kodla güncel relay uç noktaları yeniden alınır.

@@ -676,6 +676,14 @@ namespace GTACoOp
                 Util.SaveSettings(null);
             };
 
+            var hudItem = new NativeCheckboxItem("HUD (FPS / Ping)", PlayerSettings.ShowHud);
+            hudItem.CheckboxChanged += (item, check) =>
+            {
+                PlayerSettings.ShowHud = hudItem.Checked;
+                Hud.Enabled = hudItem.Checked;
+                Util.SaveSettings(null);
+            };
+
 #if DEBUGSYNCPED
             var debugItem = new NativeCheckboxItem("Debug", false);
             debugItem.CheckboxChanged += (item, check) =>
@@ -705,6 +713,7 @@ namespace GTACoOp
             _settingsMenu.Add(debugItem);
 #endif
             _settingsMenu.Add(netGraphItem);
+            _settingsMenu.Add(hudItem);
 
             _menuPool.Add(_mainMenu);
             _menuPool.Add(_serverBrowserMenu);
@@ -719,6 +728,7 @@ namespace GTACoOp
 
             _debug = new DebugWindow();
             _logger = new Logger();
+            Hud.Enabled = PlayerSettings.ShowHud;
 
             DebugLogger = new Debug();
             DebugLogger.Enabled = PlayerSettings.ShowNetGraph;
@@ -2551,6 +2561,7 @@ namespace GTACoOp
                 _menuPool.Process();
                 _chat.Tick();
                 _playerList.Tick(!_menuPool.AreAnyVisible);
+                Hud.Draw();
 
                 if (_storyMissions != null)
                 {

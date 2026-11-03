@@ -192,6 +192,8 @@ public sealed class MyServerTab : UserControl
         controlButtons.Controls.Add(Ui.Btn(T("Durumu Yenile"), (_, _) => RefreshStatus()));
         controlButtons.Controls.Add(Ui.Btn(T("Katılım Kodu Oluştur..."), (_, _) => ShowJoinCode()));
         controlButtons.Controls.Add(Ui.Btn(T("Sunucu Klasörlerini Aç"), (_, _) => OpenFolder(AppEnv.ServersFolder)));
+        controlButtons.Controls.Add(Ui.Btn(T("Sunucu Yedeği Al..."), (_, _) => ExportServerBackup()));
+        controlButtons.Controls.Add(Ui.Btn(T("Yedeği Geri Yükle..."), (_, _) => ImportServerBackup()));
 
         _gameServerStatus.Text = T("Oyun sunucusu: kapalı");
         _gameServerStatus.AutoSize = true;
@@ -1497,6 +1499,82 @@ public sealed class MyServerTab : UserControl
         {
             AppEnv.LogError(ex.Message);
             Ui.Error(FindForm()!, T("Eklenti eklenemedi:\r\n") + ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// Sunucu ayarlarını, Addons klasörünü ve sunucuya özel mod klasörlerini tek
+    /// bir .zip olarak kaydeder; başka bir bilgisayarda geri yüklenebilir.
+    /// </summary>
+    private void ExportServerBackup()
+    {
+        try
+        {
+            var suggested = ServerBackup.DefaultExportPath();
+            using var dlg = new SaveFileDialog
+            {
+                Title = T("Sunucu yedeğini kaydet"),
+                Filter = "ZIP (*.zip)|*.zip",
+                FileName = Path.GetFileName(suggested),
+                InitialDirectory = Path.GetDirectoryName(suggested) ?? AppEnv.DataFolder,
+                OverwritePrompt = true
+            };
+            if (dlg.ShowDialog(FindForm()) != DialogResult.OK) return;
+
+            UseWaitCursor = true;
+            var path = ServerBackup.Export(dlg.FileName);
+            Ui.Info(FindForm()!, T("Sunucu yedeği kaydedildi:\r\n{0}\r\n\r\nŞifre ve sync token yedeğe yazılmaz; geri yükledikten sonra yeniden girin.", path));
+        }
+        catch (Exception ex)
+        {
+            AppEnv.LogError("Sunucu yedeği alınamadı: " + ex.Message);
+            Ui.Error(FindForm()!, T("Sunucu yedeği alınamadı:\r\n") + ex.Message);
+        }
+        finally
+        {
+            UseWaitCursor = false;
+        }
+    }
+
+    /// <summary>Yedekteki ayarları ve mod dosyalarını geri yükler (önce güvenlik yedeği alınır).</summary>
+    private void ImportServerBackup()
+    {
+        var path = "";
+        using (var dlg = new OpenFileDialog
+        {
+            Title = T("Sunucu yedeğini seç"),
+            Filter = "ZIP (*.zip)|*.zip",
+            CheckFileExists = true
+        })
+        {
+            if (dlg.ShowDialog(FindForm()) != DialogResult.OK) return;
+            path = dlg.FileName;
+        }
+
+        if (!Ui.Confirm(FindForm()!,
+            T("Yedekteki sunucu ayarları ve mod dosyaları mevcut sunucunun üzerine yazılacak.\r\nÖnce mevcut durumun güvenlik yedeği alınır. Devam edilsin mi?")))
+            return;
+
+        try
+        {
+            UseWaitCursor = true;
+            var result = ServerBackup.Import(path);
+            RefreshModsList();
+            Ui.Info(FindForm()!,
+                T("Sunucu yedeği geri yüklendi ({0} dosya).\r\n{1}\r\n\r\nAyarların etkin olması için launcher'ı yeniden başlatın.",
+                    result.Files,
+                    string.IsNullOrEmpty(result.SafetyPath)
+                        ? T("Güvenlik yedeği alınamadı.")
+                        : T("Güvenlik yedeği: {0}", result.SafetyPath)));
+        }
+        catch (Exception ex)
+        {
+            AppEnv.LogError("Sunucu yedeği geri yüklenemedi: " + ex.Message);
+            Ui.Error(FindForm()!, T("Yedek geri yüklenemedi:\r\n") + ex.Message);
+        }
+        finally
+        {
+            UseWaitCursor = false;
         }
     }
 

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2015/06/nuspec.xsd">
+  <metadata>
+    <id>gtacoop-remake</id>
+    <version>2.7.4</version>
+    <title>GTACoop Remake</title>
+    <authors>Baloraa</authors>
+    <projectUrl>https://github.com/Baloraa/Gta-Coop-Remake-Gta-5-</projectUrl>
+    <licenseUrl>https://github.com/Baloraa/Gta-Coop-Remake-Gta-5-/blob/main/LICENSE.md</licenseUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <summary>Launcher and server manager for GTA V story-mode co-op (GTACoOp based).</summary>
+    <description>Starts a co-op session between friends in GTA V story mode, installs the server's mods only while you play and removes them on exit. Requires the original GTA V.</description>
+    <tags>gta5 coop multiplayer launcher</tags>
+  </metadata>
+  <files>
+    <file src="tools\**" target="tools" />
+  </files>
+</package>
