@@ -8,7 +8,7 @@ GTACoop Remake is not a new multiplayer engine. It is the desktop layer around G
 
 GTACoop Remake is for private Story Mode co-op. It does not touch GTA Online, does not bypass anti-cheat, and does not inject into online sessions.
 
-**Current release:** 2.8.2  
+**Current release:** 2.8.3  
 **Platform:** Windows 10/11, x64  
 **UI:** Turkish, English, and Russian  
 **License:** GNU GPL v3
@@ -289,6 +289,13 @@ This is a tool for playing with friends, not a hardened anti-cheat or privacy sy
 - Server owners are responsible for the mods they distribute. The launcher automates delivery; it does not grant permission to redistribute someone else's work.
 
 ---
+
+### 2.8.3 — Vertical sidebar and working navigation
+
+- The menu moved to a vertical sidebar on the left with a green active marker and a hover
+  state; the content area is now wider.
+- Page switching no longer depends on the hidden TabControl, so every menu item responds
+  reliably (the click handling was the bug behind unresponsive buttons).
 
 ### 2.8.2 — Navigation bar and no white areas
 

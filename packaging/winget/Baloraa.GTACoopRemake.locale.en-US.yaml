@@ -1,6 +1,6 @@
 # yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.6.0.schema.json
 PackageIdentifier: Baloraa.GTACoopRemake
-PackageVersion: 2.8.2
+PackageVersion: 2.8.3
 PackageLocale: en-US
 Publisher: Baloraa
 PublisherUrl: https://github.com/Baloraa
