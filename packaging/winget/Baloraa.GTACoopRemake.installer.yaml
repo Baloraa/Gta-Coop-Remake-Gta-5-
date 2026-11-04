@@ -1,14 +1,14 @@
 # yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.6.0.schema.json
 PackageIdentifier: Baloraa.GTACoopRemake
-PackageVersion: 2.8.0
+PackageVersion: 2.8.1
 InstallerLocale: en-US
 InstallerType: portable
 Commands:
   - GTACoop.Launcher
 Installers:
   - Architecture: x64
-    InstallerUrl: https://github.com/Baloraa/Gta-Coop-Remake-Gta-5-/releases/download/2.8.0/GTACoop.Launcher.exe
-    InstallerSha256: AA9852574B06184E71571320DC25BE407E17C5C3B9489BF409427DC454674E81
+    InstallerUrl: https://github.com/Baloraa/Gta-Coop-Remake-Gta-5-/releases/download/2.8.1/GTACoop.Launcher.exe
+    InstallerSha256: A4BAA4D20928ABA36DBC2F4FBE8C06E7921FA5AAD3FDCB1EDFFCB828BE2A568F
     InstallerSwitches:
       Silent: ""
       SilentWithProgress: ""

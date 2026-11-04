@@ -1,25 +1,31 @@
 using System.Drawing;
+using System.Runtime.InteropServices;
 using System.Windows.Forms;
 
 namespace GTACoop.Remake;
 
 /// <summary>
-/// Karanlık arayüz teması. Yerleşimi ve davranışı değiştirmez; yalnızca
-/// renkleri ve kenarlıkları uygular. Anlam taşıyan renkler (yeşil/kırmızı
-/// durum yazıları) korunur.
+/// Tam siyah, düz arayüz teması. Yerleşimi ve davranışı değiştirmez; yalnızca
+/// renkleri uygular. Liste başlıkları/satırları ve pencere başlık çubuğu da
+/// koyu çizilir, böylece beyaz alan kalmaz. Anlam taşıyan durum renkleri
+/// (yeşil/kırmızı) korunur.
 /// </summary>
 internal static class Theme
 {
-    public static readonly Color Background = Color.FromArgb(23, 26, 30);
-    public static readonly Color Surface = Color.FromArgb(31, 35, 40);
-    public static readonly Color SurfaceAlt = Color.FromArgb(41, 46, 53);
-    public static readonly Color Border = Color.FromArgb(60, 67, 76);
-    public static readonly Color Text = Color.FromArgb(229, 233, 238);
-    public static readonly Color Muted = Color.FromArgb(150, 158, 167);
-    public static readonly Color Accent = Color.FromArgb(224, 164, 69);
-    public static readonly Color AccentAlt = Color.FromArgb(74, 168, 156);
+    public static readonly Color Background = Color.Black;
+    public static readonly Color Surface = Color.FromArgb(8, 8, 8);
+    public static readonly Color SurfaceAlt = Color.FromArgb(18, 18, 18);
+    public static readonly Color Selection = Color.FromArgb(14, 52, 30);
+    public static readonly Color Border = Color.FromArgb(38, 38, 38);
+    public static readonly Color Text = Color.FromArgb(237, 237, 237);
+    public static readonly Color Muted = Color.FromArgb(154, 160, 166);
+    public static readonly Color Accent = Color.FromArgb(53, 199, 89);
+    public static readonly Color AccentAlt = Color.FromArgb(47, 163, 107);
 
     public static bool Enabled { get; private set; }
+
+    [DllImport("dwmapi.dll")]
+    private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int value, int size);
 
     /// <summary>Formu ve içindeki tüm denetimleri temaya uyarlar.</summary>
     public static void Apply(Form form)
@@ -31,6 +37,8 @@ internal static class Theme
 
         if (form is MainForm main)
             main.ApplyTabStyle();
+
+        ApplyDarkTitleBar(form);
     }
 
     /// <summary>Sonradan oluşturulan sekmeler için.</summary>
@@ -40,6 +48,22 @@ internal static class Theme
         control.BackColor = Background;
         control.ForeColor = Text;
         ApplyToChildren(control);
+    }
+
+    private static void ApplyDarkTitleBar(Form form)
+    {
+        try
+        {
+            var handle = form.Handle;
+            int on = 1;
+            // 20 = DWMWA_USE_IMMERSIVE_DARK_MODE (Win10 2004+), 19 = eski yapı.
+            if (DwmSetWindowAttribute(handle, 20, ref on, sizeof(int)) != 0)
+                DwmSetWindowAttribute(handle, 19, ref on, sizeof(int));
+        }
+        catch
+        {
+            // Eski Windows sürümlerinde başlık çubuğu sistem renginde kalır.
+        }
     }
 
     private static void ApplyToChildren(Control parent)
@@ -75,9 +99,7 @@ internal static class Theme
                 break;
 
             case ListView list:
-                list.BackColor = Surface;
-                list.ForeColor = Text;
-                list.BorderStyle = BorderStyle.FixedSingle;
+                StyleList(list);
                 break;
 
             case TextBoxBase text:
@@ -114,8 +136,8 @@ internal static class Theme
                 button.ForeColor = Text;
                 button.FlatAppearance.BorderColor = Border;
                 button.FlatAppearance.BorderSize = 1;
-                button.FlatAppearance.MouseOverBackColor = Color.FromArgb(52, 58, 66);
-                button.FlatAppearance.MouseDownBackColor = Color.FromArgb(64, 71, 80);
+                button.FlatAppearance.MouseOverBackColor = Color.FromArgb(28, 28, 28);
+                button.FlatAppearance.MouseDownBackColor = Color.FromArgb(15, 44, 26);
                 break;
 
             case Label label:
@@ -156,6 +178,90 @@ internal static class Theme
                 split.BackColor = Border;
                 break;
         }
+    }
+
+    /// <summary>Listeyi koyu çizer: başlık, satırlar ve varsa onay kutuları.</summary>
+    private static void StyleList(ListView list)
+    {
+        list.BackColor = Surface;
+        list.ForeColor = Text;
+        list.BorderStyle = BorderStyle.FixedSingle;
+
+        if (list.OwnerDraw) return;
+
+        list.OwnerDraw = true;
+        list.DrawColumnHeader += DrawHeader;
+        list.DrawItem += DrawItem;
+        list.DrawSubItem += DrawSubItem;
+    }
+
+    private static void DrawHeader(object? sender, DrawListViewColumnHeaderEventArgs e)
+    {
+        using (var back = new SolidBrush(SurfaceAlt))
+            e.Graphics.FillRectangle(back, e.Bounds);
+
+        using (var pen = new Pen(Border))
+        {
+            e.Graphics.DrawLine(pen, e.Bounds.Left, e.Bounds.Bottom - 1,
+                e.Bounds.Right, e.Bounds.Bottom - 1);
+            e.Graphics.DrawLine(pen, e.Bounds.Right - 1, e.Bounds.Top + 3,
+                e.Bounds.Right - 1, e.Bounds.Bottom - 3);
+        }
+
+        var text = e.Header?.Text ?? "";
+        TextRenderer.DrawText(e.Graphics, text, e.Font ?? Control.DefaultFont,
+            new Rectangle(e.Bounds.X + 6, e.Bounds.Y, e.Bounds.Width - 10, e.Bounds.Height),
+            Muted, TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis |
+                    TextFormatFlags.NoPrefix);
+    }
+
+    private static void DrawItem(object? sender, DrawListViewItemEventArgs e)
+    {
+        var list = (ListView)sender!;
+        using var back = new SolidBrush(e.Item.Selected ? Selection : Surface);
+        e.Graphics.FillRectangle(back, e.Bounds);
+
+        // Onay kutusu (yalnızca CheckBoxes açıksa) elle çizilir.
+        if (!list.CheckBoxes) return;
+
+        var box = new Rectangle(e.Bounds.Left + 3, e.Bounds.Top + (e.Bounds.Height - 13) / 2, 13, 13);
+        using (var fill = new SolidBrush(SurfaceAlt))
+            e.Graphics.FillRectangle(fill, box);
+        using (var pen = new Pen(e.Item.Checked ? Accent : Border))
+            e.Graphics.DrawRectangle(pen, box);
+
+        if (!e.Item.Checked) return;
+
+        using var tick = new Pen(Accent, 2f);
+        e.Graphics.DrawLines(tick, new[]
+        {
+            new Point(box.Left + 3, box.Top + 6),
+            new Point(box.Left + 6, box.Top + 9),
+            new Point(box.Left + 10, box.Top + 3)
+        });
+    }
+
+    private static void DrawSubItem(object? sender, DrawListViewSubItemEventArgs e)
+    {
+        var list = (ListView)sender!;
+        var bump = list.CheckBoxes && e.ColumnIndex == 0 ? 18 : 0;
+
+        var background = e.Item.Selected
+            ? Selection
+            : e.ItemIndex % 2 == 0 ? Surface : Background;
+
+        using (var back = new SolidBrush(background))
+            e.Graphics.FillRectangle(back, e.Bounds);
+
+        var fore = e.Item.ForeColor == Color.Empty || IsDefaultFore(e.Item.ForeColor)
+            ? Text
+            : e.Item.ForeColor;
+
+        TextRenderer.DrawText(e.Graphics, e.SubItem?.Text ?? "", e.Item.Font ?? list.Font,
+            new Rectangle(e.Bounds.X + 4 + bump, e.Bounds.Y, e.Bounds.Width - 8 - bump, e.Bounds.Height),
+            e.Item.Selected ? Color.White : fore,
+            TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis |
+            TextFormatFlags.NoPrefix);
     }
 
     /// <summary>Sekme şeridini koyu, düz bir görünüme çevirir.</summary>

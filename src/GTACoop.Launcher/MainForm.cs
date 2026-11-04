@@ -206,6 +206,7 @@ public sealed class MainForm : Form
         {
             page.BackColor = Theme.Background;
             page.ForeColor = Theme.Text;
+            Theme.Apply(control);
         }
         page.Controls.Add(control);
         if (index >= 0 && index <= _tabs.TabPages.Count)
