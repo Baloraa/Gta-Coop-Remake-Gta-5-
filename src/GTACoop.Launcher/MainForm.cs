@@ -9,6 +9,10 @@ public sealed class MainForm : Form
     private readonly ToolStripStatusLabel _status = new();
     private readonly ComboBox _langCombo = new();
     private readonly TabControl _tabs = new();
+    private readonly FlowLayoutPanel _navBar = new();
+    private readonly Panel _content = new();
+    private readonly Dictionary<TabPage, Button> _navButtons = new();
+    private readonly Dictionary<TabPage, Control> _pageContent = new();
 
     private readonly GameTab _gameTab = new();
     private readonly ComponentsTab _componentsTab = new();
@@ -60,13 +64,14 @@ public sealed class MainForm : Form
         _componentsTab.ComponentsChanged += _gameTab.RefreshStatus;
         _tabs.SelectedIndexChanged += (_, _) =>
         {
+            ShowSelectedTab();
+            UpdateNav();
             _serverTab.RefreshStatus();
-            if (_tabs.SelectedTab?.Controls.Contains(_componentsTab) == true)
+            if (_content.Controls.Contains(_componentsTab))
                 _componentsTab.OnShown();
-            if (_tabs.SelectedTab?.Controls.Contains(_serverBrowserTab) == true)
+            if (_content.Controls.Contains(_serverBrowserTab))
                 _serverBrowserTab.OnShown();
-            if (_addonPedsTab != null &&
-                _tabs.SelectedTab?.Controls.Contains(_addonPedsTab) == true)
+            if (_addonPedsTab != null && _content.Controls.Contains(_addonPedsTab))
                 _addonPedsTab.RefreshList();
         };
     }
@@ -170,8 +175,6 @@ public sealed class MainForm : Form
 
     private void BuildTabs()
     {
-        _tabs.Dock = DockStyle.Fill;
-
         AddTab(T("Oyun"), _gameTab);
         AddTab(T("Bileşenler"), _componentsTab);
         AddTab(T("Sunucular"), _serversTab);
@@ -181,38 +184,117 @@ public sealed class MainForm : Form
         AddTab(T("Günlük / Araçlar"), _logTab);
         AddTab(T("Hakkında"), _aboutTab);
 
-        Controls.Add(_tabs);
-        _tabs.BringToFront();
+        // Gerçek TabControl hiç gösterilmez: yalnızca sekme listesini tutar.
+        // Böylece hiçbir yerde sistemin beyaz şeridi kalmaz; üstte düğmeli
+        // bir gezinme çubuğu ve altında tek bir içerik paneli kullanılır.
+        _tabs.Visible = false;
+
+        _navBar.Dock = DockStyle.Top;
+        _navBar.Height = 42;
+        _navBar.FlowDirection = FlowDirection.LeftToRight;
+        _navBar.WrapContents = false;
+        _navBar.BackColor = Theme.Background;
+        _navBar.Padding = new Padding(8, 6, 8, 4);
+
+        _content.Dock = DockStyle.Fill;
+        _content.BackColor = Theme.Background;
+
+        Controls.Add(_content);
+        Controls.Add(_navBar);
+
+        if (_tabs.TabPages.Count > 0) _tabs.SelectedIndex = 0;
+        ShowSelectedTab();
+        RebuildNav();
     }
 
-    /// <summary>Sekme şeridini koyu temaya geçirir (içerik yerleşimi değişmez).</summary>
+    /// <summary>Seçili sekmenin içeriğini tek içerik panelinde gösterir.</summary>
+    private void ShowSelectedTab()
+    {
+        var page = _tabs.SelectedTab;
+        if (page == null || !_pageContent.TryGetValue(page, out var control)) return;
+
+        _content.SuspendLayout();
+        _content.Controls.Clear();
+        control.Dock = DockStyle.Fill;
+        _content.Controls.Add(control);
+        _content.ResumeLayout();
+    }
+
+    /// <summary>Üstteki gezinme düğmelerini sekme listesine göre yeniden kurar.</summary>
+    private void RebuildNav()
+    {
+        _navBar.SuspendLayout();
+        foreach (Control old in _navBar.Controls.Cast<Control>().ToList()) old.Dispose();
+        _navBar.Controls.Clear();
+        _navButtons.Clear();
+
+        foreach (TabPage page in _tabs.TabPages)
+        {
+            var button = new Button
+            {
+                Text = page.Text,
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                FlatStyle = FlatStyle.Flat,
+                UseVisualStyleBackColor = false,
+                Padding = new Padding(14, 4, 14, 4),
+                Margin = new Padding(2, 0, 4, 0),
+                Font = new Font(Font.FontFamily, 9.5f)
+            };
+            button.FlatAppearance.BorderSize = 1;
+            var target = page;
+            button.Click += (_, _) => _tabs.SelectedTab = target;
+
+            _navBar.Controls.Add(button);
+            _navButtons[page] = button;
+        }
+
+        _navBar.ResumeLayout();
+        UpdateNav();
+    }
+
+    /// <summary>Etkin sekmeyi yeşil vurgular.</summary>
+    private void UpdateNav()
+    {
+        foreach (var pair in _navButtons)
+        {
+            var active = ReferenceEquals(_tabs.SelectedTab, pair.Key);
+            pair.Value.BackColor = active ? Theme.SurfaceAlt : Theme.Background;
+            pair.Value.ForeColor = active ? Theme.Accent : Theme.Muted;
+            pair.Value.FlatAppearance.BorderColor = active ? Theme.Accent : Theme.Border;
+        }
+    }
+
+    /// <summary>Gezinme çubuğunu koyu temaya geçirir (içerik yerleşimi değişmez).</summary>
     public void ApplyTabStyle()
     {
-        _tabs.Appearance = TabAppearance.FlatButtons;
-        _tabs.DrawMode = TabDrawMode.OwnerDrawFixed;
-        _tabs.ItemSize = new Size(150, 32);
-        _tabs.SizeMode = TabSizeMode.Fixed;
-        _tabs.Padding = new Point(12, 6);
-        _tabs.DrawItem -= Theme.DrawTab;
-        _tabs.DrawItem += Theme.DrawTab;
-        _tabs.Invalidate();
+        _navBar.BackColor = Theme.Background;
+        _content.BackColor = Theme.Background;
+        RebuildNav();
     }
 
     private TabPage AddTab(string title, UserControl control, int index = -1)
     {
         control.Dock = DockStyle.Fill;
-        var page = new TabPage(title) { Padding = new Padding(8) };
+        var page = new TabPage(title) { Padding = new Padding(8), UseVisualStyleBackColor = false };
         if (Theme.Enabled)
         {
             page.BackColor = Theme.Background;
             page.ForeColor = Theme.Text;
             Theme.Apply(control);
         }
-        page.Controls.Add(control);
+
+        // İçerik doğrudan sayfaya değil, seçimde gösterilecek panele eklenir.
+        _pageContent[page] = control;
+
         if (index >= 0 && index <= _tabs.TabPages.Count)
             _tabs.TabPages.Insert(index, page);
         else
             _tabs.TabPages.Add(page);
+
+        if (_navBar.IsHandleCreated || _navButtons.Count > 0)
+            RebuildNav();
+
         return page;
     }
 

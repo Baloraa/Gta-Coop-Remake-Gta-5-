@@ -12,11 +12,12 @@ namespace GTACoop.Remake;
 /// </summary>
 internal static class Theme
 {
-    public static readonly Color Background = Color.Black;
-    public static readonly Color Surface = Color.FromArgb(8, 8, 8);
-    public static readonly Color SurfaceAlt = Color.FromArgb(18, 18, 18);
-    public static readonly Color Selection = Color.FromArgb(14, 52, 30);
-    public static readonly Color Border = Color.FromArgb(38, 38, 38);
+    // Saf siyah değil: göz yormayan çok koyu gri tonları.
+    public static readonly Color Background = Color.FromArgb(13, 13, 15);
+    public static readonly Color Surface = Color.FromArgb(18, 18, 21);
+    public static readonly Color SurfaceAlt = Color.FromArgb(26, 26, 31);
+    public static readonly Color Selection = Color.FromArgb(19, 60, 34);
+    public static readonly Color Border = Color.FromArgb(42, 42, 49);
     public static readonly Color Text = Color.FromArgb(237, 237, 237);
     public static readonly Color Muted = Color.FromArgb(154, 160, 166);
     public static readonly Color Accent = Color.FromArgb(53, 199, 89);
@@ -89,6 +90,9 @@ internal static class Theme
                 break;
 
             case TabPage page:
+                // UseVisualStyleBackColor açıkken TabPage kendi rengini yok sayar
+                // ve beyaz kalır; bu yüzden kapatılır.
+                page.UseVisualStyleBackColor = false;
                 page.BackColor = Background;
                 page.ForeColor = Text;
                 break;

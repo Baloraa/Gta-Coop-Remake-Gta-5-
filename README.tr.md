@@ -2,7 +2,7 @@
 
 **Türkçe** | [English](README.md)
 
-2.8.1 sürümü - kendi sunucu yönetimi, otomatik mod indirme, **oturum modu**,
+2.8.2 sürümü - kendi sunucu yönetimi, otomatik mod indirme, **oturum modu**,
 **kısa kod** (ör. `Gel.com`) ile internetten sunucu bulma, **otomatik relay**,
 **UPnP doğrudan bağlantı**, **özel relay sunucusu**, **tanılama kopyalama**,
 **canlı sunucu durumu**, **Sunucu Tarayıcı** sekmesi, **OpenIV (.oiv) paket desteği**,
