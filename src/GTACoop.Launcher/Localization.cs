@@ -49,12 +49,14 @@ public static partial class Loc
         if (En.TryGetValue(tr, out var en)) source = en;
         else if (OivEn.TryGetValue(tr, out en)) source = en;
         else if (RelayEn.TryGetValue(tr, out en)) source = en;
+        else if (ExtraEn.TryGetValue(tr, out en)) source = en;
 
         if (Language == "ru")
         {
             var key = source ?? tr;
             if (Ru.TryGetValue(key, out var ru)) return ru;
             if (OivRu.TryGetValue(key, out ru)) return ru;
+            if (OivEn.TryGetValue(tr, out var fallback)) return fallback;
         }
 
         return source ?? tr;

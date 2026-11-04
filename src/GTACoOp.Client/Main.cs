@@ -991,7 +991,7 @@ namespace GTACoOp
                     BaseModel = ped.BaseModel ?? "",
                     IsReset = false,
                     ReadyAt = now + 120,
-                    Deadline = now + 6000
+                    Deadline = now + 20000
                 };
 
                 Notification.Show("~o~Ped hazırlanıyor: ~w~" + _pendingSwap.Name);
@@ -1027,6 +1027,9 @@ namespace GTACoOp
             {
                 _pendingSwap = null;
 
+                // Model artık kullanılmıyor; streaming referansını bırak.
+                try { Function.Call(Hash.SET_MODEL_AS_NO_LONGER_NEEDED, swap.ModelHash); } catch { }
+
                 if (swap.IsReset)
                 {
                     Notification.Show("~g~Player model reset.");
@@ -1040,7 +1043,7 @@ namespace GTACoOp
                     Name = swap.Name,
                     Health = swap.Health,
                     ApplyAt = Game.GameTime + 250,
-                    Deadline = Game.GameTime + 6000,
+                    Deadline = Game.GameTime + 10000,
                     Ragdoll = swap.Ragdoll,
                     MetaVerified = swap.MetaVerified,
                     BaseModel = swap.BaseModel
@@ -1051,25 +1054,70 @@ namespace GTACoOp
             if (Game.GameTime > swap.Deadline)
             {
                 _pendingSwap = null;
-                Notification.Show("~r~Ped model could not be applied.");
+                Main.Logger.Write("Ped değişimi zaman aşımı: " + swap.Name +
+                    " (araç/ragdoll/hava nedeniyle ertelendi)");
+                Notification.Show("~r~Ped değişimi uygulanamadı: ~w~" + swap.Name +
+                    " (araçtan inin veya düşmeyi bekleyin)");
                 return;
             }
 
             // Yürüme/animasyon görevini bırak ki oyun yeni pedi temiz bir
-            // durumda oluştursun. Bir kare sonra tekrar denenir.
-            if (!CanSwapModel(player) || Game.GameTime < swap.ReadyAt)
+            // durumda oluştursun. ReadyAt YALNIZCA gerçekten hazırlık
+            // yapıldığında ileri alınır: her karede ileri alınırsa süre hiç
+            // dolmaz ve değişim "uygulanamadı" ile düşer.
+            if (!CanSwapModel(player))
             {
-                PreparePedForSwap(player);
-                swap.ReadyAt = Game.GameTime + 120;
+                if (Game.GameTime >= swap.ReadyAt)
+                {
+                    PreparePedForSwap(player);
+                    swap.ReadyAt = Game.GameTime + 150;
+                }
                 return;
             }
 
+            if (Game.GameTime < swap.ReadyAt) return;
+
             var model = new Model(swap.ModelHash);
-            if (!model.IsLoaded && !model.Request(500))
+            if (!model.IsLoaded)
             {
-                swap.ReadyAt = Game.GameTime + 200;
-                return;
+                // Model oyunda yoksa SET_PLAYER_MODEL çağrılmaz: geçersiz
+                // model handle'ı oyunu çökertiyor.
+                try
+                {
+                    var inCdImage = Function.Call<bool>(Hash.IS_MODEL_IN_CDIMAGE, swap.ModelHash);
+                    var valid = Function.Call<bool>(Hash.IS_MODEL_VALID, swap.ModelHash);
+                    if (!inCdImage || !valid)
+                    {
+                        _pendingSwap = null;
+                        Main.Logger.Write("Addon ped modeli oyunda bulunamadı: " + swap.Name);
+                        Notification.Show("~r~Addon ped modeli yüklenemedi: ~w~" + swap.Name +
+                            " (sunucudaki paket eksik olabilir)");
+                        return;
+                    }
+                }
+                catch { }
+
+                try { Function.Call(Hash.REQUEST_MODEL, swap.ModelHash); } catch { }
+
+                if (!model.IsLoaded)
+                {
+                    swap.ReadyAt = Game.GameTime + 150;
+                    return;
+                }
             }
+
+            // Son kontrol: model gerçekten bir ped mi?
+            try
+            {
+                if (!Function.Call<bool>(Hash.IS_MODEL_A_PED, swap.ModelHash))
+                {
+                    _pendingSwap = null;
+                    Main.Logger.Write("Model bir ped değil: " + swap.Name);
+                    Notification.Show("~r~Seçilen model bir ped değil: ~w~" + swap.Name);
+                    return;
+                }
+            }
+            catch { }
 
             PreparePedForSwap(player);
             _lastModelChangeAt = Game.GameTime;
@@ -1655,7 +1703,7 @@ namespace GTACoOp
                     Name = "Reset",
                     IsReset = true,
                     ReadyAt = now + 120,
-                    Deadline = now + 6000
+                    Deadline = now + 20000
                 };
                 Notification.Show("~o~Player model reset is being applied...");
             }
@@ -2701,6 +2749,9 @@ namespace GTACoOp
             try
             {
                 Ped player = Game.Player.Character;
+
+                // Sunucunun saat ayarı (kapalıysa hiçbir şey yapmaz).
+                WorldTime.Process();
 
                 // Değişim sürerken animasyon/clipset uygulanmaz: yarım kalmış
                 // model değişiminin üstüne clipset yazmak çökmenin kaynağıydı.

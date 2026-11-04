@@ -18,6 +18,8 @@ public sealed class MyServerTab : UserControl
     private readonly TextBox _token = new();
     private readonly TextBox _relayServer = new();
     private readonly TextBox _shortCode = new();
+    private readonly ComboBox _timeMode = new();
+    private readonly NumericUpDown _timeHour = new();
     private readonly ListView _modsList = new();
     private readonly Label _modsStatus = new();
     private readonly Label _gameServerStatus = new();
@@ -63,7 +65,7 @@ public sealed class MyServerTab : UserControl
         {
             Dock = DockStyle.Fill,
             ColumnCount = 2,
-            RowCount = 9,
+            RowCount = 10,
             Padding = new Padding(8, 4, 8, 4)
         };
         settingsTable.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 200));
@@ -85,6 +87,54 @@ public sealed class MyServerTab : UserControl
         _shortCode.AccessibleName = T("Kısa kod (boş = kapalı):");
         _shortCode.PlaceholderText = "Gel.com";
         _shortCode.TextChanged += (_, _) => RefreshShortCodeStatus();
+
+        // --- saat ayarı: sunucunun varsayılan saati ve gerçek zamanlı seçeneği
+        settingsTable.Controls.Add(new Label
+        {
+            Text = T("Saat:"),
+            AutoSize = true,
+            Padding = new Padding(0, 4, 0, 0)
+        });
+
+        _timeMode.DropDownStyle = ComboBoxStyle.DropDownList;
+        _timeMode.Width = 180;
+        _timeMode.Margin = new Padding(0, 4, 6, 4);
+        _timeMode.Items.Add(T("Kapalı (oyun saati)"));
+        _timeMode.Items.Add(T("Gerçek zamanlı"));
+        _timeMode.Items.Add(T("Sabit saat"));
+        _timeMode.SelectedIndex = s.TimeMode switch
+        {
+            "realtime" => 1,
+            "fixed" => 2,
+            _ => 0
+        };
+
+        _timeHour.Minimum = 0;
+        _timeHour.Maximum = 23;
+        _timeHour.Width = 60;
+        _timeHour.Margin = new Padding(0, 4, 4, 4);
+        _timeHour.Value = Math.Clamp(s.TimeHour, 0, 23);
+        _timeHour.Enabled = _timeMode.SelectedIndex == 2;
+        _timeMode.SelectedIndexChanged += (_, _) =>
+            _timeHour.Enabled = _timeMode.SelectedIndex == 2;
+
+        var timePanel = new FlowLayoutPanel
+        {
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            FlowDirection = FlowDirection.LeftToRight,
+            WrapContents = false,
+            Margin = new Padding(0)
+        };
+        timePanel.Controls.Add(_timeMode);
+        timePanel.Controls.Add(new Label
+        {
+            Text = T("saat"),
+            AutoSize = true,
+            Margin = new Padding(0, 8, 6, 0)
+        });
+        timePanel.Controls.Add(_timeHour);
+        settingsTable.Controls.Add(timePanel);
 
         var settingsGroup = new GroupBox
         {
@@ -310,11 +360,14 @@ public sealed class MyServerTab : UserControl
         _motd.Text,
         _token.Text.Trim(),
         string.IsNullOrWhiteSpace(_relayServer.Text) ? "bore.pub" : _relayServer.Text.Trim(),
-        _shortCode.Text.Trim());
+        _shortCode.Text.Trim(),
+        _timeMode.SelectedIndex == 1 ? "realtime" : _timeMode.SelectedIndex == 2 ? "fixed" : "off",
+        (int)_timeHour.Value);
 
     private readonly record struct MyServerServerInfo(
         string Name, int GamePort, int SyncPort, int MaxClients,
-        string Password, string Motd, string Token, string RelayServer, string ShortCode);
+        string Password, string Motd, string Token, string RelayServer, string ShortCode,
+        string TimeMode, int TimeHour);
 
     private MyServerSettings ToSettings(MyServerServerInfo i)
     {
@@ -330,6 +383,8 @@ public sealed class MyServerTab : UserControl
             SyncToken = i.Token,
             RelayServer = string.IsNullOrWhiteSpace(i.RelayServer) ? "bore.pub" : i.RelayServer,
             ShortCode = i.ShortCode,
+            TimeMode = i.TimeMode,
+            TimeHour = i.TimeHour,
             DisabledMods = existing.DisabledMods
         };
     }
@@ -690,7 +745,9 @@ public sealed class MyServerTab : UserControl
                 return false;
             }
 
-            ToSettings(info).Save(AppEnv.DataFolder);
+            var savedSettings = ToSettings(info);
+            savedSettings.Save(AppEnv.DataFolder);
+            Server.WriteWorldSettings(savedSettings);
             Server.EnsureLayout();
             AppEnv.Log($"Sunucu ayarları kaydedildi: {info.Name} (oyun: {info.GamePort}, sync: {info.SyncPort}, relay: {info.RelayServer})" +
                        (info.ShortCode.Length > 0 ? $", kısa kod: {info.ShortCode}" : ""));

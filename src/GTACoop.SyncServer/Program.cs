@@ -62,6 +62,24 @@ HashSet<string> DisabledMods()
     }
 }
 
+// Sunucunun saat ayarı (Configuration\gtacoop-world.json). Manifeste eklenir;
+// eski istemciler bu alanları yok sayar.
+WorldSettings? LoadWorld()
+{
+    try
+    {
+        var serverDir = Directory.GetParent(addonsDir)?.FullName ?? addonsDir;
+        var path = Path.Combine(serverDir, "Configuration", "gtacoop-world.json");
+        if (!File.Exists(path) && !string.IsNullOrWhiteSpace(settingsPath))
+            path = Path.Combine(Path.GetDirectoryName(settingsPath)!, "gtacoop-world.json");
+        return File.Exists(path) ? SyncJson.Load<WorldSettings>(path) : null;
+    }
+    catch
+    {
+        return null;
+    }
+}
+
 // Kalıcı sunucu kimliği
 var idPath = Path.Combine(addonsDir, ".gtacoop-server.json");
 var idDoc = SyncJson.Load<Dictionary<string, string>>(idPath) ?? new Dictionary<string, string>();
@@ -132,6 +150,13 @@ app.MapGet("/api/v1/manifest", (HttpContext ctx) =>
 
     var disabled = DisabledMods();
     var hidden = disabled.Count == 0 ? 0 : manifest.Addons.RemoveAll(a => disabled.Contains(a.Key));
+
+    var world = LoadWorld();
+    if (world != null)
+    {
+        manifest.TimeMode = string.IsNullOrWhiteSpace(world.TimeMode) ? "off" : world.TimeMode;
+        manifest.TimeHour = Math.Min(23, Math.Max(0, world.TimeHour));
+    }
 
     Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Manifest istendi: {manifest.Addons.Count} eklenti " +
                       $"({hidden} devre dışı, {scan.Warnings.Count} not) <- {ctx.Connection.RemoteIpAddress}");

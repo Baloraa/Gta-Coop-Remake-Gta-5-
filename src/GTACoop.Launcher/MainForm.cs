@@ -15,6 +15,7 @@ public sealed class MainForm : Form
     private readonly ServersTab _serversTab = new();
     private readonly ServerBrowserTab _serverBrowserTab;
     private readonly MyServerTab _serverTab = new();
+    private readonly SingleplayerTab _singleplayerTab = new();
     private readonly LogTab _logTab = new();
     private readonly AboutTab _aboutTab = new();
     private AddonPedsTab? _addonPedsTab;
@@ -75,7 +76,8 @@ public sealed class MainForm : Form
         if (_addonPedsPage == null)
         {
             _addonPedsTab = new AddonPedsTab();
-            _addonPedsPage = AddTab(T("Addon Peds"), _addonPedsTab, 5);
+            var tabIndex = Math.Max(0, _tabs.TabPages.Count - 2);
+            _addonPedsPage = AddTab(T("Addon Peds"), _addonPedsTab, tabIndex);
         }
 
         _addonPedsTab!.RefreshList();
@@ -174,6 +176,7 @@ public sealed class MainForm : Form
         AddTab(T("Sunucular"), _serversTab);
         AddTab(T("Sunucu Tarayıcı"), _serverBrowserTab);
         AddTab(T("Sunucum"), _serverTab);
+        AddTab(T("Tek Oyunculu"), _singleplayerTab);
         AddTab(T("Günlük / Araçlar"), _logTab);
         AddTab(T("Hakkında"), _aboutTab);
 

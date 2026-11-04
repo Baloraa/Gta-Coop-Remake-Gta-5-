@@ -8,7 +8,7 @@ GTACoop Remake is not a new multiplayer engine. It is the desktop layer around G
 
 GTACoop Remake is for private Story Mode co-op. It does not touch GTA Online, does not bypass anti-cheat, and does not inject into online sessions.
 
-**Current release:** 2.7.6  
+**Current release:** 2.7.7  
 **Platform:** Windows 10/11, x64  
 **UI:** Turkish, English, and Russian  
 **License:** GNU GPL v3
@@ -289,6 +289,21 @@ This is a tool for playing with friends, not a hardened anti-cheat or privacy sy
 - Server owners are responsible for the mods they distribute. The launcher automates delivery; it does not grant permission to redistribute someone else's work.
 
 ---
+
+### 2.7.7 — Ped change fix, server clock, and a single-player mod manager
+
+- **The "ped could not be applied" error is fixed.** The preparation step was rescheduled on every
+  frame, so the wait never completed. It now runs once, the model gets up to 20 seconds to stream,
+  the model is verified to actually exist in the game (`IS_MODEL_IN_CDIMAGE`, `IS_MODEL_VALID`,
+  `IS_MODEL_A_PED`), and only then is `SET_PLAYER_MODEL` called. Failure messages now say why.
+- **Server clock.** A new *Time* setting on the *My Server* tab: off (game clock), **real time** (follows
+  your computer clock) or **fixed time**. The setting is delivered through the manifest to everyone
+  who joins, so the network protocol is unchanged and older clients are unaffected. The override is
+  cleared when you leave the server.
+- **Single-Player tab.** A `Singleplayer\Mods` folder appears next to the launcher. Enabling a pack copies
+  it into the game folder; disabling removes only the files we added and restores anything overwritten from
+  backup. The game's .rpf archives and existing files are never modified; writes are limited to the
+  scripts, asi, mods, plugins and lua folders.
 
 ### 2.7.6 — Addon ped crash fix, port check, and server sorting
 

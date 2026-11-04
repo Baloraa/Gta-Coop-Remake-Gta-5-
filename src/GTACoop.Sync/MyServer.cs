@@ -17,6 +17,16 @@ public sealed class MyServerSettings
     public string SyncToken { get; set; } = "";
 
     /// <summary>
+    /// Sunucunun varsayılan saat ayarı: "off" (oyun saati), "realtime"
+    /// (bilgisayar saati) veya "fixed" (TimeHour). İstemcilere manifest
+    /// üzerinden iletilir.
+    /// </summary>
+    public string TimeMode { get; set; } = "off";
+
+    /// <summary>"fixed" modunda kullanılacak saat (0-23).</summary>
+    public int TimeHour { get; set; } = 12;
+
+    /// <summary>
     /// İsteğe bağlı kısa katılım kodu (ör. "Gel.com"). Boşsa kısa kod yayını kapalıdır.
     /// Uzun GTC1 kodu bu ayardan bağımsız olarak çalışır.
     /// </summary>
@@ -184,8 +194,33 @@ public sealed class MyServer : IDisposable
                 new XElement("ServerVariables")));
 
         doc.Save(ConfigPath);
+        WriteWorldSettings(s);
         _log($"Sunucu ayarları yazıldı: {ConfigPath}" +
              (pluginNames.Count > 0 ? $" ({pluginNames.Count} eklenti etkin)" : ""));
+    }
+
+    /// <summary>
+    /// Sunucunun saat ayarını Configuration\gtacoop-world.json dosyasına yazar.
+    /// SyncServer bu dosyayı manifeste ekler; istemci de manifestten alıp
+    /// oyun saatini ayarlar. Ağ protokolü değişmez.
+    /// </summary>
+    public void WriteWorldSettings(MyServerSettings s)
+    {
+        try
+        {
+            Directory.CreateDirectory(ConfigDir);
+            SyncJson.Save(Path.Combine(ConfigDir, "gtacoop-world.json"), new WorldSettings
+            {
+                ServerName = s.ServerName,
+                TimeMode = string.IsNullOrWhiteSpace(s.TimeMode) ? "off" : s.TimeMode,
+                TimeHour = Math.Min(23, Math.Max(0, s.TimeHour)),
+                GeneratedUtc = DateTime.UtcNow
+            });
+        }
+        catch (Exception ex)
+        {
+            _log("Dünya ayarı yazılamadı: " + ex.Message);
+        }
     }
 
     /// <summary>Oyun sunucusunu başlatır.</summary>

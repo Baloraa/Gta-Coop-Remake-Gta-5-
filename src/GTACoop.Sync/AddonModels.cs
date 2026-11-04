@@ -87,7 +87,30 @@ public sealed class Manifest
     public string ServerId { get; set; } = "";
     public DateTime GeneratedUtc { get; set; } = DateTime.UtcNow;
     public int SyncPort { get; set; } = 4599;
+
+    /// <summary>
+    /// Sunucunun saat ayarı: "off", "realtime" veya "fixed". Boş = kapalı.
+    /// Eski istemciler bu alanı yok sayar; protokol değişmez.
+    /// </summary>
+    public string TimeMode { get; set; } = "";
+
+    /// <summary>"fixed" modunda 0-23 arası saat.</summary>
+    public int TimeHour { get; set; } = 12;
+
     public List<AddonInfo> Addons { get; set; } = new();
+}
+
+/// <summary>
+/// Sunucunun dünya ayarları (Configuration\gtacoop-world.json). Saat ayarı
+/// manifest üzerinden istemcilere dağıtılır; böylece sunucu ile istemci
+/// arasında ek bir kanal gerekmez.
+/// </summary>
+public sealed class WorldSettings
+{
+    public string ServerName { get; set; } = "";
+    public string TimeMode { get; set; } = "off";
+    public int TimeHour { get; set; } = 12;
+    public DateTime GeneratedUtc { get; set; } = DateTime.UtcNow;
 }
 
 /// <summary>İstemcide kurulu tek eklentinin kaydı.</summary>

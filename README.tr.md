@@ -2,7 +2,7 @@
 
 **Türkçe** | [English](README.md)
 
-2.7.6 sürümü - kendi sunucu yönetimi, otomatik mod indirme, **oturum modu**,
+2.7.7 sürümü - kendi sunucu yönetimi, otomatik mod indirme, **oturum modu**,
 **kısa kod** (ör. `Gel.com`) ile internetten sunucu bulma, **otomatik relay**,
 **UPnP doğrudan bağlantı**, **özel relay sunucusu**, **tanılama kopyalama**,
 **canlı sunucu durumu**, **Sunucu Tarayıcı** sekmesi, **OpenIV (.oiv) paket desteği**,
@@ -14,6 +14,20 @@ yalnızca oyun açıkken kurulu kalır, oyundan çıkınca otomatik kaldırılı
 Oyun başlatma dosyası seçilebilir; varsayılan **PlayGTAV.exe**'dir (GTA5.exe de seçilebilir).
 **Sesli sohbet** (bas-konuş, `[MIC]` göstergesi) ve **host-led hikaye görevi koordinasyonu**
 bu sürümde eklendi; ayrıntılar aşağıda.
+
+### 2.7.7 — Ped değişimi, sunucu saati ve tek oyunculu mod yöneticisi
+
+- **"Ped uygulanamadı" hatası giderildi.** Değişim hazırlığı her karede yeniden zamanlanıyordu ve
+  süre hiç dolmuyordu. Artık hazırlık bir kez yapılır, model 20 saniyeye kadar beklenir, modelin
+  oyunda gerçekten bulunduğu doğrulanır (`IS_MODEL_IN_CDIMAGE`, `IS_MODEL_VALID`, `IS_MODEL_A_PED`)
+  ve ancak ondan sonra `SET_PLAYER_MODEL` çağrılır. Hata mesajı artık nedenini söyler.
+- **Sunucu saati.** *Sunucum* sekmesinde **Saat** ayarı: kapalı (oyun saati), **gerçek zamanlı**
+  (bilgisayar saatinizi izler) veya **sabit saat**. Ayar manifest üzerinden bağlanan herkese dağıtılır;
+  ağ protokolü değişmez ve eski istemciler etkilenmez. Sunucudan çıkınca saat zorlaması kalkar.
+- **Tek Oyunculu sekmesi.** Launcher'ın yanında `Singleplayer\Mods` klasörü oluşur. Paket ekleyip
+  etkinleştirdiğinizde dosyalar oyun klasörüne kopyalanır; devre dışı bıraktığınızda yalnızca eklenen
+  dosyalar silinir, üzerine yazılanlar yedekten geri gelir. Oyunun .rpf arşivleri ve mevcut dosyaları
+  değiştirilmez; yalnızca scripts, asi, mods, plugins ve lua klasörlerine yazılır.
 
 ### 2.7.6 — Addon ped çökmeleri, port kontrolü ve sıralama
 
