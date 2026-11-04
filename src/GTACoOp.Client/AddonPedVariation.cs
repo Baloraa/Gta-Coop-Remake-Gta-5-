@@ -10,15 +10,23 @@ namespace GTACoOp
     /// variation. Other clients then receive a model they cannot render.
     /// Applying the default variation and forcing the same component change
     /// used by working FiveM animal scripts makes the animal visible.
+    ///
+    /// Çökme koruması: hiçbir native çağrısı model değişimi sırasında veya
+    /// menü işleyicisinden yapılmaz. İstek kuyruğa alınır; Process() her karede
+    /// çalışır ve yalnızca ped yeni modeline geçtiğinde, yerde, araç dışında ve
+    /// ragdoll'da değilken uygular. Drawable/texture sayıları da çağrıdan önce
+    /// doğrulanır (0 drawable'a varyasyon uygulamak oyunu çökertiyordu).
     /// </summary>
     internal static class AddonPedVariation
     {
         private sealed class PendingFix
         {
             public Ped Ped;
+            public int Handle;
             public int ModelHash;
             public int Stage;
             public int DueAt;
+            public int ExpiresAt;
         }
 
         private static readonly List<PendingFix> Pending = new List<PendingFix>();
@@ -29,6 +37,12 @@ namespace GTACoOp
         // path. The model name/hash is the reliable signal.
         private static readonly HashSet<int> BaseAnimalHashes = BuildBaseAnimalHashes();
         private static readonly HashSet<int> AddonAnimalHashes = new HashSet<int>();
+
+        /// <summary>Bekleyen varyasyon düzeltmesi var mı?</summary>
+        public static bool HasPending
+        {
+            get { return Pending.Count > 0; }
+        }
 
         private static HashSet<int> BuildBaseAnimalHashes()
         {
@@ -68,29 +82,46 @@ namespace GTACoOp
         {
             for (var i = 0; i < Pending.Count; i++)
             {
-                var fix = Pending[i];
-                if (fix.Ped != null && fix.Ped.Exists() && fix.Ped.Handle == handle)
-                    return true;
+                if (Pending[i].Handle == handle) return true;
             }
             return false;
         }
 
+        /// <summary>
+        /// Varyasyon düzeltmesini kuyruğa alır. Bu metot hiçbir native çağırmaz;
+        /// böylece model değişiminin tam ortasında pede dokunulmaz.
+        /// </summary>
         public static void ScheduleAnimalFix(Ped ped)
         {
             if (ped == null || !ped.Exists()) return;
 
             var handle = ped.Handle;
-            Pending.RemoveAll(p => p.Ped == null || !p.Ped.Exists() || p.Ped.Handle == handle);
+            if (handle == 0) return;
 
-            ApplyDefault(ped);
+            Pending.RemoveAll(p => p.Ped == null || !p.Ped.Exists() || p.Handle == handle);
 
             Pending.Add(new PendingFix
             {
                 Ped = ped,
+                Handle = handle,
                 ModelHash = ped.Model.Hash,
                 Stage = 0,
-                DueAt = Game.GameTime + 50
+                DueAt = Game.GameTime + 120,
+                ExpiresAt = Game.GameTime + 8000
             });
+        }
+
+        /// <summary>Bir ped için bekleyen düzeltmeleri iptal eder (model değişimi öncesi).</summary>
+        public static void Cancel(int handle)
+        {
+            if (handle == 0) return;
+            Pending.RemoveAll(p => p.Handle == handle);
+        }
+
+        /// <summary>Tüm bekleyen düzeltmeleri iptal eder (model değişimi öncesi).</summary>
+        public static void CancelAll()
+        {
+            Pending.Clear();
         }
 
         public static void Process()
@@ -104,49 +135,79 @@ namespace GTACoOp
                 if (now < fix.DueAt) continue;
 
                 var ped = fix.Ped;
-                if (ped == null || !ped.Exists() || ped.Handle == 0 ||
-                    ped.Model.Hash != fix.ModelHash)
+                if (!IsReady(ped, fix))
                 {
-                    Pending.RemoveAt(i);
+                    // Ped henüz yeni modele geçmedi ya da havada/araçta/ragdoll'da:
+                    // kısa süre bekle, süre dolunca sessizce vazgeç.
+                    if (now > fix.ExpiresAt) Pending.RemoveAt(i);
+                    else fix.DueAt = now + 100;
                     continue;
                 }
 
                 if (fix.Stage == 0)
                 {
-                    // The known working sequence for animals is:
-                    // component 0 -> drawable 0, texture 0, then texture 1.
-                    Main.Logger.WriteLine("Addon variation stage 0: handle=" +
-                        ped.Handle + " model=0x" + ped.Model.Hash.ToString("X8") +
-                        " pedType=" + Function.Call<int>(Hash.GET_PED_TYPE, ped.Handle) +
-                        " drawables=" + Function.Call<int>(
-                            Hash.GET_NUMBER_OF_PED_DRAWABLE_VARIATIONS, ped.Handle, 0));
-                    Function.Call(Hash.SET_PED_COMPONENT_VARIATION, ped.Handle, 0, 0, 0, 0);
+                    try
+                    {
+                        Function.Call(Hash.SET_PED_DEFAULT_COMPONENT_VARIATION, ped.Handle);
+                        Function.Call(Hash.CLEAR_ALL_PED_PROPS, ped.Handle);
+                        Function.Call(Hash.CLEAR_PED_DECORATIONS, ped.Handle);
+                    }
+                    catch
+                    {
+                        // Ped bu karede silinmiş olabilir; düzeltme düşer.
+                    }
+
                     fix.Stage = 1;
                     fix.DueAt = now + 250;
                     continue;
                 }
 
-                var count = Function.Call<int>(
-                    Hash.GET_NUMBER_OF_PED_TEXTURE_VARIATIONS, ped.Handle, 0, 0);
-                var texture = count > 1 ? 1 : 0;
-                var drawables = Function.Call<int>(
-                    Hash.GET_NUMBER_OF_PED_DRAWABLE_VARIATIONS, ped.Handle, 0);
-                Main.Logger.WriteLine("Addon variation stage 1: handle=" +
-                    ped.Handle + " model=0x" + ped.Model.Hash.ToString("X8") +
-                    " pedType=" + Function.Call<int>(Hash.GET_PED_TYPE, ped.Handle) +
-                    " drawables=" + drawables +
-                    " textures=" + count + " pick=" + texture);
-                Function.Call(Hash.SET_PED_COMPONENT_VARIATION, ped.Handle, 0, 0,
-                    texture, 0);
+                // Drawable/texture sayısı çağrıdan ÖNCE doğrulanır: olmayan bir
+                // varyasyon indeksi oyunu çökertiyordu.
+                try
+                {
+                    var drawables = Function.Call<int>(
+                        Hash.GET_NUMBER_OF_PED_DRAWABLE_VARIATIONS, ped.Handle, 0);
+                    if (drawables > 0)
+                    {
+                        var textures = Function.Call<int>(
+                            Hash.GET_NUMBER_OF_PED_TEXTURE_VARIATIONS, ped.Handle, 0, 0);
+                        if (textures > 0)
+                        {
+                            var texture = textures > 1 ? 1 : 0;
+                            Function.Call(Hash.SET_PED_COMPONENT_VARIATION, ped.Handle, 0, 0,
+                                texture, 0);
+                        }
+                    }
+                }
+                catch
+                {
+                    // Sessizce atla; ped görünür kalır, oyun çökmez.
+                }
+
                 Pending.RemoveAt(i);
             }
         }
 
-        private static void ApplyDefault(Ped ped)
+        /// <summary>
+        /// Ped gerçekten hedef modelde mi ve varyasyon uygulamak için güvenli mi?
+        /// </summary>
+        private static bool IsReady(Ped ped, PendingFix fix)
         {
-            Function.Call(Hash.SET_PED_DEFAULT_COMPONENT_VARIATION, ped.Handle);
-            Function.Call(Hash.CLEAR_ALL_PED_PROPS, ped.Handle);
-            Function.Call(Hash.CLEAR_PED_DECORATIONS, ped.Handle);
+            if (ped == null || !ped.Exists()) return false;
+            if (ped.Handle == 0 || ped.Handle != fix.Handle) return false;
+            if (ped.Model.Hash != fix.ModelHash) return false;
+            if (ped.IsDead) return false;
+            if (ped.IsInVehicle()) return false;
+            if (ped.IsRagdoll) return false;
+
+            try
+            {
+                if (Function.Call<bool>(Hash.IS_ENTITY_IN_AIR, ped.Handle)) return false;
+            }
+            catch { }
+
+            return true;
         }
     }
 }

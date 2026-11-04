@@ -197,6 +197,8 @@ public sealed class MyServerTab : UserControl
         controlButtons.Controls.Add(Ui.Btn(T("Sunucu Klasörlerini Aç"), (_, _) => OpenFolder(AppEnv.ServersFolder)));
         controlButtons.Controls.Add(Ui.Btn(T("Sunucu Yedeği Al..."), (_, _) => ExportServerBackup()));
         controlButtons.Controls.Add(Ui.Btn(T("Yedeği Geri Yükle..."), (_, _) => ImportServerBackup()));
+        controlButtons.Controls.Add(Ui.Btn(T("Port Kontrolü"), (_, _) => CheckPorts()));
+        controlButtons.Controls.Add(Ui.Btn(T("Yeniden Başlat"), (_, _) => RestartServer()));
 
         _gameServerStatus.Text = T("Oyun sunucusu: kapalı");
         _gameServerStatus.AutoSize = true;
@@ -754,6 +756,26 @@ public sealed class MyServerTab : UserControl
             if (!SaveSettings()) return;
             var settings = ToSettings(info);
 
+            // Port çakışması, sunucunun sessizce başlamaması yerine burada
+            // anlaşılır bir uyarıya dönüşür.
+            if (!Server.IsGameServerRunning && !CanBindPort(info.GamePort, udp: true))
+            {
+                Ui.Warn(FindForm()!, T(
+                    "Oyun portu {0} (UDP) şu an başka bir uygulama tarafından kullanılıyor.\r\n" +
+                    "Eski sunucu süreci açık olabilir; kapatıp tekrar deneyin veya ayarlardan portu değiştirin.",
+                    info.GamePort));
+                return;
+            }
+
+            if (!Server.IsSyncServerRunning && !CanBindPort(info.SyncPort, udp: false))
+            {
+                Ui.Warn(FindForm()!, T(
+                    "Sync portu {0} (TCP) şu an başka bir uygulama tarafından kullanılıyor.\r\n" +
+                    "Eski sunucu süreci açık olabilir; kapatıp tekrar deneyin veya ayarlardan portu değiştirin.",
+                    info.SyncPort));
+                return;
+            }
+
             Server.EnsureLayout();
             Server.GetOrCreateIdentity(info.Name);
             Server.WriteSettings(settings);
@@ -813,6 +835,80 @@ public sealed class MyServerTab : UserControl
         {
             AppEnv.LogError("Sunucu kapatılırken hata: " + ex.Message);
         }
+    }
+
+    /// <summary>Sunucuyu durdurup yeniden başlatır; portlar boşaltıldıktan sonra tekrar dinler.</summary>
+    private void RestartServer()
+    {
+        try
+        {
+            StopServer();
+            StartServer();
+        }
+        catch (Exception ex)
+        {
+            AppEnv.LogError("Sunucu yeniden başlatılamadı: " + ex.Message);
+            Ui.Error(FindForm()!, ex.Message);
+        }
+    }
+
+    // ------------------------------------------------------------------ portlar
+
+    /// <summary>
+    /// Portun gerçekten boş olup olmadığını bağlanarak sınar. Yalnızca "dinleyen
+    /// soket" listesine bakmak yetmez: UDP portu başka bir süreç tarafından
+    /// ayrılmış olabilir. Hata durumunda "boş" kabul edilir; bu kontrolün
+    /// kendisi sunucuyu başlatmayı engellemeye çalışmaz.
+    /// </summary>
+    private static bool CanBindPort(int port, bool udp)
+    {
+        try
+        {
+            using var socket = new Socket(AddressFamily.InterNetwork,
+                udp ? SocketType.Dgram : SocketType.Stream,
+                udp ? ProtocolType.Udp : ProtocolType.Tcp);
+            socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, false);
+            socket.Bind(new IPEndPoint(IPAddress.Any, port));
+            return true;
+        }
+        catch (SocketException ex) when (ex.SocketErrorCode == SocketError.AddressAlreadyInUse)
+        {
+            return false;
+        }
+        catch
+        {
+            return true;
+        }
+    }
+
+    /// <summary>Oyun ve sync portlarının kullanılabilirliğini gösterir.</summary>
+    private void CheckPorts()
+    {
+        var info = CurrentSettings();
+        var gameRunning = Server.IsGameServerRunning;
+        var syncRunning = Server.IsSyncServerRunning;
+
+        var gameFree = gameRunning || CanBindPort(info.GamePort, udp: true);
+        var syncFree = syncRunning || CanBindPort(info.SyncPort, udp: false);
+
+        var lines = new List<string>
+        {
+            T("Oyun portu (UDP {0}): {1}", info.GamePort,
+                gameRunning ? T("kendi sunucumuz kullanıyor")
+                            : T(gameFree ? "boş" : "BAŞKA BİR UYGULAMA TARAFINDAN KULLANILIYOR")),
+            T("Sync portu (TCP {0}): {1}", info.SyncPort,
+                syncRunning ? T("kendi sunucumuz kullanıyor")
+                            : T(syncFree ? "boş" : "BAŞKA BİR UYGULAMA TARAFINDAN KULLANILIYOR"))
+        };
+
+        var text = string.Join("\r\n", lines);
+        if (gameFree && syncFree)
+            Ui.Info(FindForm()!, text + "\r\n\r\n" + T("Sunucu bu portlarla başlatılabilir."));
+        else
+            Ui.Warn(FindForm()!, text + "\r\n\r\n" + T(
+                "Kullanılan portu boşaltın (eski sunucu süreci) veya ayarlardan başka bir port seçin."));
+
+        AppEnv.Log("Port kontrolü: " + text.Replace("\r\n", " | "));
     }
 
     // ------------------------------------------------------------------ oyuncular

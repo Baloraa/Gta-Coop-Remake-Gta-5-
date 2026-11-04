@@ -32,7 +32,7 @@ namespace GTACoOp
                 _scaleform.CallFunction("SET_DATA_SLOT", i++, $"{player.Latency * 1000:N0}ms", playerName, 116, 0, "", "", "", 2, "", "", ' ');
             }
 
-            _scaleform.CallFunction("SET_TITLE", "GTA Coop", (Main.Opponents.Count + 1) + " players");
+            _scaleform.CallFunction("SET_TITLE", "GTACoop Remake", (Main.Opponents.Count + 1) + " players");
             _scaleform.CallFunction("DISPLAY_VIEW");
 
             _lastUpdate = GetGameTimer();

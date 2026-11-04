@@ -2,7 +2,7 @@
 
 **Türkçe** | [English](README.md)
 
-2.7.5 sürümü - kendi sunucu yönetimi, otomatik mod indirme, **oturum modu**,
+2.7.6 sürümü - kendi sunucu yönetimi, otomatik mod indirme, **oturum modu**,
 **kısa kod** (ör. `Gel.com`) ile internetten sunucu bulma, **otomatik relay**,
 **UPnP doğrudan bağlantı**, **özel relay sunucusu**, **tanılama kopyalama**,
 **canlı sunucu durumu**, **Sunucu Tarayıcı** sekmesi, **OpenIV (.oiv) paket desteği**,
@@ -14,6 +14,19 @@ yalnızca oyun açıkken kurulu kalır, oyundan çıkınca otomatik kaldırılı
 Oyun başlatma dosyası seçilebilir; varsayılan **PlayGTAV.exe**'dir (GTA5.exe de seçilebilir).
 **Sesli sohbet** (bas-konuş, `[MIC]` göstergesi) ve **host-led hikaye görevi koordinasyonu**
 bu sürümde eklendi; ayrıntılar aşağıda.
+
+### 2.7.6 — Addon ped çökmeleri, port kontrolü ve sıralama
+
+- **Addon ped çökmesi giderildi.** Model değişimi artık menü tıklamasında değil, oyun döngüsünde
+  güvenli anda yapılıyor: görevler bırakılır, hız sıfırlanır, ped bir kare sakin kalır, sonra model
+  değişir. Havada, ragdoll'da veya araçtayken değişim reddedilir ve kısa süre sonra yeniden denenir.
+- **Varyasyon koruması.** Drawable/texture sayısı sıfır olan pedlere varyasyon uygulanmaz; her native
+  çağrısı pedin hâlâ var olduğu ve hedef modelde olduğu doğrulandıktan sonra yapılır. Animasyon ve
+  clipset uygulaması model değişimi boyunca tamamen durur.
+- **Port kontrolü.** *Sunucum* sekmesinde **Port Kontrolü**: oyun (UDP) ve sync (TCP) portları başka bir
+  uygulama tarafından kullanılıyorsa uyarır. Sunucu başlatılırken de aynı kontrol yapılır; sessiz
+  başarısızlık yerine anlaşılır bir mesaj gösterilir. **Yeniden Başlat** düğmesi eklendi.
+- **Sunucu listesinde sıralama.** *Sırala: Favoriler / Ad / Ping / Son girilenler*.
 
 ### 2.7.5 — Oyuncu listesi, moderasyon ve kasma düzeltmesi
 

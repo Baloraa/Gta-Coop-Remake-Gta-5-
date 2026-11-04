@@ -8,7 +8,7 @@ GTACoop Remake is not a new multiplayer engine. It is the desktop layer around G
 
 GTACoop Remake is for private Story Mode co-op. It does not touch GTA Online, does not bypass anti-cheat, and does not inject into online sessions.
 
-**Current release:** 2.7.5  
+**Current release:** 2.7.6  
 **Platform:** Windows 10/11, x64  
 **UI:** Turkish, English, and Russian  
 **License:** GNU GPL v3
@@ -289,6 +289,20 @@ This is a tool for playing with friends, not a hardened anti-cheat or privacy sy
 - Server owners are responsible for the mods they distribute. The launcher automates delivery; it does not grant permission to redistribute someone else's work.
 
 ---
+
+### 2.7.6 — Addon ped crash fix, port check, and server sorting
+
+- **Addon ped crash fixed.** Model swaps no longer run inside a menu callback. The request is queued
+  and applied from the game loop: tasks are cleared, velocity is zeroed, the ped gets a frame to settle,
+  and only then is the model changed. Swaps are refused while the ped is in the air, in ragdoll, or in a
+  vehicle, and retried a moment later.
+- **Variation guards.** Component variations are applied only when the ped still exists, still matches the
+  target model, and reports a valid drawable/texture count. Animal animation clipsets stop being applied
+  for the whole duration of a swap.
+- **Port check.** A *Port Check* button in the *My Server* tab reports whether the game (UDP) and sync (TCP)
+  ports are free. The same check runs before a server start, so a port clash gives a clear message instead
+  of a silent failure. A *Restart* button was added as well.
+- **Server list sorting.** *Sort: Favorites / Name / Ping / Recently played*.
 
 ## What is new in 2.7.5
 

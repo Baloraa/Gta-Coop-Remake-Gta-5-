@@ -17,6 +17,7 @@ public sealed class ServersTab : UserControl
     private readonly CheckBox _lowDesync = new();
     private readonly CheckBox _favoritesOnly = new();
     private readonly TextBox _search = new();
+    private readonly ComboBox _sort = new();
     private readonly Label _sessionInfo = new();
     private readonly Button _endSessionBtn;
     private readonly System.Windows.Forms.Timer _sessionTimer = new();
@@ -74,6 +75,17 @@ public sealed class ServersTab : UserControl
         _search.PlaceholderText = T("Ara (ad, adres veya kod)");
         _search.TextChanged += (_, _) => RefreshList();
         listButtons.Controls.Add(_search);
+
+        _sort.DropDownStyle = ComboBoxStyle.DropDownList;
+        _sort.Width = 165;
+        _sort.Margin = new Padding(4, 6, 4, 4);
+        _sort.Items.Add(T("Sırala: Favoriler"));
+        _sort.Items.Add(T("Sırala: Ad"));
+        _sort.Items.Add(T("Sırala: Ping"));
+        _sort.Items.Add(T("Sırala: Son girilenler"));
+        _sort.SelectedIndex = 0;
+        _sort.SelectedIndexChanged += (_, _) => RefreshList();
+        listButtons.Controls.Add(_sort);
 
         // Bağlantı grubu
         var connectGroup = new GroupBox
@@ -381,7 +393,16 @@ public sealed class ServersTab : UserControl
                 (s.ShortCode ?? "").Contains(query, StringComparison.OrdinalIgnoreCase));
         }
 
-        foreach (var s in servers.OrderByDescending(s => s.Favorite))
+        var ordered = _sort.SelectedIndex switch
+        {
+            1 => servers.OrderBy(s => s.Name, StringComparer.CurrentCultureIgnoreCase),
+            2 => servers.OrderBy(PingForSort).ThenByDescending(s => s.Favorite),
+            3 => servers.OrderByDescending(s => s.LastUsedUtc ?? DateTime.MinValue),
+            _ => servers.OrderByDescending(s => s.Favorite)
+                          .ThenBy(s => s.Name, StringComparer.CurrentCultureIgnoreCase)
+        };
+
+        foreach (var s in ordered)
         {
             var key = StatusKey(s);
             var status = _statusCache.TryGetValue(key, out var cached) ? cached : default;
@@ -418,6 +439,12 @@ public sealed class ServersTab : UserControl
 
     private static string StatusKey(ServerEntry s) =>
         $"{s.Host}|{s.SyncPort}|{s.RelayHost}|{s.RelaySyncPort}";
+
+    /// <summary>Sıralama için ping; bilinmiyorsa/çevrimdışıysa listenin sonuna gider.</summary>
+    private int PingForSort(ServerEntry entry) =>
+        _statusCache.TryGetValue(StatusKey(entry), out var status) && status.Online
+            ? status.Ms
+            : int.MaxValue;
 
     /// <summary>
     /// Her sunucunun sync portuna kısa bir TCP bağlantısı dener. Relay varsa
@@ -712,6 +739,10 @@ public sealed class ServersTab : UserControl
         }
         var sel = entry ?? Selected;
         if (sel == null) { Ui.Warn(FindForm()!, T("Önce listeden bir sunucu seçin.")); return; }
+
+        // "Son girilenler" sıralaması için bağlanma anını kaydet.
+        sel.LastUsedUtc = DateTime.UtcNow;
+        AppEnv.SaveSettings();
         if (!MainForm.RequireGameFolder(FindForm()!, out var gameFolder)) return;
 
         if (AddonApplier.IsGameRunning())

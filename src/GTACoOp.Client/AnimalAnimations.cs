@@ -66,6 +66,13 @@ namespace GTACoOp
         /// <summary>Duruş animasyonları için seçili set ("rottweiler" / "retriever" / "cat").</summary>
         public static string SelectedSet = "rottweiler";
 
+        /// <summary>
+        /// Model değişimi sürerken true: hiçbir animasyon, clipset veya görev
+        /// temizleme çağrısı yapılmaz. Ped değişiminin ortasına clipset yazmak
+        /// oyunu çökertiyordu.
+        /// </summary>
+        public static bool Suspended;
+
         private static string _selectedMoveKey = "rottweiler";
 
         private static int _catHash;
@@ -350,6 +357,8 @@ namespace GTACoOp
 
         public static void Stop()
         {
+            if (Suspended) return;
+
             _pendingDict = null;
             var player = Game.Player.Character;
             if (player != null && player.Exists())
@@ -364,6 +373,9 @@ namespace GTACoOp
         /// <summary>Her karede çağrılır: hareket setini ve bekleyen animasyonu uygular.</summary>
         public static void Process()
         {
+            // Model değişimi sırasında animasyon/clipset işlemi yapılmaz.
+            if (Suspended) return;
+
             var player = Game.Player.Character;
             var alive = player != null && player.Exists();
 
@@ -458,6 +470,15 @@ namespace GTACoOp
 
             if (Function.Call<bool>(Hash.HAS_ANIM_DICT_LOADED, set.Dict))
             {
+                // Clipset yalnızca ped yerde ve stabilken uygulanır. Araçta,
+                // ragdoll'da veya havadayken uygulamak oyunu çökertiyordu.
+                if (ped.IsInVehicle() || ped.IsRagdoll) return;
+                try
+                {
+                    if (Function.Call<bool>(Hash.IS_ENTITY_IN_AIR, ped.Handle)) return;
+                }
+                catch { }
+
                 try
                 {
                     Function.Call(Hash.SET_PED_MOVEMENT_CLIPSET, ped.Handle, set.Clipset, 1.0f);

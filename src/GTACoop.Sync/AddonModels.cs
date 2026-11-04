@@ -216,6 +216,9 @@ public sealed class ServerEntry
     /// <summary>Sunucular listesinde favori olarak işaretlendi mi? Favoriler üstte listelenir.</summary>
     public bool Favorite { get; set; }
 
+    /// <summary>Son bağlanma zamanı; "Son girilenler" sıralaması için kullanılır.</summary>
+    public DateTime? LastUsedUtc { get; set; }
+
     /// <summary>
     /// Sunucuyu eklerken kullanılan kısa kod (varsa). Relay bilgisi eskirse
     /// bağlantı öncesinde bu kodla güncel relay uç noktaları yeniden alınır.

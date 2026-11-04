@@ -43,6 +43,28 @@ namespace GTACoOp
         private int _defaultPlayerModel;
         private PendingAddonPed _pendingAddonPed;
 
+        /// <summary>
+        /// Sırada bekleyen model değişimi. Menü işleyicisi yalnızca bu isteği
+        /// yazar; SET_PLAYER_MODEL her zaman OnTick içinde, ped sakinleştikten
+        /// sonra çağrılır. Değişim yürürken tetiklendiğinde oyunun görev/animasyon
+        /// durumu yarım kalıp çöküyordu.
+        /// </summary>
+        private PendingModelSwap _pendingSwap;
+
+        private sealed class PendingModelSwap
+        {
+            public int ModelHash;
+            public string Model;
+            public string Name;
+            public string BaseModel;
+            public string Ragdoll;
+            public bool MetaVerified;
+            public int Health;
+            public bool IsReset;
+            public int ReadyAt;
+            public int Deadline;
+        }
+
         // Model değişimleri sıraya konur. SET_PLAYER_MODEL pedi yok edip yeniden
         // yarattığı için art arda çağrılar eski handle'ları geçersiz bırakıyor ve
         // oyun çökebiliyordu (ör. menüde hızlı ped değiştirme).
@@ -950,52 +972,173 @@ namespace GTACoOp
 
             try
             {
-                // Değişimden önce eski pedin görevlerini ve ragdoll bayrağını
-                // bırak: animasyon/ragdoll sürerken model değiştirmek yeni pede
-                // geçersiz varyant devredip çökmeye yol açabiliyor.
-                try
-                {
-                    if (current != null && current.Exists())
-                    {
-                        Function.Call(Hash.CLEAR_PED_TASKS_IMMEDIATELY, current.Handle);
-                        Function.Call(Hash.SET_PED_CAN_RAGDOLL, current.Handle, false);
-                    }
-                }
-                catch { }
-                AnimalAnimations.Stop();
+                // Menü işleyicisinden SET_PLAYER_MODEL çağrılmaz. Yalnızca istek
+                // sıraya yazılır; değişim OnTick içinde, pedin görevleri bırakıp
+                // bir kare sakin kaldığı doğrulandıktan sonra yapılır.
+                AnimalAnimations.ResetDefaults(current);
+                AddonPedVariation.CancelAll();
                 _ragdollGuardModel = 0;
 
-                _lastModelChangeAt = Game.GameTime;
-                if (!Game.Player.ChangeModel(model))
-                {
-                    Notification.Show("~r~Could not change ped model.");
-                    return;
-                }
-
-                // ChangeModel returns before the game swaps in the new ped.
-                // Configuring Game.Player.Character here would still touch the
-                // outgoing ped. Do nothing else until the swap is visible.
                 var now = Game.GameTime;
-                _pendingAddonPed = new PendingAddonPed
+                _pendingSwap = new PendingModelSwap
                 {
                     ModelHash = model.Hash,
                     Model = ped.Model,
                     Name = string.IsNullOrWhiteSpace(ped.Name) ? ped.Model : ped.Name,
                     Health = ped.Health,
-                    ApplyAt = now + 100,
-                    Deadline = now + 3000,
                     Ragdoll = NormalizeRagdoll(ped.Ragdoll),
                     MetaVerified = ped.MetaVerified,
-                    BaseModel = ped.BaseModel ?? ""
+                    BaseModel = ped.BaseModel ?? "",
+                    IsReset = false,
+                    ReadyAt = now + 120,
+                    Deadline = now + 6000
                 };
 
-                Notification.Show("~g~Addon ped: ~w~" + _pendingAddonPed.Name);
+                Notification.Show("~o~Ped hazırlanıyor: ~w~" + _pendingSwap.Name);
             }
             catch (Exception ex)
             {
                 Notification.Show("~r~Ped error: ~w~" + ex.Message);
                 Main.Logger.WriteException("Exception while changing addon ped", ex);
             }
+        }
+
+        /// <summary>
+        /// Sıradaki model değişimini güvenli anda uygular. Ped yürürken de
+        /// çalışır: önce görevler temizlenir, hız sıfırlanır, bir kare beklenir,
+        /// sonra SET_PLAYER_MODEL çağrılır. Havada/ragdoll'da/araçta değişim
+        /// reddedilir ve 120 ms sonra yeniden denenir.
+        /// </summary>
+        private void ProcessPendingSwap()
+        {
+            var swap = _pendingSwap;
+            if (swap == null) return;
+
+            var player = Game.Player.Character;
+            if (player == null || !player.Exists())
+            {
+                if (Game.GameTime > swap.Deadline) _pendingSwap = null;
+                return;
+            }
+
+            // ChangeModel bir sonraki karede uygular; model eşleştiyse değişim
+            // tamamlanmıştır. Yeni ped yalnızca burada, tek noktada yapılandırılır.
+            if (player.Model.Hash == swap.ModelHash)
+            {
+                _pendingSwap = null;
+
+                if (swap.IsReset)
+                {
+                    Notification.Show("~g~Player model reset.");
+                    return;
+                }
+
+                _pendingAddonPed = new PendingAddonPed
+                {
+                    ModelHash = swap.ModelHash,
+                    Model = swap.Model,
+                    Name = swap.Name,
+                    Health = swap.Health,
+                    ApplyAt = Game.GameTime + 250,
+                    Deadline = Game.GameTime + 6000,
+                    Ragdoll = swap.Ragdoll,
+                    MetaVerified = swap.MetaVerified,
+                    BaseModel = swap.BaseModel
+                };
+                return;
+            }
+
+            if (Game.GameTime > swap.Deadline)
+            {
+                _pendingSwap = null;
+                Notification.Show("~r~Ped model could not be applied.");
+                return;
+            }
+
+            // Yürüme/animasyon görevini bırak ki oyun yeni pedi temiz bir
+            // durumda oluştursun. Bir kare sonra tekrar denenir.
+            if (!CanSwapModel(player) || Game.GameTime < swap.ReadyAt)
+            {
+                PreparePedForSwap(player);
+                swap.ReadyAt = Game.GameTime + 120;
+                return;
+            }
+
+            var model = new Model(swap.ModelHash);
+            if (!model.IsLoaded && !model.Request(500))
+            {
+                swap.ReadyAt = Game.GameTime + 200;
+                return;
+            }
+
+            PreparePedForSwap(player);
+            _lastModelChangeAt = Game.GameTime;
+
+            try
+            {
+                if (!Game.Player.ChangeModel(model))
+                {
+                    _pendingSwap = null;
+                    Notification.Show("~r~Could not change ped model.");
+                }
+            }
+            catch (Exception ex)
+            {
+                _pendingSwap = null;
+                Notification.Show("~r~Ped error: ~w~" + ex.Message);
+                Main.Logger.WriteException("Model swap failed", ex);
+            }
+        }
+
+        /// <summary>Yerde, sağlıklı ve araç dışında mı?</summary>
+        private static bool CanSwapModel(Ped ped)
+        {
+            if (ped == null || !ped.Exists()) return false;
+            if (ped.IsDead) return false;
+            if (ped.IsInVehicle() || ped.IsRagdoll) return false;
+
+            try
+            {
+                if (Function.Call<bool>(Hash.IS_ENTITY_IN_AIR, ped.Handle)) return false;
+            }
+            catch { }
+
+            return true;
+        }
+
+        /// <summary>
+        /// Değişimden önce pedin görevlerini bırakır. Hiçbir koşulda istisna
+        /// dışarı sızmaz; ped silinmiş olsa bile oyun çalışmaya devam eder.
+        /// </summary>
+        private static void PreparePedForSwap(Ped ped)
+        {
+            if (ped == null || !ped.Exists()) return;
+
+            try { Function.Call(Hash.CLEAR_PED_TASKS_IMMEDIATELY, ped.Handle); } catch { }
+            try { Function.Call(Hash.SET_PED_CAN_RAGDOLL, ped.Handle, false); } catch { }
+            try { Function.Call(Hash.SET_ENTITY_VELOCITY, ped.Handle, 0f, 0f, 0f); } catch { }
+
+            AnimalAnimations.ResetDefaults(ped);
+        }
+
+        /// <summary>
+        /// Model değişiminden sonra pedin tamamen oturduğunu doğrular: havada,
+        /// ragdoll'da, araçta veya ölüyken varyasyon/ragdoll uygulanmaz.
+        /// </summary>
+        private static bool IsPedStable(Ped ped)
+        {
+            if (ped == null || !ped.Exists()) return false;
+            if (ped.Handle == 0 || ped.IsDead) return false;
+            if (ped.IsInVehicle() || ped.IsRagdoll) return false;
+
+            try
+            {
+                if (Function.Call<bool>(Hash.IS_ENTITY_IN_AIR, ped.Handle)) return false;
+                if (!Function.Call<bool>(Hash.IS_PED_A_PLAYER, ped.Handle)) return false;
+            }
+            catch { }
+
+            return true;
         }
 
         private void ProcessPendingAddonPed()
@@ -1021,6 +1164,23 @@ namespace GTACoOp
             }
 
             if (Game.GameTime < pending.ApplyAt) return;
+
+            // Yeni ped henüz oturmadıysa (havada, ragdoll, araçta) varyasyon ve
+            // ragdoll ayarı uygulanmaz; o kombinasyon oyunu çökertiyordu.
+            if (!IsPedStable(player))
+            {
+                if (Game.GameTime > pending.Deadline)
+                {
+                    _pendingAddonPed = null;
+                    Notification.Show("~o~Ped hazır olmadı; varyasyon atlandı (güvenlik).");
+                }
+                else
+                {
+                    pending.ApplyAt = Game.GameTime + 150;
+                }
+                return;
+            }
+
             _pendingAddonPed = null;
 
             var animal = AddonPedVariation.LooksLikeAnimal(pending.Model, player);
@@ -1424,6 +1584,8 @@ namespace GTACoOp
             if (player.Model.Hash != hash) return;
             if (player.IsHuman && !AddonPedVariation.IsAnimalHash(hash)) return;
             if (AddonPedVariation.IsScheduled(player.Handle)) return;
+            if (_pendingSwap != null || _pendingAddonPed != null) return;
+            if (!IsPedStable(player)) return;
 
             try { player.Weapons.RemoveAll(); } catch { }
             try { player.Armor = 0; } catch { }
@@ -1482,21 +1644,20 @@ namespace GTACoOp
                     return;
                 }
 
-                AnimalAnimations.Stop();
-                AnimalAnimations.ResetDefaults(current);
-                try
-                {
-                    if (current != null && current.Exists())
-                    {
-                        Function.Call(Hash.CLEAR_PED_TASKS_IMMEDIATELY, current.Handle);
-                        Function.Call(Hash.SET_PED_CAN_RAGDOLL, current.Handle, false);
-                    }
-                }
-                catch { }
+                AddonPedVariation.CancelAll();
                 _ragdollGuardModel = 0;
-                _lastModelChangeAt = Game.GameTime;
-                Game.Player.ChangeModel(model);
-                Notification.Show("~g~Player model reset.");
+
+                var now = Game.GameTime;
+                _pendingSwap = new PendingModelSwap
+                {
+                    ModelHash = model.Hash,
+                    Model = "reset",
+                    Name = "Reset",
+                    IsReset = true,
+                    ReadyAt = now + 120,
+                    Deadline = now + 6000
+                };
+                Notification.Show("~o~Player model reset is being applied...");
             }
             catch (Exception ex)
             {
@@ -2540,6 +2701,11 @@ namespace GTACoOp
             try
             {
                 Ped player = Game.Player.Character;
+
+                // Değişim sürerken animasyon/clipset uygulanmaz: yarım kalmış
+                // model değişiminin üstüne clipset yazmak çökmenin kaynağıydı.
+                AnimalAnimations.Suspended = _pendingSwap != null || _pendingAddonPed != null;
+                ProcessPendingSwap();
                 ProcessPendingAddonPed();
                 WatchLocalPlayerAnimal();
                 EnforceRagdollGuard();
