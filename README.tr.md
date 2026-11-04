@@ -2,7 +2,7 @@
 
 **Türkçe** | [English](README.md)
 
-2.7.4 sürümü - kendi sunucu yönetimi, otomatik mod indirme, **oturum modu**,
+2.7.5 sürümü - kendi sunucu yönetimi, otomatik mod indirme, **oturum modu**,
 **kısa kod** (ör. `Gel.com`) ile internetten sunucu bulma, **otomatik relay**,
 **UPnP doğrudan bağlantı**, **özel relay sunucusu**, **tanılama kopyalama**,
 **canlı sunucu durumu**, **Sunucu Tarayıcı** sekmesi, **OpenIV (.oiv) paket desteği**,
@@ -14,6 +14,18 @@ yalnızca oyun açıkken kurulu kalır, oyundan çıkınca otomatik kaldırılı
 Oyun başlatma dosyası seçilebilir; varsayılan **PlayGTAV.exe**'dir (GTA5.exe de seçilebilir).
 **Sesli sohbet** (bas-konuş, `[MIC]` göstergesi) ve **host-led hikaye görevi koordinasyonu**
 bu sürümde eklendi; ayrıntılar aşağıda.
+
+### 2.7.5 — Oyuncu listesi, moderasyon ve kasma düzeltmesi
+
+- **Oyuncular paneli.** *Sunucum* sekmesinde canlı oyuncu listesi (ad, ping, sağlık). Liste sunucu
+  eklentisinin yazdığı `gtacoop-players.json` dosyasından okunur; ağ protokolü ve oyun dosyaları
+  değişmez, oyun tarafında hiçbir ek iş yapılmaz.
+- **Kontrol.** Seçili oyuncuyu *At (Kick)*, adını yasakla, tek oyuncuya mesaj gönder veya sunucudaki
+  herkese *Duyuru* yap. *Yasak / Beyaz Liste* penceresinde yasak listesi ve "yalnızca beyaz
+  listedekiler girebilsin" seçeneği yönetilir; yasaklı bir ad bağlanınca otomatik atılır.
+- **Kasma/lag düzeltmesi.** 2.7.4'te her karede çizilen HUD tamamen kaldırıldı. Oyun içi döngüde
+  artık ek çizim, LINQ ve metin ayırma yok; güncellemeden sonra başlayan takılmalar bu yüzeydi.
+- **Sunucu tarayıcıda arama.** Sunucu listesini ad, adres veya kısa koda göre anında filtreler.
 
 ### 2.7.4 — Güncelleme, destek paketi, sunucu yedeği, favoriler ve HUD
 

@@ -16,6 +16,7 @@ public sealed class ServersTab : UserControl
     private readonly CheckBox _sessionMode = new();
     private readonly CheckBox _lowDesync = new();
     private readonly CheckBox _favoritesOnly = new();
+    private readonly TextBox _search = new();
     private readonly Label _sessionInfo = new();
     private readonly Button _endSessionBtn;
     private readonly System.Windows.Forms.Timer _sessionTimer = new();
@@ -67,6 +68,12 @@ public sealed class ServersTab : UserControl
         _favoritesOnly.Margin = new Padding(10, 8, 4, 4);
         _favoritesOnly.CheckedChanged += (_, _) => RefreshList();
         listButtons.Controls.Add(_favoritesOnly);
+
+        _search.Width = 190;
+        _search.Margin = new Padding(12, 6, 4, 4);
+        _search.PlaceholderText = T("Ara (ad, adres veya kod)");
+        _search.TextChanged += (_, _) => RefreshList();
+        listButtons.Controls.Add(_search);
 
         // Bağlantı grubu
         var connectGroup = new GroupBox
@@ -364,6 +371,15 @@ public sealed class ServersTab : UserControl
         // Favoriler her zaman üstte; "sadece favoriler" işaretliyse diğerleri gizlenir.
         var servers = AppEnv.Settings.Servers.AsEnumerable();
         if (_favoritesOnly.Checked) servers = servers.Where(s => s.Favorite);
+
+        var query = _search.Text.Trim();
+        if (query.Length > 0)
+        {
+            servers = servers.Where(s =>
+                (s.Name ?? "").Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                (s.Host ?? "").Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                (s.ShortCode ?? "").Contains(query, StringComparison.OrdinalIgnoreCase));
+        }
 
         foreach (var s in servers.OrderByDescending(s => s.Favorite))
         {

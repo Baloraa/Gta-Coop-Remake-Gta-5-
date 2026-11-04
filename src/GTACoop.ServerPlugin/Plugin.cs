@@ -65,6 +65,9 @@ namespace GTACoop.Remake.Plugin
                 return response;
             });
 
+            // Oyuncu listesi + kick/ban/beyaz liste köprüsü (dosya tabanlı, protokol değişmez).
+            ModerationBridge.Attach(gameServer);
+
             return true;
         }
     }

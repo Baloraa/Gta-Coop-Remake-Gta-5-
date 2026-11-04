@@ -23,6 +23,9 @@ public sealed class MyServerTab : UserControl
     private readonly Label _gameServerStatus = new();
     private readonly Label _syncServerStatus = new();
     private readonly Label _shortCodeStatus = new();
+    private readonly ListView _playersList = new();
+    private readonly Label _playersStatus = new();
+    private bool _playersErrorLogged;
     private readonly Label _addressInfo = new();
     private readonly System.Windows.Forms.Timer _timer = new();
     private bool _suppressModsCheck;
@@ -217,20 +220,64 @@ public sealed class MyServerTab : UserControl
         controlGroup.Controls.Add(statusPanel);
         controlGroup.Controls.Add(controlButtons);
 
+        // --- oyuncular (canlı liste + moderasyon)
+        var playersGroup = new GroupBox
+        {
+            Text = T("Oyuncular (canlı)"),
+            Dock = DockStyle.Top,
+            Height = 252,
+            Padding = new Padding(8)
+        };
+
+        Ui.StyleList(_playersList,
+            (T("Oyuncu"), 280),
+            (T("Ping"), 90),
+            (T("Sağlık"), 90));
+        _playersList.Dock = DockStyle.Top;
+        _playersList.Height = 140;
+        _playersList.MultiSelect = false;
+
+        _playersStatus.Dock = DockStyle.Bottom;
+        _playersStatus.AutoSize = false;
+        _playersStatus.Height = 22;
+        _playersStatus.TextAlign = ContentAlignment.MiddleLeft;
+        _playersStatus.ForeColor = Color.DimGray;
+        _playersStatus.Padding = new Padding(4, 0, 0, 0);
+        _playersStatus.Text = T("Bağlı oyuncu yok.");
+
+        var playersButtons = Ui.Flow(DockStyle.Bottom);
+        playersButtons.Controls.Add(Ui.Btn(T("Yenile"), (_, _) => RefreshPlayers()));
+        playersButtons.Controls.Add(Ui.Btn(T("At (Kick)"), (_, _) => KickSelectedPlayer()));
+        playersButtons.Controls.Add(Ui.Btn(T("Yasakla"), (_, _) => BanSelectedPlayer()));
+        playersButtons.Controls.Add(Ui.Btn(T("Mesaj Gönder..."), (_, _) => MessageSelectedPlayer()));
+        playersButtons.Controls.Add(Ui.Btn(T("Duyuru..."), (_, _) => BroadcastMessage()));
+        playersButtons.Controls.Add(Ui.Btn(T("Yasak / Beyaz Liste..."), (_, _) => EditModeration()));
+
+        playersGroup.Controls.Add(_playersList);
+        playersGroup.Controls.Add(_playersStatus);
+        playersGroup.Controls.Add(playersButtons);
+
         // İçerik pencereden uzun olabilir: gerektiğinde dikey kaydırma çubuğu çıksın
         var scroll = new Panel { Dock = DockStyle.Fill, AutoScroll = true };
         scroll.Controls.Add(controlGroup);
         scroll.Controls.Add(modsGroup);
         scroll.Controls.Add(settingsGroup);
+        scroll.Controls.Add(playersGroup);
         scroll.Controls.Add(info);
         Controls.Add(scroll);
 
         _timer.Interval = 1500;
-        _timer.Tick += (_, _) => RefreshStatus();
+        _timer.Tick += (_, _) =>
+        {
+            RefreshStatus();
+            RefreshPlayers();
+        };
         _timer.Start();
 
+        ServerModeration.CleanupCommands();
         RefreshModsList();
         RefreshStatus();
+        RefreshPlayers();
     }
 
     private static void AddRow(TableLayoutPanel table, string label, Control control,
@@ -765,6 +812,177 @@ public sealed class MyServerTab : UserControl
         catch (Exception ex)
         {
             AppEnv.LogError("Sunucu kapatılırken hata: " + ex.Message);
+        }
+    }
+
+    // ------------------------------------------------------------------ oyuncular
+
+    /// <summary>Sunucu eklentisinin yazdığı canlı oyuncu listesini gösterir.</summary>
+    private void RefreshPlayers()
+    {
+        try
+        {
+            var roster = ServerModeration.LoadRoster();
+
+            var selectedId = _playersList.SelectedItems.Count > 0 &&
+                             _playersList.SelectedItems[0].Tag is ModerationPlayer selected
+                ? selected.Id
+                : long.MinValue;
+
+            _playersList.BeginUpdate();
+            _playersList.Items.Clear();
+            foreach (var player in roster.Players.OrderBy(p => p.Name, StringComparer.OrdinalIgnoreCase))
+            {
+                var item = new ListViewItem(new[]
+                {
+                    player.Name,
+                    player.LatencyMs > 0 ? player.LatencyMs + " ms" : "-",
+                    player.Health > 0 ? player.Health.ToString() : "-"
+                })
+                {
+                    Tag = player
+                };
+                if (player.Id == selectedId) item.Selected = true;
+                _playersList.Items.Add(item);
+            }
+            _playersList.EndUpdate();
+
+            if (!Server.IsGameServerRunning)
+            {
+                _playersStatus.Text = T("Sunucu kapalı. Oyuncu listesi sunucu başlatılınca dolar.");
+                _playersStatus.ForeColor = Color.DimGray;
+            }
+            else if (roster.Players.Count == 0)
+            {
+                _playersStatus.Text = roster.UpdatedUtc == default
+                    ? T("Oyuncu listesi hazırlanıyor...")
+                    : T("Bağlı oyuncu yok.");
+                _playersStatus.ForeColor = Color.DimGray;
+            }
+            else
+            {
+                _playersStatus.Text = T("Bağlı oyuncu: {0} | Son güncelleme: {1:HH:mm:ss}",
+                    roster.Players.Count, roster.UpdatedUtc.ToLocalTime());
+                _playersStatus.ForeColor = Ui.OkColor;
+            }
+        }
+        catch (Exception ex)
+        {
+            if (_playersErrorLogged) return;
+            _playersErrorLogged = true;
+            AppEnv.Log("Oyuncu listesi okunamadı: " + ex.Message);
+        }
+    }
+
+    private ModerationPlayer? SelectedPlayer()
+    {
+        if (_playersList.SelectedItems.Count == 0)
+        {
+            Ui.Info(FindForm()!, T("Önce listeden bir oyuncu seçin."));
+            return null;
+        }
+
+        return _playersList.SelectedItems[0].Tag as ModerationPlayer;
+    }
+
+    private void KickSelectedPlayer()
+    {
+        var player = SelectedPlayer();
+        if (player == null) return;
+        if (!Ui.Confirm(FindForm()!, T("'{0}' sunucudan atılsın mı?", player.Name))) return;
+
+        try
+        {
+            ServerModeration.Kick(player, T("Sunucu yöneticisi tarafından atıldınız."));
+            AppEnv.Log($"Oyuncu atıldı: {player.Name}");
+        }
+        catch (Exception ex)
+        {
+            AppEnv.LogError(ex.Message);
+            Ui.Error(FindForm()!, T("Oyuncu atılamadı:\r\n") + ex.Message);
+        }
+    }
+
+    private void BanSelectedPlayer()
+    {
+        var player = SelectedPlayer();
+        if (player == null) return;
+        if (!Ui.Confirm(FindForm()!, T(
+            "'{0}' yasaklansın mı?\r\nBu adla bağlanan herkes sunucudan atılır.", player.Name))) return;
+
+        try
+        {
+            var added = ServerModeration.Ban(player.Name);
+            ServerModeration.Kick(player, T("Bu oyuncu adı sunucudan yasaklandı."));
+
+            AppEnv.Log(added
+                ? $"Oyuncu yasaklandı: {player.Name}"
+                : $"Oyuncu zaten yasaklıydı: {player.Name}");
+            RefreshPlayers();
+        }
+        catch (Exception ex)
+        {
+            AppEnv.LogError(ex.Message);
+            Ui.Error(FindForm()!, T("Oyuncu yasaklanamadı:\r\n") + ex.Message);
+        }
+    }
+
+    private void MessageSelectedPlayer()
+    {
+        var player = SelectedPlayer();
+        if (player == null) return;
+
+        using var dlg = new TextInputDialog(
+            T("Oyuncuya mesaj"),
+            T("'{0}' oyuncusuna gönderilecek mesaj:", player.Name));
+        if (dlg.ShowDialog(FindForm()) != DialogResult.OK) return;
+
+        try
+        {
+            ServerModeration.SendMessage(player, dlg.Value);
+            AppEnv.Log($"Oyuncuya mesaj gönderildi: {player.Name}");
+        }
+        catch (Exception ex)
+        {
+            AppEnv.LogError(ex.Message);
+            Ui.Error(FindForm()!, T("Mesaj gönderilemedi:\r\n") + ex.Message);
+        }
+    }
+
+    private void BroadcastMessage()
+    {
+        using var dlg = new TextInputDialog(
+            T("Tüm oyunculara duyuru"),
+            T("Sunucudaki herkese gönderilecek mesaj:"));
+        if (dlg.ShowDialog(FindForm()) != DialogResult.OK) return;
+
+        try
+        {
+            ServerModeration.Broadcast(dlg.Value);
+            AppEnv.Log("Sunucuya duyuru gönderildi.");
+        }
+        catch (Exception ex)
+        {
+            AppEnv.LogError(ex.Message);
+            Ui.Error(FindForm()!, T("Duyuru gönderilemedi:\r\n") + ex.Message);
+        }
+    }
+
+    private void EditModeration()
+    {
+        using var dlg = new ModerationDialog(ServerModeration.LoadSettings());
+        if (dlg.ShowDialog(FindForm()) != DialogResult.OK) return;
+
+        try
+        {
+            ServerModeration.SaveSettings(dlg.Result);
+            AppEnv.Log($"Yasak listesi: {dlg.Result.Banned.Count}, beyaz liste: {dlg.Result.Whitelist.Count} " +
+                       $"(beyaz liste {(dlg.Result.WhitelistEnabled ? "açık" : "kapalı")})");
+        }
+        catch (Exception ex)
+        {
+            AppEnv.LogError(ex.Message);
+            Ui.Error(FindForm()!, T("Ayarlar kaydedilemedi:\r\n") + ex.Message);
         }
     }
 

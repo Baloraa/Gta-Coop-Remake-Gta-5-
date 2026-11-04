@@ -30,9 +30,6 @@ namespace GTACoOp
         public bool AutoStartServer { get; set; }
         public bool ShowNetGraph { get; set; }
 
-        /// <summary>Köşedeki FPS / ping / oyuncu göstergesi.</summary>
-        public bool ShowHud { get; set; }
-
         public PlayerSettings()
         {
             Username = string.IsNullOrWhiteSpace(GTA.Game.Player.Name) ? "Player" : GTA.Game.Player.Name;
@@ -58,7 +55,6 @@ namespace GTACoOp
             AutoRegister = false;
             AutoStartServer = false;
             ShowNetGraph = false;
-            ShowHud = true;
         }
     }
 }

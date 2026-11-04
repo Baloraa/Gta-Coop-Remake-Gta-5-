@@ -8,7 +8,7 @@ GTACoop Remake is not a new multiplayer engine. It is the desktop layer around G
 
 GTACoop Remake is for private Story Mode co-op. It does not touch GTA Online, does not bypass anti-cheat, and does not inject into online sessions.
 
-**Current release:** 2.7.4  
+**Current release:** 2.7.5  
 **Platform:** Windows 10/11, x64  
 **UI:** Turkish, English, and Russian  
 **License:** GNU GPL v3
@@ -289,6 +289,18 @@ This is a tool for playing with friends, not a hardened anti-cheat or privacy sy
 - Server owners are responsible for the mods they distribute. The launcher automates delivery; it does not grant permission to redistribute someone else's work.
 
 ---
+
+## What is new in 2.7.5
+
+- **Players panel.** The *My Server* tab shows a live list of connected players (name, ping, health).
+  It is read from the roster file the server plugin writes; the network protocol and the game files
+  are untouched and nothing extra runs inside the game.
+- **Moderation.** Kick the selected player, ban their name, message a single player or announce to
+  everyone. *Bans / Whitelist* manages the ban list and the "whitelisted players only" switch;
+  a banned name is kicked as soon as it connects.
+- **Stutter fix.** The per-frame HUD added in 2.7.4 is gone, so the game loop no longer draws text or
+  allocates every tick. This was the cause of the stutter and lag reported after the last update.
+- **Server browser search.** Filter the server list instantly by name, address or short code.
 
 ## What is new in 2.7.4
 
