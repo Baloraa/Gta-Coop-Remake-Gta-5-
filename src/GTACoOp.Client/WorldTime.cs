@@ -12,6 +12,7 @@ namespace GTACoOp
         public string ServerName { get; set; }
         public string TimeMode { get; set; }
         public int TimeHour { get; set; }
+        public string Weather { get; set; }
         public DateTime GeneratedUtc { get; set; }
     }
 
@@ -28,7 +29,9 @@ namespace GTACoOp
         private static ClientWorldConfig _config;
         private static int _reloadAt;
         private static int _applyAt;
+        private static int _weatherAt;
         private static bool _applied;
+        private static string _appliedWeather = "";
 
         public static string ConfigPath
         {
@@ -52,6 +55,8 @@ namespace GTACoOp
                 _reloadAt = now + 3000;
                 _config = Load();
             }
+
+            ApplyWeather(now);
 
             var mode = _config == null ? null : _config.TimeMode;
             if (string.IsNullOrWhiteSpace(mode) ||
@@ -82,6 +87,40 @@ namespace GTACoOp
             catch
             {
                 // Native başarısız olursa oyun saati normal akışında kalır.
+            }
+        }
+
+        /// <summary>
+        /// Sunucunun hava kilidini uygular. "dynamic" ise zorlama kaldırılır ve
+        /// oyun kendi hava döngüsüne döner.
+        /// </summary>
+        private static void ApplyWeather(int now)
+        {
+            var weather = _config == null ? null : _config.Weather;
+            if (string.IsNullOrWhiteSpace(weather)) weather = "dynamic";
+
+            if (string.Equals(weather, _appliedWeather, StringComparison.OrdinalIgnoreCase)) return;
+            if (now < _weatherAt) return;
+            _weatherAt = now + 3000;
+
+            try
+            {
+                if (string.Equals(weather, "dynamic", StringComparison.OrdinalIgnoreCase))
+                {
+                    // CLEAR_OVERRIDE_WEATHER (isim sabiti eski SHVDN sürümlerinde yok)
+                    Function.Call((Hash)0x338D2E3477711050);
+                }
+                else
+                {
+                    // SET_WEATHER_TYPE_NOW_PERSISTENT
+                    Function.Call((Hash)0x29B487C359E19889, weather.ToUpperInvariant());
+                }
+
+                _appliedWeather = weather;
+            }
+            catch
+            {
+                // Geçersiz hava adı: oyunun kendi döngüsü devam eder.
             }
         }
 

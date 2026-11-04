@@ -8,7 +8,7 @@ GTACoop Remake is not a new multiplayer engine. It is the desktop layer around G
 
 GTACoop Remake is for private Story Mode co-op. It does not touch GTA Online, does not bypass anti-cheat, and does not inject into online sessions.
 
-**Current release:** 2.7.7  
+**Current release:** 2.8.0  
 **Platform:** Windows 10/11, x64  
 **UI:** Turkish, English, and Russian  
 **License:** GNU GPL v3
@@ -289,6 +289,24 @@ This is a tool for playing with friends, not a hardened anti-cheat or privacy sy
 - Server owners are responsible for the mods they distribute. The launcher automates delivery; it does not grant permission to redistribute someone else's work.
 
 ---
+
+### 2.8.0 — New look, weather lock, conflict detection and mod details
+
+- **New interface.** The window now uses a dark, flat theme: a compact header, an accent-underlined
+  tab strip and themed lists, buttons and inputs. Layout and behaviour are unchanged; only colours
+  are applied, and status colours (green/red) are preserved.
+- **Weather lock.** *My Server* now has a **Weather** setting next to the clock: dynamic, or a fixed
+  weather from a list (extra sunny, clear, clouds, overcast, rain, thunder, foggy, smog, snow,
+  blizzard, xmas). It travels through the manifest like the clock, so guests need no configuration
+  and older clients ignore it. Dynamic restores the game's own weather cycle.
+- **Script conflict detection.** Before a launcher-managed connection, the launcher compares the
+  server's script/ASI files with the player's own files in `scripts`, `asi` and `lua`, and warns
+  about likely clashes. It is read-only: no file is written, moved or deleted, and the player can
+  still continue.
+- **Richer single-player pack list.** Packs can carry a `mod.json` (or `mod.ini`) with name, author,
+  version, category and description; the list shows them in columns and a detail pane below.
+- **Self-hosted relay.** `relay/` now ships a `docker-compose.yml` and a short guide to run your own
+  `bore` relay on a VPS instead of the public one.
 
 ### 2.7.7 — Ped change fix, server clock, and a single-player mod manager
 

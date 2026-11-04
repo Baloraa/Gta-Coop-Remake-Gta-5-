@@ -97,6 +97,12 @@ public sealed class Manifest
     /// <summary>"fixed" modunda 0-23 arası saat.</summary>
     public int TimeHour { get; set; } = 12;
 
+    /// <summary>
+    /// Sunucunun hava durumu kilidi: "dynamic" (varsayılan) veya oyunun
+    /// hava adı ("EXTRASUNNY", "RAIN", "THUNDER", ...). Boş = dinamik.
+    /// </summary>
+    public string Weather { get; set; } = "";
+
     public List<AddonInfo> Addons { get; set; } = new();
 }
 
@@ -110,6 +116,7 @@ public sealed class WorldSettings
     public string ServerName { get; set; } = "";
     public string TimeMode { get; set; } = "off";
     public int TimeHour { get; set; } = 12;
+    public string Weather { get; set; } = "dynamic";
     public DateTime GeneratedUtc { get; set; } = DateTime.UtcNow;
 }
 

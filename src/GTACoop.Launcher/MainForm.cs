@@ -50,6 +50,7 @@ public sealed class MainForm : Form
         };
         Load += (_, _) =>
         {
+            Theme.Apply(this);
             FitToScreen();
             RefreshGamePath();
             _gameTab.RefreshStatus();
@@ -184,10 +185,28 @@ public sealed class MainForm : Form
         _tabs.BringToFront();
     }
 
+    /// <summary>Sekme şeridini koyu temaya geçirir (içerik yerleşimi değişmez).</summary>
+    public void ApplyTabStyle()
+    {
+        _tabs.Appearance = TabAppearance.FlatButtons;
+        _tabs.DrawMode = TabDrawMode.OwnerDrawFixed;
+        _tabs.ItemSize = new Size(150, 32);
+        _tabs.SizeMode = TabSizeMode.Fixed;
+        _tabs.Padding = new Point(12, 6);
+        _tabs.DrawItem -= Theme.DrawTab;
+        _tabs.DrawItem += Theme.DrawTab;
+        _tabs.Invalidate();
+    }
+
     private TabPage AddTab(string title, UserControl control, int index = -1)
     {
         control.Dock = DockStyle.Fill;
         var page = new TabPage(title) { Padding = new Padding(8) };
+        if (Theme.Enabled)
+        {
+            page.BackColor = Theme.Background;
+            page.ForeColor = Theme.Text;
+        }
         page.Controls.Add(control);
         if (index >= 0 && index <= _tabs.TabPages.Count)
             _tabs.TabPages.Insert(index, page);

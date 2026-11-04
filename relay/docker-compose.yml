@@ -1,0 +1,25 @@
+# GTACoop Remake — self-hosted relay (bore server)
+#
+# The launcher's automatic relay uses a public bore server by default. If you
+# prefer your own VPS, run this file there and put your host name (or
+# "host:port") into Sunucum -> "Relay sunucusu" instead of bore.pub.
+#
+# Open TCP 7835 in your firewall / cloud security group.
+#
+#   docker compose up -d
+#   docker compose logs -f
+#
+services:
+  relay:
+    image: ekzhang/bore:latest
+    container_name: gtacoop-relay
+    restart: unless-stopped
+    command: ["server", "--min-port", "1024"]
+    ports:
+      - "7835:7835"
+    # Optional: keep logs small on a long-running VPS.
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

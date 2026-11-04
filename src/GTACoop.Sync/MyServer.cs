@@ -27,6 +27,13 @@ public sealed class MyServerSettings
     public int TimeHour { get; set; } = 12;
 
     /// <summary>
+    /// Sunucunun hava durumu kilidi: "dynamic" (varsayılan) veya oyunun hava
+    /// adı ("EXTRASUNNY", "RAIN", "THUNDER", ...). Boyunca tüm istemcilere
+    /// manifest ile bildirilir.
+    /// </summary>
+    public string Weather { get; set; } = "dynamic";
+
+    /// <summary>
     /// İsteğe bağlı kısa katılım kodu (ör. "Gel.com"). Boşsa kısa kod yayını kapalıdır.
     /// Uzun GTC1 kodu bu ayardan bağımsız olarak çalışır.
     /// </summary>
@@ -214,6 +221,7 @@ public sealed class MyServer : IDisposable
                 ServerName = s.ServerName,
                 TimeMode = string.IsNullOrWhiteSpace(s.TimeMode) ? "off" : s.TimeMode,
                 TimeHour = Math.Min(23, Math.Max(0, s.TimeHour)),
+                Weather = string.IsNullOrWhiteSpace(s.Weather) ? "dynamic" : s.Weather,
                 GeneratedUtc = DateTime.UtcNow
             });
         }

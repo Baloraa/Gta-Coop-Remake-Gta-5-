@@ -62,6 +62,35 @@ public static partial class Loc
         [" (araçtan inin veya düşmeyi bekleyin)"] = " (exit the vehicle or wait until you land)",
         ["Addon ped modeli yüklenemedi: "] = "The add-on ped model could not be loaded: ",
         [" (sunucudaki paket eksik olabilir)"] = " (the pack may be missing on the server)",
-        ["Seçilen model bir ped değil: "] = "The selected model is not a ped: "
+        ["Seçilen model bir ped değil: "] = "The selected model is not a ped: ",
+
+        // --- hava durumu kilidi
+        ["Hava durumu:"] = "Weather:",
+        ["Dinamik (varsayılan)"] = "Dynamic (default)",
+        ["Açık"] = "Clear",
+        ["Bulutlu"] = "Cloudy",
+        ["Yağmur"] = "Rain",
+        ["Fırtına"] = "Thunder",
+        ["Sis"] = "Foggy",
+        ["Dumanlı"] = "Smog",
+        ["Kar"] = "Snow",
+        ["Tipi"] = "Blizzard",
+
+        // --- tek oyunculu paket detayları
+        ["Yazar"] = "Author",
+        ["Sürüm"] = "Version",
+        ["Açıklama"] = "Description",
+        ["Paket: {0}"] = "Pack: {0}",
+        ["Yazar: {0}"] = "Author: {0}",
+        ["Sürüm: {0}"] = "Version: {0}",
+        ["Tür: {0}"] = "Category: {0}",
+        ["Durum: etkin ({0} dosya)"] = "Status: enabled ({0} files)",
+        ["Durum: kapalı"] = "Status: off",
+        ["Paket seçin: açıklama ve sürüm bilgisi burada görünür."] =
+            "Select a pack to see its description and version.",
+
+        // --- mod çakışma denetimi
+        ["Sunucunun scriptleriyle çakışabilecek yerel dosyalar bulundu:\r\n\r\n{0}\r\n\r\nBunlar oyun çökmesine yol açabilir. Yine de bağlanılsın mı?"] =
+            "Local files were found that may conflict with the server's scripts:\r\n\r\n{0}\r\n\r\nThese can cause game crashes. Connect anyway?"
     };
 }

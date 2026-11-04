@@ -23,6 +23,7 @@ public static class WorldConfig
                 ServerName = manifest.ServerName,
                 TimeMode = string.IsNullOrWhiteSpace(manifest.TimeMode) ? "off" : manifest.TimeMode,
                 TimeHour = Math.Min(23, Math.Max(0, manifest.TimeHour)),
+                Weather = string.IsNullOrWhiteSpace(manifest.Weather) ? "dynamic" : manifest.Weather,
                 GeneratedUtc = DateTime.UtcNow
             });
         }

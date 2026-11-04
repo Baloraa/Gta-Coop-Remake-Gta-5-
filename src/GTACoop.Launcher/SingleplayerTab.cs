@@ -16,6 +16,7 @@ public sealed class SingleplayerTab : UserControl
 {
     private readonly ListView _list = new();
     private readonly Label _status = new();
+    private readonly Label _details = new();
     private SpState _state = new();
 
     private static string? _root;
@@ -85,12 +86,16 @@ public sealed class SingleplayerTab : UserControl
         };
 
         Ui.StyleList(_list,
-            (T("Paket"), 340),
-            (T("Dosya"), 90),
-            (T("Durum"), 110));
+            (T("Paket"), 250),
+            (T("Dosya"), 70),
+            (T("Durum"), 90),
+            (T("Yazar"), 130),
+            (T("Sürüm"), 80),
+            (T("Açıklama"), 280));
         _list.Dock = DockStyle.Top;
         _list.Height = 320;
         _list.MultiSelect = false;
+        _list.SelectedIndexChanged += (_, _) => ShowDetails();
 
         _status.Dock = DockStyle.Bottom;
         _status.AutoSize = false;
@@ -108,13 +113,50 @@ public sealed class SingleplayerTab : UserControl
         buttons.Controls.Add(Ui.Btn(T("Mod Klasörünü Aç"), (_, _) => OpenFolder(ModsFolder)));
         buttons.Controls.Add(Ui.Btn(T("Yedekleri Aç"), (_, _) => OpenFolder(BackupFolder)));
 
+        _details.Dock = DockStyle.Bottom;
+        _details.AutoSize = false;
+        _details.Height = 66;
+        _details.ForeColor = Color.DimGray;
+        _details.Padding = new Padding(4, 2, 4, 2);
+        _details.Text = T("Paket seçin: açıklama ve sürüm bilgisi burada görünür.");
+
         Controls.Add(_list);
         Controls.Add(pathInfo);
         Controls.Add(info);
+        Controls.Add(_details);
         Controls.Add(_status);
         Controls.Add(buttons);
 
         RefreshList();
+    }
+
+    /// <summary>Seçili paketin açıklamasını ve sürüm bilgisini gösterir.</summary>
+    private void ShowDetails()
+    {
+        if (_list.SelectedItems.Count == 0)
+        {
+            _details.Text = T("Paket seçin: açıklama ve sürüm bilgisi burada görünür.");
+            return;
+        }
+
+        var packName = _list.SelectedItems[0].Tag as string ?? _list.SelectedItems[0].Text;
+        var meta = SpModInfo.Read(Path.Combine(ModsFolder, packName));
+        var pack = _state.Packs.FirstOrDefault(p =>
+            string.Equals(p.Name, packName, StringComparison.OrdinalIgnoreCase));
+
+        var lines = new List<string>
+        {
+            T("Paket: {0}", packName) + (string.IsNullOrWhiteSpace(meta.Name) ? "" : "  —  " + meta.Name)
+        };
+        if (!string.IsNullOrWhiteSpace(meta.Author)) lines.Add(T("Yazar: {0}", meta.Author));
+        if (!string.IsNullOrWhiteSpace(meta.Version)) lines.Add(T("Sürüm: {0}", meta.Version));
+        if (!string.IsNullOrWhiteSpace(meta.Category)) lines.Add(T("Tür: {0}", meta.Category));
+        if (!string.IsNullOrWhiteSpace(meta.Description)) lines.Add(meta.Description);
+        lines.Add(pack is { Enabled: true }
+            ? T("Durum: etkin ({0} dosya)", pack.Files.Count)
+            : T("Durum: kapalı"));
+
+        _details.Text = string.Join("\r\n", lines);
     }
 
     private void OpenFolder(string path)
@@ -182,9 +224,13 @@ public sealed class SingleplayerTab : UserControl
             var count = pack.Files.Count;
             if (!exists && count == 0) continue;
 
+            var meta = SpModInfo.Read(dir);
             var item = new ListViewItem(pack.Name);
             item.SubItems.Add(exists ? Directory.GetFiles(dir, "*", SearchOption.AllDirectories).Length.ToString() : "0");
             item.SubItems.Add(pack.Enabled ? T("Etkin") : T("Kapalı"));
+            item.SubItems.Add(meta.Author ?? "");
+            item.SubItems.Add(meta.Version ?? "");
+            item.SubItems.Add(meta.Description ?? "");
             item.Tag = pack.Name;
             item.ForeColor = pack.Enabled ? Color.FromArgb(22, 122, 54) : _list.ForeColor;
             _list.Items.Add(item);
@@ -417,6 +463,50 @@ public sealed class SingleplayerTab : UserControl
             var dest = Path.Combine(target, rel);
             Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
             File.Copy(file, dest, overwrite: true);
+        }
+    }
+}
+
+/// <summary>Paket klasöründeki mod.json / mod.ini bilgisi (isteğe bağlı).</summary>
+public sealed class SpModInfo
+{
+    public string Name { get; set; } = "";
+    public string Author { get; set; } = "";
+    public string Version { get; set; } = "";
+    public string Category { get; set; } = "";
+    public string Description { get; set; } = "";
+
+    public static SpModInfo Read(string packDir)
+    {
+        try
+        {
+            var json = Path.Combine(packDir, "mod.json");
+            if (File.Exists(json)) return SyncJson.Load<SpModInfo>(json) ?? new SpModInfo();
+
+            var ini = Path.Combine(packDir, "mod.ini");
+            if (!File.Exists(ini)) return new SpModInfo();
+
+            var info = new SpModInfo();
+            foreach (var line in File.ReadAllLines(ini))
+            {
+                var idx = line.IndexOf('=');
+                if (idx <= 0) continue;
+                var key = line[..idx].Trim().ToLowerInvariant();
+                var value = line[(idx + 1)..].Trim();
+                switch (key)
+                {
+                    case "name": info.Name = value; break;
+                    case "author": info.Author = value; break;
+                    case "version": info.Version = value; break;
+                    case "category": info.Category = value; break;
+                    case "description": info.Description = value; break;
+                }
+            }
+            return info;
+        }
+        catch
+        {
+            return new SpModInfo();
         }
     }
 }

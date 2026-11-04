@@ -972,6 +972,20 @@ public sealed class ServersTab : UserControl
                 return;
             }
 
+            // Yerel scriptlerle çakışma riski: yalnızca bilgi verir, hiçbir dosya
+            // yazmaz veya silmez. Oyuncu isterse bağlanmaktan vazgeçer.
+            try
+            {
+                var conflictState = SyncStateStore.Load(AppEnv.DataFolder, manifest.ServerId);
+                var conflicts = ModConflicts.Find(gameFolder, manifest, conflictState);
+                if (conflicts.Count > 0 &&
+                    !Ui.Confirm(FindForm()!,
+                        T("Sunucunun scriptleriyle çakışabilecek yerel dosyalar bulundu:\r\n\r\n{0}\r\n\r\nBunlar oyun çökmesine yol açabilir. Yine de bağlanılsın mı?",
+                            string.Join("\r\n", conflicts.Take(8)))))
+                    return;
+            }
+            catch { /* çakışma denetimi kritik değil */ }
+
             // "Bağlan ve Oyna" açıkça bağlanma isteğidir; AutoConnect her zaman açılır.
             ClientSettingsEditor.Apply(gameFolder, AppEnv.Settings.Username, gameHost,
                 gamePort, sel.Password, autoConnect: true,

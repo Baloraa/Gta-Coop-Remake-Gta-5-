@@ -156,6 +156,7 @@ app.MapGet("/api/v1/manifest", (HttpContext ctx) =>
     {
         manifest.TimeMode = string.IsNullOrWhiteSpace(world.TimeMode) ? "off" : world.TimeMode;
         manifest.TimeHour = Math.Min(23, Math.Max(0, world.TimeHour));
+        manifest.Weather = string.IsNullOrWhiteSpace(world.Weather) ? "dynamic" : world.Weather;
     }
 
     Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Manifest istendi: {manifest.Addons.Count} eklenti " +

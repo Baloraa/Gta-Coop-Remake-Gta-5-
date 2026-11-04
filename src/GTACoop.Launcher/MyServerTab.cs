@@ -20,6 +20,7 @@ public sealed class MyServerTab : UserControl
     private readonly TextBox _shortCode = new();
     private readonly ComboBox _timeMode = new();
     private readonly NumericUpDown _timeHour = new();
+    private readonly ComboBox _weather = new();
     private readonly ListView _modsList = new();
     private readonly Label _modsStatus = new();
     private readonly Label _gameServerStatus = new();
@@ -65,7 +66,7 @@ public sealed class MyServerTab : UserControl
         {
             Dock = DockStyle.Fill,
             ColumnCount = 2,
-            RowCount = 10,
+            RowCount = 11,
             Padding = new Padding(8, 4, 8, 4)
         };
         settingsTable.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 200));
@@ -135,6 +136,17 @@ public sealed class MyServerTab : UserControl
         });
         timePanel.Controls.Add(_timeHour);
         settingsTable.Controls.Add(timePanel);
+
+        // --- hava durumu kilidi: dinamik ya da sabit hava
+        AddRow(settingsTable, T("Hava durumu:"), _weather, null);
+        _weather.DropDownStyle = ComboBoxStyle.DropDownList;
+        _weather.Width = 220;
+        _weather.Items.Clear();
+        foreach (var (label, _) in WeatherChoices) _weather.Items.Add(T(label));
+
+        var weatherIndex = Array.FindIndex(WeatherChoices,
+            c => string.Equals(c.Value, s.Weather, StringComparison.OrdinalIgnoreCase));
+        _weather.SelectedIndex = weatherIndex >= 0 ? weatherIndex : 0;
 
         var settingsGroup = new GroupBox
         {
@@ -351,6 +363,23 @@ public sealed class MyServerTab : UserControl
         table.Controls.Add(control);
     }
 
+    /// <summary>Hava seçenekleri: görünen ad + oyunun hava adı.</summary>
+    private static readonly (string Label, string Value)[] WeatherChoices =
+    {
+        ("Dinamik (varsayılan)", "dynamic"),
+        ("Extra Sunny", "EXTRASUNNY"),
+        ("Açık", "CLEAR"),
+        ("Bulutlu", "CLOUDS"),
+        ("Kapalı", "OVERCAST"),
+        ("Yağmur", "RAIN"),
+        ("Fırtına", "THUNDER"),
+        ("Sis", "FOGGY"),
+        ("Dumanlı", "SMOG"),
+        ("Kar", "SNOW"),
+        ("Tipi", "BLIZZARD"),
+        ("Xmas", "XMAS")
+    };
+
     private MyServerServerInfo CurrentSettings() => new(
         _name.Text.Trim(),
         (int)_gamePort.Value,
@@ -362,12 +391,15 @@ public sealed class MyServerTab : UserControl
         string.IsNullOrWhiteSpace(_relayServer.Text) ? "bore.pub" : _relayServer.Text.Trim(),
         _shortCode.Text.Trim(),
         _timeMode.SelectedIndex == 1 ? "realtime" : _timeMode.SelectedIndex == 2 ? "fixed" : "off",
-        (int)_timeHour.Value);
+        (int)_timeHour.Value,
+        _weather.SelectedIndex >= 0 && _weather.SelectedIndex < WeatherChoices.Length
+            ? WeatherChoices[_weather.SelectedIndex].Value
+            : "dynamic");
 
     private readonly record struct MyServerServerInfo(
         string Name, int GamePort, int SyncPort, int MaxClients,
         string Password, string Motd, string Token, string RelayServer, string ShortCode,
-        string TimeMode, int TimeHour);
+        string TimeMode, int TimeHour, string Weather);
 
     private MyServerSettings ToSettings(MyServerServerInfo i)
     {
@@ -385,6 +417,7 @@ public sealed class MyServerTab : UserControl
             ShortCode = i.ShortCode,
             TimeMode = i.TimeMode,
             TimeHour = i.TimeHour,
+            Weather = i.Weather,
             DisabledMods = existing.DisabledMods
         };
     }
