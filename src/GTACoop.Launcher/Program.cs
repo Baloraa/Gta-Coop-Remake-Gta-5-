@@ -17,6 +17,9 @@ internal static class Program
         }
 
         ApplicationConfiguration.Initialize();
+        // Yerel denetimlerin (kaydırma çubukları, listeler) koyu çizilmesi için
+        // pencere açılmadan önce uygulama karanlık moda alınır.
+        Theme.InitDarkMode();
 
         try
         {

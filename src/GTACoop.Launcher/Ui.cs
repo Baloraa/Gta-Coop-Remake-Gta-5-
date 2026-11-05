@@ -49,13 +49,58 @@ internal static class Ui
 
     public static GroupBox GroupBox(string title, Control content, int height)
     {
-        return new GroupBox
+        return new DarkGroup
         {
             Text = title,
             Dock = DockStyle.Top,
             Height = height,
             Padding = new Padding(8),
         }.With(c => c.Controls.Add(content));
+    }
+
+    /// <summary>
+    /// Grubun yüksekliğini içeriğine göre ayarlar. Sabit yükseklikler DPI ve
+    /// pencere boyutuna göre tutmadığı için satırlar kesilebiliyordu; burada
+    /// üst/alt yaslı satırların gerçek yüksekliği toplanır ve grup ona göre büyür.
+    /// </summary>
+    public static void FitToContent(GroupBox box)
+    {
+        var fitting = false;
+
+        void Apply()
+        {
+            if (fitting || box.IsDisposed) return;
+            fitting = true;
+            try
+            {
+                var need = box.Padding.Vertical + 4;
+                foreach (Control c in box.Controls)
+                {
+                    if (!c.Visible) continue;
+                    need += c.Dock switch
+                    {
+                        DockStyle.Top or DockStyle.Bottom => c.Height + c.Margin.Vertical,
+                        DockStyle.Fill => c.PreferredSize.Height + c.Margin.Vertical,
+                        _ => 0
+                    };
+                }
+
+                if (need > 0 && box.Height != need) box.Height = need;
+            }
+            finally
+            {
+                fitting = false;
+            }
+        }
+
+        foreach (Control c in box.Controls)
+        {
+            c.SizeChanged += (_, _) => Apply();
+            c.VisibleChanged += (_, _) => Apply();
+        }
+
+        box.Layout += (_, _) => Apply();
+        Apply();
     }
 
     public static FlowLayoutPanel Flow(DockStyle dock = DockStyle.Top)

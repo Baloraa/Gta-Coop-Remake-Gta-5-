@@ -115,7 +115,7 @@ public sealed class ServerBrowserTab : UserControl
         _list.DoubleClick += (_, _) => _ = ConnectSelectedAsync(gameOnly: false);
         _list.SelectedIndexChanged += (_, _) => UpdateDetails();
 
-        var detailsGroup = new GroupBox
+        var detailsGroup = new DarkGroup
         {
             Text = T("Sunucu Detayları"),
             Dock = DockStyle.Fill,

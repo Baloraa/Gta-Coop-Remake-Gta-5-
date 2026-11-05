@@ -1,5 +1,6 @@
 using System.Drawing;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Windows.Forms;
 
 namespace GTACoop.Remake;
@@ -32,9 +33,11 @@ internal static class Theme
     public static void Apply(Form form)
     {
         Enabled = true;
+        InitDarkMode();
         form.BackColor = Background;
         form.ForeColor = Text;
         ApplyToChildren(form);
+        DarkenScrollbars(form);
 
         if (form is MainForm main)
             main.ApplyTabStyle();
@@ -49,7 +52,73 @@ internal static class Theme
         control.BackColor = Background;
         control.ForeColor = Text;
         ApplyToChildren(control);
+        DarkenScrollbars(control);
     }
+
+    // Windows 11'de yerel kaydırma çubuklarının koyu çizilmesi için uygulama
+    // karanlık moda zorlanır (belgelenmemiş ama yaygın kullanılan ordinal).
+    [DllImport("uxtheme.dll", EntryPoint = "#135")]
+    private static extern int SetPreferredAppMode(int mode);
+
+    [DllImport("uxtheme.dll", EntryPoint = "#136")]
+    private static extern void FlushMenuThemes();
+
+    [DllImport("uxtheme.dll", CharSet = CharSet.Unicode)]
+    private static extern int SetWindowTheme(IntPtr hWnd, string subAppName, string? subIdList);
+
+    [DllImport("user32.dll")]
+    private static extern bool EnumChildWindows(IntPtr parent, EnumWindowsProc callback, IntPtr lParam);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern int GetClassName(IntPtr hWnd, StringBuilder name, int max);
+
+    private delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
+
+    /// <summary>
+    /// ListView/TextBox gibi denetimlerin kaydırma çubuklarını Windows açık
+    /// renkte çizer. Yalnızca kaydırma çubukları koyu temaya çevrilir; diğer
+    /// denetimlerin görünümü değişmez.
+    /// </summary>
+    public static void DarkenScrollbars(Control root)
+    {
+        if (!root.IsHandleCreated) return;
+        try
+        {
+            EnumChildWindows(root.Handle, (h, _) =>
+            {
+                var name = new StringBuilder(64);
+                if (GetClassName(h, name, name.Capacity) > 0 &&
+                    name.ToString().Contains("ScrollBar", StringComparison.OrdinalIgnoreCase))
+                {
+                    SetWindowTheme(h, "DarkMode_Explorer", null);
+                }
+                return true;
+            }, IntPtr.Zero);
+        }
+        catch
+        {
+            // Eski Windows sürümlerinde kaydırma çubukları sistem renginde kalır.
+        }
+    }
+
+    /// <summary>Yerel (Windows) denetimlerin koyu çizilmesi için uygulama
+    /// karanlık moda alınır. Pencere oluşturulmadan önce çağrılmalıdır.</summary>
+    public static void InitDarkMode()
+    {
+        if (_darkModeTried) return;
+        _darkModeTried = true;
+        try
+        {
+            SetPreferredAppMode(2); // ForceDark
+            FlushMenuThemes();
+        }
+        catch
+        {
+            // Windows 10'da bu giriş noktası yoksa varsayılan görünüm kalır.
+        }
+    }
+
+    private static bool _darkModeTried;
 
     private static void ApplyDarkTitleBar(Form form)
     {
@@ -76,6 +145,10 @@ internal static class Theme
         }
     }
 
+    private static bool IsStatusColor(Color c) =>
+        c == Ui.OkColor || c == Ui.ErrColor || c == Ui.WarnColor ||
+        c == Accent || c == AccentAlt || c == Color.Red || c == Color.DarkRed;
+
     private static bool IsDefaultFore(Color c) =>
         c == Control.DefaultForeColor || c == Color.Black || c == Color.White ||
         c == SystemColors.ControlText || c == SystemColors.WindowText;
@@ -100,6 +173,10 @@ internal static class Theme
             case GroupBox group:
                 group.BackColor = Surface;
                 group.ForeColor = Accent;
+                // Başlık yazısı docked ilk satırın altında kalmasın.
+                if (group.Padding.Top < 22)
+                    group.Padding = new Padding(group.Padding.Left, 22,
+                        group.Padding.Right, group.Padding.Bottom);
                 break;
 
             case ListView list:
@@ -153,6 +230,9 @@ internal static class Theme
                 // Anlam taşıyan (yeşil/kırmızı) yazılar korunur.
                 if (IsDefaultFore(label.ForeColor)) label.ForeColor = Text;
                 else if (label.ForeColor == Color.DimGray) label.ForeColor = Muted;
+                // Koyu zeminde okunmayan koyu yazılar açık renge çevrilir.
+                else if (label.ForeColor.GetBrightness() < 0.45f && !IsStatusColor(label.ForeColor))
+                    label.ForeColor = Text;
                 break;
 
             case TableLayoutPanel table:
@@ -212,6 +292,14 @@ internal static class Theme
                 e.Bounds.Right - 1, e.Bounds.Bottom - 3);
         }
 
+        // Son sütunun sağında kalan şerit beyaz kalmasın.
+        if (sender is ListView headerList && e.Bounds.Right < headerList.ClientSize.Width)
+        {
+            using var rest = new SolidBrush(SurfaceAlt);
+            e.Graphics.FillRectangle(rest, e.Bounds.Right, e.Bounds.Top,
+                headerList.ClientSize.Width - e.Bounds.Right, e.Bounds.Height);
+        }
+
         var text = e.Header?.Text ?? "";
         TextRenderer.DrawText(e.Graphics, text, e.Font ?? Control.DefaultFont,
             new Rectangle(e.Bounds.X + 6, e.Bounds.Y, e.Bounds.Width - 10, e.Bounds.Height),
@@ -224,6 +312,11 @@ internal static class Theme
         var list = (ListView)sender!;
         using var back = new SolidBrush(e.Item.Selected ? Selection : Surface);
         e.Graphics.FillRectangle(back, e.Bounds);
+
+        // Satır, sütunların toplamından kısa olabilir; sağdaki boşluğu da boya.
+        if (e.Bounds.Right < list.ClientSize.Width)
+            e.Graphics.FillRectangle(back, e.Bounds.Right, e.Bounds.Top,
+                list.ClientSize.Width - e.Bounds.Right, e.Bounds.Height);
 
         // Onay kutusu (yalnızca CheckBoxes açıksa) elle çizilir.
         if (!list.CheckBoxes) return;

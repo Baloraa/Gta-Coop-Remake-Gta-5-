@@ -62,7 +62,7 @@ public sealed class ShareCodeDialog : Form
 
         // --- kısa kod
         var hasShortCode = !string.IsNullOrWhiteSpace(_settings.ShortCode);
-        var shortGroup = new GroupBox
+        var shortGroup = new DarkGroup
         {
             Text = T("Kısa Kod (arkadaşınızın yazacağı kod)"),
             Dock = DockStyle.Fill,

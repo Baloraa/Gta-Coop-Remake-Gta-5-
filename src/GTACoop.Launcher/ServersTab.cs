@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.Net.Sockets;
 using System.Windows.Forms;
 using GTACoop.Sync;
@@ -41,7 +41,7 @@ public sealed class ServersTab : UserControl
         {
             Dock = DockStyle.Top,
             AutoSize = false,
-            Height = 72,
+            Height = 100,
             Text = T("Sunucu listesine sunucu ekleyin (arkadaşınızın IP'si veya kendi sunucunuz), seçip 'Bağlan ve Oyna'ya basın.\r\nSunucunun tüm modları (araç/ped paketleri, scriptler, ASI eklentileri) otomatik indirilir ve yalnızca siz oynarken kurulu kalır; oyundan çıkınca kaldırılır."),
             ForeColor = Color.DimGray,
             Padding = new Padding(4, 4, 4, 4)
@@ -88,7 +88,7 @@ public sealed class ServersTab : UserControl
         listButtons.Controls.Add(_sort);
 
         // Bağlantı grubu
-        var connectGroup = new GroupBox
+        var connectGroup = new DarkGroup
         {
             Text = T("Bağlantı"),
             Dock = DockStyle.Top,

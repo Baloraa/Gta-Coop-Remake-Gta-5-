@@ -1,4 +1,4 @@
-﻿using System.Net;
+using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Text.Json;
@@ -64,7 +64,10 @@ public sealed class MyServerTab : UserControl
         // --- ayarlar
         var settingsTable = new TableLayoutPanel
         {
-            Dock = DockStyle.Fill,
+            // Satırlar sabit yükseklikle kesilmesin: tablo içeriği kadar büyür.
+            Dock = DockStyle.Top,
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
             ColumnCount = 2,
             RowCount = 11,
             Padding = new Padding(8, 4, 8, 4)
@@ -148,7 +151,7 @@ public sealed class MyServerTab : UserControl
             c => string.Equals(c.Value, s.Weather, StringComparison.OrdinalIgnoreCase));
         _weather.SelectedIndex = weatherIndex >= 0 ? weatherIndex : 0;
 
-        var settingsGroup = new GroupBox
+        var settingsGroup = new DarkGroup
         {
             Text = T("Sunucu Ayarları"),
             Dock = DockStyle.Top,
@@ -177,7 +180,7 @@ public sealed class MyServerTab : UserControl
         settingsGroup.Controls.Add(settingsButtons);
 
         // --- modlar
-        var modsGroup = new GroupBox
+        var modsGroup = new DarkGroup
         {
             Text = T("Sunucu Modları"),
             Dock = DockStyle.Top,
@@ -244,7 +247,7 @@ public sealed class MyServerTab : UserControl
         modsGroup.Controls.Add(modsListLabel);
 
         // --- kontrol
-        var controlGroup = new GroupBox
+        var controlGroup = new DarkGroup
         {
             Text = T("Sunucu Kontrolü"),
             Dock = DockStyle.Top,
@@ -285,7 +288,7 @@ public sealed class MyServerTab : UserControl
         controlGroup.Controls.Add(controlButtons);
 
         // --- oyuncular (canlı liste + moderasyon)
-        var playersGroup = new GroupBox
+        var playersGroup = new DarkGroup
         {
             Text = T("Oyuncular (canlı)"),
             Dock = DockStyle.Top,
@@ -322,13 +325,19 @@ public sealed class MyServerTab : UserControl
         playersGroup.Controls.Add(playersButtons);
 
         // İçerik pencereden uzun olabilir: gerektiğinde dikey kaydırma çubuğu çıksın
-        var scroll = new Panel { Dock = DockStyle.Fill, AutoScroll = true };
+        var scroll = new ScrollPanel { Dock = DockStyle.Fill };
         scroll.Controls.Add(controlGroup);
         scroll.Controls.Add(modsGroup);
         scroll.Controls.Add(settingsGroup);
         scroll.Controls.Add(playersGroup);
         scroll.Controls.Add(info);
         Controls.Add(scroll);
+
+        // Grup yükseklikleri içeriğe göre hesaplanır (DPI/pencere boyutundan bağımsız).
+        Ui.FitToContent(settingsGroup);
+        Ui.FitToContent(modsGroup);
+        Ui.FitToContent(controlGroup);
+        Ui.FitToContent(playersGroup);
 
         _timer.Interval = 1500;
         _timer.Tick += (_, _) =>

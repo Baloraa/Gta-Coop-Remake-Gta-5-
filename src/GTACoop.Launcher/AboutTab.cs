@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.Windows.Forms;
 
 namespace GTACoop.Remake;
@@ -11,6 +11,12 @@ public sealed class AboutTab : UserControl
     private const string UrlX = "https://x.com/imp_loyal38310";
     private const string UrlGitHub = "https://github.com/oldnapalm/GTACoop";
 
+    private readonly ScrollPanel _scroll = new()
+    {
+        Dock = DockStyle.Fill,
+        // Üst boşluk: içerik pencere başlık şeridinin altından başlasın.
+        Padding = new Padding(12, 10, 12, 10)
+    };
     private readonly ToolTip _tips = new();
     private readonly Label _updateStatus = Ui.StatusLbl();
     private readonly Button _updateBtn;
@@ -19,14 +25,16 @@ public sealed class AboutTab : UserControl
     public AboutTab()
     {
         Dock = DockStyle.Fill;
-        Padding = new Padding(14);
+        // Sayfa tek bir kaydırılabilir kaba yığılır: pencere kısa olduğunda
+        // hiçbir bölüm kesilmez, tamamı kaydırılarak görülür.
 
         // ---- Bilgi / lisans (kalan alanı doldurur)
-        var infoGroup = new GroupBox
+        var infoGroup = new DarkGroup
         {
             Text = T("Lisans ve Bilgi"),
-            Dock = DockStyle.Fill,
-            Padding = new Padding(10, 6, 10, 6)
+            Dock = DockStyle.None,
+            Height = 142,
+            Padding = new Padding(10, 22, 10, 6)
         };
         infoGroup.Controls.Add(new Label
         {
@@ -37,16 +45,18 @@ public sealed class AboutTab : UserControl
         });
 
         // ---- Bağlantılar
-        var linksGroup = new GroupBox
+        var linksGroup = new DarkGroup
         {
             Text = T("Bağlantılar"),
-            Dock = DockStyle.Top,
-            Height = 162,
-            Padding = new Padding(10, 6, 10, 6)
+            Dock = DockStyle.None,
+            Height = 176,
+            Padding = new Padding(10, 22, 10, 6)
         };
         var links = new FlowLayoutPanel
         {
-            Dock = DockStyle.Fill,
+            Dock = DockStyle.Top,
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
             FlowDirection = FlowDirection.TopDown,
             WrapContents = false,
             AutoScroll = false,
@@ -59,17 +69,17 @@ public sealed class AboutTab : UserControl
         linksGroup.Controls.Add(links);
 
         // ---- Güncelleme
-        var updateGroup = new GroupBox
+        var updateGroup = new DarkGroup
         {
             Text = T("Güncelleme"),
-            Dock = DockStyle.Top,
-            Height = 98,
-            Padding = new Padding(10, 6, 10, 6)
+            Dock = DockStyle.None,
+            Height = 104,
+            Padding = new Padding(10, 22, 10, 6)
         };
 
         _updateStatus.Text = T("Sürüm {0}. Güncelleme kontrol ediliyor...", AppVersion());
 
-        var updateRow = Ui.Flow(DockStyle.Fill);
+        var updateRow = Ui.Flow(DockStyle.Top);
         updateRow.Controls.Add(_updateStatus);
         _updateBtn = Ui.Btn(T("Güncellemeyi Kontrol Et"), (_, _) => CheckForUpdates());
         updateRow.Controls.Add(_updateBtn);
@@ -81,18 +91,21 @@ public sealed class AboutTab : UserControl
         // ---- Üst bölüm: avatar + başlık
         var header = new TableLayoutPanel
         {
-            Dock = DockStyle.Top,
-            Height = 300,
+            Dock = DockStyle.None,
+            Height = 218,
             ColumnCount = 2,
             RowCount = 1,
             Padding = new Padding(0, 0, 0, 8)
         };
+        // Tek satır, metinlerin toplam yüksekliğine sabit: başlık kesilmez.
+        header.RowStyles.Add(new RowStyle(SizeType.Absolute, 210));
         header.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 178));
         header.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
 
         var avatar = new PictureBox
         {
             Size = new Size(164, 180),
+            Anchor = AnchorStyles.Top | AnchorStyles.Left,
             SizeMode = PictureBoxSizeMode.Zoom,
             Image = LoadAvatar(),
             Margin = new Padding(0, 0, 12, 0)
@@ -100,14 +113,18 @@ public sealed class AboutTab : UserControl
 
         var who = new FlowLayoutPanel
         {
-            Dock = DockStyle.Fill,
+            Dock = DockStyle.Top,
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
             FlowDirection = FlowDirection.TopDown,
-            WrapContents = false
+            WrapContents = false,
+            Margin = new Padding(10, 0, 0, 0)
         };
         who.Controls.Add(new Label
         {
             Text = "GTACoop Remake",
             Font = new Font("Segoe UI", 18f, FontStyle.Bold),
+            ForeColor = Theme.Text,
             AutoSize = true,
             Margin = new Padding(2, 6, 2, 0)
         });
@@ -115,13 +132,14 @@ public sealed class AboutTab : UserControl
         {
             Text = T("GTA V hikâye modu için arkadaş-arası co-op aracı (GTACoOp tabanlı)."),
             AutoSize = true,
-            ForeColor = Color.DimGray,
+            ForeColor = Theme.Muted,
             Margin = new Padding(4, 4, 2, 10)
         });
         who.Controls.Add(new Label
         {
-            Text = T("Geliştirici: Turkish Mods"),
+            Text = T("Geliştirici: Reelone"),
             Font = new Font("Segoe UI", 11f, FontStyle.Bold),
+            ForeColor = Theme.Text,
             AutoSize = true,
             Margin = new Padding(4, 0, 2, 4)
         });
@@ -153,6 +171,7 @@ public sealed class AboutTab : UserControl
         {
             Text = T("İlk test eden: zaza specialist (Discord)"),
             Font = new Font("Segoe UI", 10f, FontStyle.Bold),
+            ForeColor = Theme.Text,
             AutoSize = true,
             Anchor = AnchorStyles.Left,
             Margin = new Padding(0)
@@ -166,21 +185,55 @@ public sealed class AboutTab : UserControl
         {
             Text = T("Sürüm: {0}", AppVersion()),
             AutoSize = true,
-            ForeColor = Color.DimGray,
+            ForeColor = Theme.Muted,
             Margin = new Padding(4, 0, 2, 0)
         });
 
         header.Controls.Add(avatar, 0, 0);
         header.Controls.Add(who, 1, 0);
 
-        Controls.Add(infoGroup);
-        Controls.Add(linksGroup);
-        Controls.Add(updateGroup);
-        Controls.Add(header);
+        // Bölümler sabit sırayla, hesaplanan konumlara yerleştirilir; böylece
+        // hiçbir bölüm üst üste binmez ve üst kısım kesilmez.
+        var body = new Panel { Dock = DockStyle.None, Width = 800 };
+        body.Controls.Add(header);
+        body.Controls.Add(updateGroup);
+        body.Controls.Add(linksGroup);
+        body.Controls.Add(infoGroup);
+        _scroll.Controls.Add(body);
+        Controls.Add(_scroll);
+
+        void Reflow()
+        {
+            var width = Math.Max(420, _scroll.ClientSize.Width - _scroll.Padding.Horizontal);
+            body.SuspendLayout();
+            body.Width = width;
+            var y = 0;
+            foreach (var block in new Control[] { header, updateGroup, linksGroup, infoGroup })
+            {
+                block.Location = new Point(0, y);
+                block.Width = width;
+                y += block.Height + 10;
+            }
+
+            body.Height = y;
+            body.ResumeLayout();
+        }
+
+        _scroll.Resize += (_, _) => Reflow();
+        Reflow();
 
         // Açılışta sessiz sürüm kontrolü: kullanıcı sekmeyi açmasa da haber
         // vermek için arka planda çalışır, hata durumunda sessiz kalır.
         _ = AutoCheckAsync();
+    }
+
+    protected override void OnVisibleChanged(EventArgs e)
+    {
+        base.OnVisibleChanged(e);
+        if (!Visible) return;
+        // Sayfa açılırken odak kaydırması üst kısmı kesmesin: yerleşim
+        // tamamlandıktan sonra kaydırma konumu en üste alınır.
+        BeginInvoke(new Action(() => _scroll.AutoScrollPosition = Point.Empty));
     }
 
     private static string AppVersion()

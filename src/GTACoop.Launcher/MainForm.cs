@@ -1,4 +1,4 @@
-﻿using System.Windows.Forms;
+using System.Windows.Forms;
 using GTACoop.Sync;
 
 namespace GTACoop.Remake;
@@ -11,6 +11,7 @@ public sealed class MainForm : Form
     private readonly TabControl _tabs = new();
     private readonly FlowLayoutPanel _navBar = new();
     private readonly Panel _content = new();
+    private Control? _headerPanel;
     private readonly Dictionary<TabPage, NavButton> _navButtons = new();
     private readonly Dictionary<TabPage, Control> _pageContent = new();
     private TabPage? _currentPage;
@@ -56,6 +57,10 @@ public sealed class MainForm : Form
         Load += (_, _) =>
         {
             Theme.Apply(this);
+            // İçerik, üst şeridin altından başlasın: aksi halde her sayfanın
+            // ilk satırları şeridin arkasında kalıyordu.
+            var headerHeight = _headerPanel?.Height ?? 58;
+            _content.Padding = new Padding(10, headerHeight + 6, 10, 8);
             FitToScreen();
             RefreshGamePath();
             _gameTab.RefreshStatus();
@@ -159,6 +164,7 @@ public sealed class MainForm : Form
         header.Controls.Add(gameLabel, 1, 0);
         header.Controls.Add(_gamePathBox, 2, 0);
         header.Controls.Add(headerButtons, 3, 0);
+        _headerPanel = header;
         Controls.Add(header);
     }
 
@@ -230,7 +236,13 @@ public sealed class MainForm : Form
         _content.SuspendLayout();
         _content.Controls.Clear();
         control.Dock = DockStyle.Fill;
+        // Sayfa ilk kez gösterilirken temaya uyarlanır: sekmeler görünür
+        // ağaçta olmadığı için açılışta taranamıyorlar.
+        Theme.Apply(control);
         _content.Controls.Add(control);
+        // Sayfa her açılışta en üstten görünsün (odak kaydırması üstü kesmesin).
+        if (control is ScrollableControl scrollable)
+            scrollable.AutoScrollPosition = new Point(0, 0);
         _content.ResumeLayout();
     }
 
@@ -242,9 +254,13 @@ public sealed class MainForm : Form
         _navBar.Controls.Clear();
         _navButtons.Clear();
 
+        var icons = new[] { "\u25B6", "\u2699", "\u2630", "\u25CE", "\u2302", "\u2726", "\u270E", "\u24D8" };
+        var index = 0;
         foreach (TabPage page in _tabs.TabPages)
         {
-            var button = new NavButton(page.Text) { Font = new Font(Font.FontFamily, 9.5f) };
+            var icon = index < icons.Length ? icons[index] : "\u2022";
+            index++;
+            var button = new NavButton(page.Text) { Font = new Font(Font.FontFamily, 9.5f), Icon = icon };
             var target = page;
             button.Click += (_, _) => SelectPage(target);
 

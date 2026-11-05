@@ -68,7 +68,7 @@ internal sealed class ModerationDialog : Form
 
     private static GroupBox BuildGroup(string title, ListBox list, IEnumerable<string> values)
     {
-        var group = new GroupBox
+        var group = new DarkGroup
         {
             Text = title,
             Dock = DockStyle.Fill,

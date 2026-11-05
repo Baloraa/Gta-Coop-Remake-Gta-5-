@@ -63,7 +63,7 @@ public sealed class ComponentsTab : UserControl
         root.Controls.Add(info, 0, 0);
 
         // --- seçim grubu
-        var selectionGroup = new GroupBox
+        var selectionGroup = new DarkGroup
         {
             Text = T("Bileşen Yöneticisi"),
             Dock = DockStyle.Fill,
@@ -165,7 +165,7 @@ public sealed class ComponentsTab : UserControl
         root.Controls.Add(actions, 0, 3);
 
         // --- kurulu durum
-        var installedGroup = new GroupBox
+        var installedGroup = new DarkGroup
         {
             Text = T("Kurulu Bileşen"),
             Dock = DockStyle.Fill,

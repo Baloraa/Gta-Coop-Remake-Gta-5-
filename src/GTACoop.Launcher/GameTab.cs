@@ -1,4 +1,4 @@
-﻿using System.Windows.Forms;
+using System.Windows.Forms;
 using GTACoop.Sync;
 
 namespace GTACoop.Remake;
@@ -23,7 +23,7 @@ public sealed class GameTab : UserControl
         _table.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 260));
         _table.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
 
-        var statusGroup = new GroupBox
+        var statusGroup = new DarkGroup
         {
             Text = T("Oyun Durumu"),
             Dock = DockStyle.Top,
@@ -61,7 +61,7 @@ public sealed class GameTab : UserControl
         launchButtons.Controls.Add(Ui.Btn(T("Varsayılana Dön"), (_, _) => ResetLaunchExe()));
 
         // --- oyuncu adı
-        var playerGroup = new GroupBox
+        var playerGroup = new DarkGroup
         {
             Text = T("Oyuncu"),
             Dock = DockStyle.Top,

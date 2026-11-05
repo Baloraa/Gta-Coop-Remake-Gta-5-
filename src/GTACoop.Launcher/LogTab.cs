@@ -1,4 +1,4 @@
-﻿using System.Text;
+using System.Text;
 using System.Windows.Forms;
 using GTACoop.Sync;
 
@@ -14,12 +14,13 @@ public sealed class LogTab : UserControl
         Dock = DockStyle.Fill;
 
         // --- araçlar
-        var tools = new GroupBox
+        // Yükseklik sabit değil: düğmeler satır kaydırsa da grup büyür ve
+        // hiçbir düğme kesilmez (DPI/yazı boyutundan bağımsız).
+        var tools = new DarkGroup
         {
             Text = T("Araçlar ve Kurtarma"),
             Dock = DockStyle.Top,
-            Height = 160,
-            Padding = new Padding(8)
+            Padding = new Padding(8, 24, 8, 8)
         };
 
         var row1 = Ui.Flow();
@@ -40,10 +41,10 @@ public sealed class LogTab : UserControl
 
         var hint = new Label
         {
-            Dock = DockStyle.Bottom,
-            AutoSize = false,
-            Height = 42,
+            Dock = DockStyle.Top,
+            AutoSize = true,
             ForeColor = Color.DimGray,
+            Padding = new Padding(6, 2, 6, 6),
             Text = T("Geri yükleme yalnızca GTA V kapalıyken yapılabilir.\r\nKalıntı temizliği; sunuculardan kurulmuş tüm eklentileri (script, ASI, dlc paketi) kaldırır — kendi modlarınıza dokunmaz.")
         };
 
@@ -62,6 +63,7 @@ public sealed class LogTab : UserControl
 
         Controls.Add(_log);
         Controls.Add(tools);
+        Ui.FitToContent(tools);
     }
 
     public void Append(string line)

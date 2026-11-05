@@ -12,6 +12,20 @@ internal sealed class NavButton : Button
     private bool _active;
     private bool _hover;
 
+    /// <summary>Menü öğesinin solundaki simge karakteri.</summary>
+    public string Icon { get; set; } = "";
+
+    public override string Text
+    {
+        get => base.Text;
+        set
+        {
+            base.Text = value;
+            // Ekran okuyucular ve otomasyon menüyü adıyla bulabilsin.
+            AccessibleName = value;
+        }
+    }
+
     public NavButton(string text)
     {
         Text = text;
@@ -26,6 +40,7 @@ internal sealed class NavButton : Button
         Padding = new Padding(18, 0, 0, 0);
         Cursor = Cursors.Hand;
         TabStop = true;
+        AccessibleRole = AccessibleRole.PushButton;
 
         SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint |
                  ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
@@ -71,9 +86,17 @@ internal sealed class NavButton : Button
             e.Graphics.FillRectangle(accent, 0, 9, 3, Height - 18);
         }
 
-        var bounds = new Rectangle(18, 0, Width - 24, Height);
-        TextRenderer.DrawText(e.Graphics, Text, Font, bounds,
-            _active ? Theme.Accent : Theme.Text,
+        var color = _active ? Theme.Accent : Theme.Text;
+
+        if (!string.IsNullOrEmpty(Icon))
+            TextRenderer.DrawText(e.Graphics, Icon, Font,
+                new Rectangle(18, 0, 22, Height), color,
+                TextFormatFlags.VerticalCenter | TextFormatFlags.HorizontalCenter |
+                TextFormatFlags.NoPrefix);
+
+        var bounds = new Rectangle(string.IsNullOrEmpty(Icon) ? 18 : 46, 0,
+            Width - (string.IsNullOrEmpty(Icon) ? 24 : 54), Height);
+        TextRenderer.DrawText(e.Graphics, Text, Font, bounds, color,
             TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis |
             TextFormatFlags.NoPrefix);
     }
