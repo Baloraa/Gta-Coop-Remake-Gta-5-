@@ -8,7 +8,7 @@ GTACoop Remake is not a new multiplayer engine. It is the desktop layer around G
 
 GTACoop Remake is for private Story Mode co-op. It does not touch GTA Online, does not bypass anti-cheat, and does not inject into online sessions.
 
-**Current release:** 2.8.4  
+**Current release:** 2.9.0  
 **Platform:** Windows 10/11, x64  
 **UI:** Turkish, English, and Russian  
 **License:** GNU GPL v3
@@ -289,6 +289,21 @@ This is a tool for playing with friends, not a hardened anti-cheat or privacy sy
 - Server owners are responsible for the mods they distribute. The launcher automates delivery; it does not grant permission to redistribute someone else's work.
 
 ---
+
+### 2.9.0 — Peer-to-peer mod sharing
+
+- New **P2P Paylaşım** page: share a mod folder directly with a friend over the local
+  network, a hotspot or a VPN (Radmin/Tailscale) — no server, relay or account involved.
+- The host gets an `IP:port` code; the guest connects, sees the file list with sizes and
+  downloads with per-file progress and a cancel button.
+- Every file is verified with SHA256 before it is moved into place, and files that are
+  already present and identical are skipped, so re-running a share only transfers what
+  changed.
+- The page can export the shared folder as a `.zip`, add the Windows firewall rule for the
+  sharing port, and remembers the last code, port and folders.
+- Fixed: the "Bileşenleri Yönet..." button on the Game page and the "Sunucular" links in the
+  server browser never switched pages, because they searched the hidden TabControl instead
+  of the visible page list.
 
 ### 2.8.4 — About page fully visible, group frames drawn by the launcher
 

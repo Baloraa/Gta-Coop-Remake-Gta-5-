@@ -33,6 +33,28 @@ internal static class FirewallHelper
         });
     }
 
+    /// <summary>P2P paylaşım portu için gelen TCP kuralı ekler (yönetici ise).</summary>
+    public static void EnsureTcpRuleAsync(int port, Action<string> log)
+    {
+        _ = Task.Run(() =>
+        {
+            try
+            {
+                if (!IsElevated())
+                {
+                    log("Güvenlik duvarı kuralı atlandı (launcher yönetici değil).");
+                    return;
+                }
+
+                EnsureRule("GTACoop Remake P2P (TCP " + port + ")", "TCP", port, log);
+            }
+            catch (Exception ex)
+            {
+                log("Güvenlik duvarı kuralı eklenemedi: " + ex.Message);
+            }
+        });
+    }
+
     private static void EnsureRule(string name, string protocol, int port, Action<string> log)
     {
         if (RuleExists(name)) return;

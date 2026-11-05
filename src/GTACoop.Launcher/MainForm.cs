@@ -24,6 +24,7 @@ public sealed class MainForm : Form
     private readonly SingleplayerTab _singleplayerTab = new();
     private readonly LogTab _logTab = new();
     private readonly AboutTab _aboutTab = new();
+    private readonly P2PTab _p2pTab = new();
     private AddonPedsTab? _addonPedsTab;
     private TabPage? _addonPedsPage;
 
@@ -175,6 +176,7 @@ public sealed class MainForm : Form
         AddTab(T("Sunucular"), _serversTab);
         AddTab(T("Sunucu Tarayıcı"), _serverBrowserTab);
         AddTab(T("Sunucum"), _serverTab);
+        AddTab(T("P2P Paylaşım"), _p2pTab);
         AddTab(T("Tek Oyunculu"), _singleplayerTab);
         AddTab(T("Günlük / Araçlar"), _logTab);
         AddTab(T("Hakkında"), _aboutTab);
@@ -254,7 +256,7 @@ public sealed class MainForm : Form
         _navBar.Controls.Clear();
         _navButtons.Clear();
 
-        var icons = new[] { "\u25B6", "\u2699", "\u2630", "\u25CE", "\u2302", "\u2726", "\u270E", "\u24D8" };
+        var icons = new[] { "▶", "⚙", "☰", "◎", "⌂", "⇄", "✦", "✎", "ⓘ" };
         var index = 0;
         foreach (TabPage page in _tabs.TabPages)
         {
@@ -378,18 +380,23 @@ public sealed class MainForm : Form
 
     public void RefreshGamePath() => _gamePathBox.Text = AppEnv.Settings.GameFolder;
 
-    public void ShowComponentsTab()
-    {
-        var page = _tabs.TabPages.Cast<TabPage>()
-            .FirstOrDefault(p => p.Controls.Contains(_componentsTab));
-        if (page != null) _tabs.SelectedTab = page;
-    }
+    public void ShowComponentsTab() => SelectPageByContent(_componentsTab);
 
-    public void ShowServersTab()
+    public void ShowServersTab() => SelectPageByContent(_serversTab);
+
+    /// <summary>
+    /// İçeriği gösterilen sayfayı seçer. Sekme sayfaları içeriklerini
+    /// barındırmadığı (içerik ayrı panelde tutulduğu) için eşleşme sayfa
+    /// listesinden yapılır; önceki sürümde bu düğmeler hiç çalışmıyordu.
+    /// </summary>
+    private void SelectPageByContent(Control content)
     {
-        var page = _tabs.TabPages.Cast<TabPage>()
-            .FirstOrDefault(p => p.Controls.Contains(_serversTab));
-        if (page != null) _tabs.SelectedTab = page;
+        foreach (var pair in _pageContent)
+        {
+            if (!ReferenceEquals(pair.Value, content)) continue;
+            SelectPage(pair.Key);
+            return;
+        }
     }
 
     public void SetStatus(string text) => _status.Text = text;

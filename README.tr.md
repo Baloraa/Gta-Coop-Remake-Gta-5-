@@ -2,10 +2,11 @@
 
 **Türkçe** | [English](README.md)
 
-2.8.4 sürümü - kendi sunucu yönetimi, otomatik mod indirme, **oturum modu**,
+2.9.0 sürümü - kendi sunucu yönetimi, otomatik mod indirme, **oturum modu**,
 **kısa kod** (ör. `Gel.com`) ile internetten sunucu bulma, **otomatik relay**,
 **UPnP doğrudan bağlantı**, **özel relay sunucusu**, **tanılama kopyalama**,
-**canlı sunucu durumu**, **Sunucu Tarayıcı** sekmesi, **OpenIV (.oiv) paket desteği**,
+**canlı sunucu durumu**, **Sunucu Tarayıcı** sekmesi, **P2P mod paylaşımı** (sunucusuz,
+**OpenIV (.oiv) paket desteği**,
 **mods klasöründeki RPF arşivlerine yerinde ekleme/değiştirme**, **Bileşenler** sekmesinden
 ScriptHookV / ScriptHookVDotNet / OpenIV.asi / RageOpenV kurulumu, **F9 oyuncuya ışınlanma**
 ve **sunucudan gelen addon pedler**:

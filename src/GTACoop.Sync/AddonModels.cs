@@ -230,6 +230,18 @@ public sealed class LauncherSettings
     /// Oyun klasörü içindeyse göreli dosya adı olarak saklanır.
     /// </summary>
     public string LaunchExe { get; set; } = "";
+
+    /// <summary>P2P mod paylaşımında kullanılan son port.</summary>
+    public int P2PPort { get; set; } = 47900;
+
+    /// <summary>P2P paylaşımında en son açılan klasör.</summary>
+    public string P2PLastFolder { get; set; } = "";
+
+    /// <summary>P2P ekranında son kullanılan eş kodu (ip:port).</summary>
+    public string P2PLastCode { get; set; } = "";
+
+    /// <summary>P2P indirmelerinin varsayılan hedef klasörü.</summary>
+    public string P2PFolder { get; set; } = "";
 }
 
 /// <summary>Sunucu listesindeki kayıt.</summary>
