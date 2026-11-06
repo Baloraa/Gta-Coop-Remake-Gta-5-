@@ -215,6 +215,7 @@ namespace GTACoOp
         private static Dictionary<int, int> _pedClothes = new Dictionary<int, int>();
 
         private static PlayerList _playerList;
+        private static HudOverlay _hud;
 
         private static NativeItem _passItem;
 
@@ -751,6 +752,7 @@ namespace GTACoOp
             }
 
             _playerList = new PlayerList();
+            _hud = new HudOverlay();
         }
 
         private static string DisplayNameOf(SyncPed ped)
@@ -2768,6 +2770,7 @@ namespace GTACoOp
                 _menuPool.Process();
                 _chat.Tick();
                 _playerList.Tick(!_menuPool.AreAnyVisible);
+                _hud?.Tick(!_menuPool.AreAnyVisible);
 
                 if (_storyMissions != null)
                 {

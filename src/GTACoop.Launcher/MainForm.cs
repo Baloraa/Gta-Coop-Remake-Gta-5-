@@ -25,6 +25,7 @@ public sealed class MainForm : Form
     private readonly LogTab _logTab = new();
     private readonly AboutTab _aboutTab = new();
     private readonly P2PTab _p2pTab = new();
+    private readonly HudDesignerTab _hudTab = new();
     private AddonPedsTab? _addonPedsTab;
     private TabPage? _addonPedsPage;
 
@@ -177,6 +178,7 @@ public sealed class MainForm : Form
         AddTab(T("Sunucu Tarayıcı"), _serverBrowserTab);
         AddTab(T("Sunucum"), _serverTab);
         AddTab(T("P2P Paylaşım"), _p2pTab);
+        AddTab(T("Arayüz Tasarımı"), _hudTab);
         AddTab(T("Tek Oyunculu"), _singleplayerTab);
         AddTab(T("Günlük / Araçlar"), _logTab);
         AddTab(T("Hakkında"), _aboutTab);
@@ -256,7 +258,7 @@ public sealed class MainForm : Form
         _navBar.Controls.Clear();
         _navButtons.Clear();
 
-        var icons = new[] { "▶", "⚙", "☰", "◎", "⌂", "⇄", "✦", "✎", "ⓘ" };
+        var icons = new[] { "▶", "⚙", "☰", "◎", "⌂", "⇄", "▣", "✦", "✎", "ⓘ" };
         var index = 0;
         foreach (TabPage page in _tabs.TabPages)
         {

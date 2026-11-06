@@ -8,7 +8,7 @@ GTACoop Remake is not a new multiplayer engine. It is the desktop layer around G
 
 GTACoop Remake is for private Story Mode co-op. It does not touch GTA Online, does not bypass anti-cheat, and does not inject into online sessions.
 
-**Current release:** 2.9.0  
+**Current release:** 2.10.0  
 **Platform:** Windows 10/11, x64  
 **UI:** Turkish, English, and Russian  
 **License:** GNU GPL v3
@@ -289,6 +289,16 @@ This is a tool for playing with friends, not a hardened anti-cheat or privacy sy
 - Server owners are responsible for the mods they distribute. The launcher automates delivery; it does not grant permission to redistribute someone else's work.
 
 ---
+
+### 2.10.0 — Custom HUD designer (optional)
+
+- New **Interface Designer** page: place panels, text, clock, ping, player list, health/armor bars and PNG images on a 16:9 preview, and they are drawn in-game in the same spot. Drag with the mouse or type exact X/Y/W/H values.
+- Layouts are saved to `%LOCALAPPDATA%\GTACoopRemake\ui\hud.json`; the in-game drawer notices a change within two seconds, so a running session does not need a restart.
+- PNG images are baked into a compact colour grid when you save and drawn as rectangles, because ScriptHookVDotNet has no texture-from-file API in this version.
+- Optional and **off by default**. One switch enables the feature, and **disable and restore defaults** hands the game HUD straight back.
+- Keyboard shortcuts run one action each: toggle the custom HUD, show the player list, toggle voice chat, toggle the radar, hide the interface.
+- The game HUD can be replaced piece by piece: hide the whole HUD (radar included), hide the radar, hide the map image while keeping the radar frame, hide wanted stars, street names, vehicle info or help text.
+- Nothing is written into the game folder or the server. Every game HUD change is applied per frame and released as soon as the feature is off, so a normal single-player or GTACoop session is left untouched.
 
 ### 2.9.0 — Peer-to-peer mod sharing
 

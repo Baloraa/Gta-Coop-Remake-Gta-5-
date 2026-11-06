@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2015/06/nuspec.xsd">
   <metadata>
     <id>gtacoop-remake</id>
-    <version>2.9.0</version>
+    <version>2.10.0</version>
     <title>GTACoop Remake</title>
     <authors>Baloraa</authors>
     <projectUrl>https://github.com/Baloraa/Gta-Coop-Remake-Gta-5-</projectUrl>
