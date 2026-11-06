@@ -8,7 +8,7 @@ Commands:
 Installers:
   - Architecture: x64
     InstallerUrl: https://github.com/Baloraa/Gta-Coop-Remake-Gta-5-/releases/download/2.10.0/GTACoop.Launcher.exe
-    InstallerSha256: dc1e58bb41e81c94437b07f42746a803f9e9849e4410a2a9d3d049c4d9dcbe79
+    InstallerSha256: ca01a6d1c75383d496ae3b15f5c45de4c8f00b916110ada36324b8b390eb36e2
     InstallerSwitches:
       Silent: ""
       SilentWithProgress: ""

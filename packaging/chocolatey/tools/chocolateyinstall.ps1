@@ -5,7 +5,7 @@ $toolsDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
 $packageArgs = @{
   packageName   = 'gtacoop-remake'
   fileFullPath  = Join-Path $toolsDir 'GTACoop.Launcher.exe'
-  checksum      = 'dc1e58bb41e81c94437b07f42746a803f9e9849e4410a2a9d3d049c4d9dcbe79'
+  checksum      = 'ca01a6d1c75383d496ae3b15f5c45de4c8f00b916110ada36324b8b390eb36e2'
   checksumType  = 'sha256'
 }
 

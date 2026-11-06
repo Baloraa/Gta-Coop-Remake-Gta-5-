@@ -1,7 +1,7 @@
 # Packaging
 
 Bu klasör, launcher'ı paket yöneticileriyle dağıtmak için hazırlanmış manifestleri içerir.
-Sürüm numarası ve exe özeti (SHA256) her sürümde güncellenir: `2.10.0` / `dc1e58bb41e81c94437b07f42746a803f9e9849e4410a2a9d3d049c4d9dcbe79`.
+Sürüm numarası ve exe özeti (SHA256) her sürümde güncellenir: `2.10.0` / `ca01a6d1c75383d496ae3b15f5c45de4c8f00b916110ada36324b8b390eb36e2`.
 
 ## winget
 

@@ -332,7 +332,7 @@ public sealed class HudDesignerTab : UserControl
             group.Margin = new Padding(2, 2, 2, 8);
         }
 
-        itemsGroup.Height = 396;
+        itemsGroup.Height = 438;
         propsGroup.Height = 312;
         keysGroup.Height = 246;
         optionsGroup.Height = 380;
