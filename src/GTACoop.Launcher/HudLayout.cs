@@ -92,6 +92,12 @@ internal sealed class HudLayout
     public bool HideHelpText { get; set; }
     public List<HudElement> Elements { get; set; } = new();
     public List<HudShortcut> Shortcuts { get; set; } = new();
+
+    /// <summary>
+    /// 2.11 öncesi kaydedilmiş yerleşimlerde "her zaman görünür" alanı yoktu; bu
+    /// bayrak eski PNG'lerin bir kez taşındığını işaretler.
+    /// </summary>
+    public bool OptionsMigrated { get; set; }
 }
 
 /// <summary>Yerleşim dosyalarını okur/yazar, PNG'leri oyun içi ızgaraya çevirir.</summary>
@@ -116,7 +122,11 @@ internal static class HudStore
             if (File.Exists(file))
             {
                 var layout = JsonSerializer.Deserialize<HudLayout>(File.ReadAllText(file), Options);
-                if (layout != null) return layout;
+                if (layout != null)
+                {
+                    Migrate(layout);
+                    return layout;
+                }
             }
         }
         catch (Exception ex)
@@ -132,6 +142,24 @@ internal static class HudStore
         Directory.CreateDirectory(UiFolder);
         var file = path ?? DefaultPath;
         File.WriteAllText(file, JsonSerializer.Serialize(layout, Options));
+    }
+
+    /// <summary>
+    /// Eski yerleşimleri taşır: 2.11'den önce eklenen PNG'ler kullanıcının HUD
+    /// açma/kapama tuşuna bağlıydı ve HUD kapalıyken kayboluyordu. Artık varsayılan
+    /// olarak her zaman görünürler; kullanıcı isterse tek tek kapatabilir.
+    /// </summary>
+    private static void Migrate(HudLayout layout)
+    {
+        if (layout.OptionsMigrated) return;
+
+        foreach (var element in layout.Elements)
+        {
+            if (element != null && string.Equals(element.Type, "image", StringComparison.OrdinalIgnoreCase))
+                element.AlwaysVisible = true;
+        }
+
+        layout.OptionsMigrated = true;
     }
 
     /// <summary>PNG'yi assets klasörüne kopyalar ve öğeyi oyun içi ızgaraya çevirir.</summary>
