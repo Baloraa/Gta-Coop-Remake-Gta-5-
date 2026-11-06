@@ -85,11 +85,18 @@ Copy-Item (Join-Path $vendor "LICENSE.md") (Join-Path $dist "Distribution") -For
 Copy-Item (Join-Path $vendor "README.md") (Join-Path $dist "Distribution\ATIF-README.md") -Force
 
 # --- 8) Publish SyncTool
-Write-Host "[8/8] Publishing SyncTool..."
+Write-Host "[8/9] Publishing SyncTool..."
 $toolOut = Join-Path $dist "tools\SyncTool"
 dotnet publish (Join-Path $root "src\GTACoop.SyncTool\GTACoop.SyncTool.csproj") `
     -c Release -o $toolOut --nologo --no-restore
 if ($LASTEXITCODE -ne 0) { throw "SyncTool publish failed." }
+
+# --- 9) Publish the headless server-mode host (VDS)
+Write-Host "[9/9] Publishing server mode host..."
+$hostOut = Join-Path $dist "tools\ServerHost"
+dotnet publish (Join-Path $root "src\GTACoop.ServerHost\GTACoop.ServerHost.csproj") `
+    -c Release -o $hostOut --nologo
+if ($LASTEXITCODE -ne 0) { throw "ServerHost publish failed." }
 
 # --- Clean apphost files that can leak into the root
 Remove-Item (Join-Path $dist "GTACoop.SyncServer.exe") -ErrorAction SilentlyContinue

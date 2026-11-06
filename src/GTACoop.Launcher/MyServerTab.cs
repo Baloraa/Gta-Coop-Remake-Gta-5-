@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
@@ -30,6 +31,10 @@ public sealed class MyServerTab : UserControl
     private readonly Label _playersStatus = new();
     private bool _playersErrorLogged;
     private readonly Label _addressInfo = new();
+    private readonly CheckBox _serverMode = new();
+    private readonly NumericUpDown _ramMb = new();
+    private readonly CheckBox _autostart = new();
+    private readonly Label _serverModeStatus = new();
     private readonly System.Windows.Forms.Timer _timer = new();
     private bool _suppressModsCheck;
     private List<ModEntry> _modEntries = new();
@@ -324,12 +329,93 @@ public sealed class MyServerTab : UserControl
         playersGroup.Controls.Add(_playersStatus);
         playersGroup.Controls.Add(playersButtons);
 
+        // --- sunucu modu (VDS): isteğe bağlı, launcher kapalıyken de çalışan sunucu
+        var serverModeGroup = new DarkGroup
+        {
+            Text = T("Sunucu Modu (VDS) — isteğe bağlı"),
+            Dock = DockStyle.Top,
+            Padding = new Padding(8)
+        };
+
+        var serverModeNote = new Label
+        {
+            AutoSize = true,
+            MaximumSize = new Size(980, 0),
+            ForeColor = Color.DimGray,
+            Padding = new Padding(4, 2, 4, 6),
+            Text = T("Sunucu modu, sunucuyu launcher'dan ve oyundan bağımsız çalıştırır: bu pencereyi kapatabilir, oyuna girmeyebilirsin. " +
+                       "VDS/dış sunucu için idealdir; oyuncular 'Sunucular' sekmesinden IP:port ile bağlanır. " +
+                       "RAM sınırı süreç başına uygulanır (0 = sınırsız). Kapalıyken her şey eskisi gibi çalışır.")
+        };
+
+        _serverMode.Text = T("Sunucu modunu kullan (launcher kapalıyken de çalışsın)");
+        _serverMode.AutoSize = true;
+        _serverMode.Checked = s.ServerMode;
+        _serverMode.Margin = new Padding(4, 4, 12, 4);
+
+        _autostart.Text = T("Windows açılışında otomatik başlat");
+        _autostart.AutoSize = true;
+        _autostart.Checked = s.ServerModeAutostart;
+        _autostart.Margin = new Padding(12, 4, 4, 4);
+
+        _ramMb.Minimum = 0;
+        _ramMb.Maximum = 131072;
+        _ramMb.Increment = 256;
+        _ramMb.Width = 100;
+        _ramMb.Value = Math.Clamp(s.ServerModeRamMb, 0, 131072);
+        _ramMb.Margin = new Padding(4, 3, 4, 3);
+
+        var serverModeToggles = Ui.Flow();
+        serverModeToggles.Controls.Add(_serverMode);
+        serverModeToggles.Controls.Add(_autostart);
+
+        var ramRow = Ui.Flow();
+        ramRow.Controls.Add(new Label
+        {
+            Text = T("RAM sınırı (MB, 0 = sınırsız):"),
+            AutoSize = true,
+            ForeColor = Color.DimGray,
+            Margin = new Padding(4, 7, 4, 4)
+        });
+        ramRow.Controls.Add(_ramMb);
+
+        var serverModeButtons = Ui.Flow();
+        serverModeButtons.Controls.Add(Ui.Btn(T("Sunucu modunu başlat"), (_, _) => StartServer()));
+        serverModeButtons.Controls.Add(Ui.Btn(T("Durdur"), (_, _) => StopServer()));
+        serverModeButtons.Controls.Add(Ui.Btn(T("Durumu yenile"), (_, _) => RefreshStatus()));
+        serverModeButtons.Controls.Add(Ui.Btn(T("Açılış görevini kaldır"), (_, _) => RemoveAutostart()));
+        serverModeButtons.Controls.Add(Ui.Btn(T("Sunucu günlüğünü aç"), (_, _) => OpenServerHostLog()));
+
+        _serverModeStatus.Text = T("Sunucu modu: kapalı (isteğe bağlı)");
+        _serverModeStatus.AutoSize = true;
+        _serverModeStatus.ForeColor = Color.DimGray;
+        _serverModeStatus.Padding = new Padding(4, 4, 4, 2);
+
+        var serverModeBody = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            FlowDirection = FlowDirection.TopDown,
+            WrapContents = false,
+            AutoScroll = true,
+            Padding = new Padding(0)
+        };
+        serverModeBody.Controls.Add(serverModeNote);
+        serverModeBody.Controls.Add(serverModeToggles);
+        serverModeBody.Controls.Add(ramRow);
+        serverModeBody.Controls.Add(serverModeButtons);
+        serverModeBody.Controls.Add(_serverModeStatus);
+        serverModeGroup.Controls.Add(serverModeBody);
+
         // İçerik pencereden uzun olabilir: gerektiğinde dikey kaydırma çubuğu çıksın
         var scroll = new ScrollPanel { Dock = DockStyle.Fill };
-        scroll.Controls.Add(controlGroup);
+        // Dock=Top denetimleri ters sırayla yerleştiği için ekleme sırası sondan
+        // başa doğrudur: görünen sıra → bilgi, sunucu kontrolü, sunucu modu,
+        // oyuncular, sunucu ayarları, modlar.
         scroll.Controls.Add(modsGroup);
         scroll.Controls.Add(settingsGroup);
         scroll.Controls.Add(playersGroup);
+        scroll.Controls.Add(serverModeGroup);
+        scroll.Controls.Add(controlGroup);
         scroll.Controls.Add(info);
         Controls.Add(scroll);
 
@@ -337,6 +423,7 @@ public sealed class MyServerTab : UserControl
         Ui.FitToContent(settingsGroup);
         Ui.FitToContent(modsGroup);
         Ui.FitToContent(controlGroup);
+        Ui.FitToContent(serverModeGroup);
         Ui.FitToContent(playersGroup);
 
         _timer.Interval = 1500;
@@ -427,7 +514,10 @@ public sealed class MyServerTab : UserControl
             TimeMode = i.TimeMode,
             TimeHour = i.TimeHour,
             Weather = i.Weather,
-            DisabledMods = existing.DisabledMods
+            DisabledMods = existing.DisabledMods,
+            ServerMode = _serverMode.Checked,
+            ServerModeRamMb = (int)_ramMb.Value,
+            ServerModeAutostart = _autostart.Checked
         };
     }
 
@@ -820,7 +910,8 @@ public sealed class MyServerTab : UserControl
             return;
         }
 
-        var serverRunning = Server.IsGameServerRunning && Server.IsSyncServerRunning;
+        var hostRunning = ServerMode.IsRunning(AppEnv.DataFolder);
+        var serverRunning = hostRunning || (Server.IsGameServerRunning && Server.IsSyncServerRunning);
         var status = _publishStatus;
         var ok = _publishOk;
 
@@ -854,6 +945,14 @@ public sealed class MyServerTab : UserControl
 
             if (!SaveSettings()) return;
             var settings = ToSettings(info);
+
+            // Sunucu modu açıksa süreçler launcher'a bağlı kalmayan barındırıcıya
+            // devredilir; böylece pencere kapatılınca sunucu düşmez.
+            if (settings.ServerMode)
+            {
+                StartServerMode(settings);
+                return;
+            }
 
             // Port çakışması, sunucunun sessizce başlamaması yerine burada
             // anlaşılır bir uyarıya dönüşür.
@@ -908,6 +1007,14 @@ public sealed class MyServerTab : UserControl
             StopPublisher(publishOffline: true);
             StopRelay();
             StopUpnp();
+
+            if (ServerMode.IsRunning(AppEnv.DataFolder))
+            {
+                StopServerMode();
+                RefreshStatus();
+                return;
+            }
+
             Server.StopAll();
             RefreshStatus();
         }
@@ -928,6 +1035,15 @@ public sealed class MyServerTab : UserControl
             StopPublisher(publishOffline: true);
             StopRelay();
             StopUpnp();
+
+            // Sunucu modu açıksa süreçler barındırıcıya aittir ve launcher
+            // kapanınca durdurulmaz; oyuncular bağlı kalmaya devam eder.
+            if (ServerMode.IsRunning(AppEnv.DataFolder))
+            {
+                AppEnv.Log("Sunucu modu açık: sunucu launcher kapandıktan sonra da çalışıyor.");
+                return;
+            }
+
             Server.StopAll();
         }
         catch (Exception ex)
@@ -1042,7 +1158,7 @@ public sealed class MyServerTab : UserControl
             }
             _playersList.EndUpdate();
 
-            if (!Server.IsGameServerRunning)
+            if (!Server.IsGameServerRunning && !ServerMode.IsRunning(AppEnv.DataFolder))
             {
                 _playersStatus.Text = T("Sunucu kapalı. Oyuncu listesi sunucu başlatılınca dolar.");
                 _playersStatus.ForeColor = Color.DimGray;
@@ -1184,8 +1300,12 @@ public sealed class MyServerTab : UserControl
     public void RefreshStatus()
     {
         var info = CurrentSettings();
-        bool game = Server.IsGameServerRunning;
-        bool sync = Server.IsSyncServerRunning;
+
+        var hostStatus = ServerMode.ReadStatus(AppEnv.DataFolder);
+        var hostRunning = ServerMode.IsHostAlive(hostStatus);
+
+        bool game = Server.IsGameServerRunning || (hostRunning && hostStatus!.GamePid > 0);
+        bool sync = Server.IsSyncServerRunning || (hostRunning && hostStatus!.SyncPid > 0);
 
         _gameServerStatus.Text = (game ? "✔" : "✘") + " " +
                                  T("Oyun sunucusu: {0} (port {1})", T(game ? "ÇALIŞIYOR" : "kapalı"), info.GamePort);
@@ -1221,7 +1341,177 @@ public sealed class MyServerTab : UserControl
 
         _addressInfo.Text = string.Join("\r\n", lines);
 
+        if (hostRunning && hostStatus != null)
+        {
+            _serverModeStatus.Text = T(
+                "Sunucu modu: ÇALIŞIYOR (PID {0}) | RAM sınırı: {1} | oyun {2} MB / sync {3} MB | yeniden başlatma: {4}",
+                hostStatus.HostPid,
+                hostStatus.RamLimitMb > 0 ? hostStatus.RamLimitMb + " MB" : T("sınırsız"),
+                hostStatus.GameRamMb, hostStatus.SyncRamMb, hostStatus.Restarts);
+            _serverModeStatus.ForeColor = Ui.OkColor;
+        }
+        else
+        {
+            _serverModeStatus.Text = _serverMode.Checked
+                ? T("Sunucu modu: etkin ama çalışmıyor (başlatmak için 'Sunucu modunu başlat').")
+                : T("Sunucu modu: kapalı (isteğe bağlı)");
+            _serverModeStatus.ForeColor = Color.DimGray;
+        }
+
         RefreshShortCodeStatus();
+    }
+
+    // ------------------------------------------------------------------ sunucu modu
+
+    /// <summary>
+    /// Sunucuyu launcher'dan bağımsız barındırıcıya devreder. Barındırıcı
+    /// gtaserver.core + SyncServer süreçlerini yönetir, çökmelerde yeniden başlatır
+    /// ve RAM sınırını uygular.
+    /// </summary>
+    private void StartServerMode(MyServerSettings settings)
+    {
+        var hostExe = ServerMode.FindHostExe(AppContext.BaseDirectory);
+        if (hostExe == null)
+        {
+            Ui.Error(FindForm()!, T("Sunucu modu bileşeni bulunamadı:\r\ntools\\ServerHost\\GTACoop.ServerHost.exe\r\n\r\nLauncher'ı yeniden kurun."));
+            return;
+        }
+
+        if (ServerMode.IsRunning(AppEnv.DataFolder))
+        {
+            Ui.Info(FindForm()!, T("Sunucu modu zaten çalışıyor."));
+            RefreshStatus();
+            return;
+        }
+
+        // Yerel (launcher'a bağlı) süreçler açıksa portlar çakışmasın diye kapatılır.
+        Server.StopAll();
+        ServerMode.ClearStopRequest(AppEnv.DataFolder);
+
+        var args = ServerMode.BuildArguments(AppEnv.ServerDir, AppEnv.DataFolder,
+            Distribution.Root, settings.ServerModeRamMb, 10);
+
+        try
+        {
+            ServerMode.StartHost(hostExe, args);
+        }
+        catch (Exception ex)
+        {
+            AppEnv.LogError("Sunucu modu başlatılamadı: " + ex.Message);
+            Ui.Error(FindForm()!, T("Sunucu modu başlatılamadı:\r\n") + ex.Message);
+            return;
+        }
+
+        AppEnv.Log($"Sunucu modu başlatıldı: {settings.ServerName} " +
+                   $"(RAM sınırı: {(settings.ServerModeRamMb > 0 ? settings.ServerModeRamMb + " MB" : "sınırsız")})");
+
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+        while (DateTime.UtcNow < deadline)
+        {
+            var status = ServerMode.ReadStatus(AppEnv.DataFolder);
+            if (status is { Running: true }) break;
+            Thread.Sleep(250);
+        }
+
+        ApplyAutostart(hostExe, args, settings.ServerModeAutostart);
+        FirewallHelper.EnsureRulesAsync(settings.GamePort, settings.SyncPort, AppEnv.Log);
+        RefreshStatus();
+    }
+
+    /// <summary>Sunucu modunu durdurur; barındırıcı süreçlerini de kapatır.</summary>
+    private void StopServerMode()
+    {
+        var status = ServerMode.ReadStatus(AppEnv.DataFolder);
+        ServerMode.RequestStop(AppEnv.DataFolder);
+
+        var deadline = DateTime.UtcNow.AddSeconds(8);
+        while (DateTime.UtcNow < deadline && ServerMode.IsHostAlive(status))
+        {
+            Thread.Sleep(300);
+            status = ServerMode.ReadStatus(AppEnv.DataFolder) ?? status;
+        }
+
+        if (ServerMode.IsHostAlive(status) && status != null)
+        {
+            try
+            {
+                using var host = Process.GetProcessById(status.HostPid);
+                host.Kill(entireProcessTree: true);
+                AppEnv.Log("Sunucu modu süreci zorla kapatıldı.");
+            }
+            catch (Exception ex)
+            {
+                AppEnv.Log("Sunucu modu kapatılamadı: " + ex.Message);
+            }
+        }
+
+        ServerMode.ClearStopRequest(AppEnv.DataFolder);
+        AppEnv.Log("Sunucu modu durduruldu.");
+    }
+
+    private void ApplyAutostart(string hostExe, string args, bool desired)
+    {
+        try
+        {
+            if (desired)
+            {
+                if (ServerMode.IsAutostartInstalled()) return;
+                if (ServerMode.InstallAutostart(hostExe, args, out var error))
+                    AppEnv.Log("Sunucu modu Windows açılış görevine eklendi.");
+                else
+                    AppEnv.Log("Açılış görevi eklenemedi: " + error.Trim());
+            }
+            else if (ServerMode.IsAutostartInstalled())
+            {
+                if (ServerMode.RemoveAutostart(out var error))
+                    AppEnv.Log("Sunucu modu açılış görevinden kaldırıldı.");
+                else
+                    AppEnv.Log("Açılış görevi kaldırılamadı: " + error.Trim());
+            }
+        }
+        catch (Exception ex)
+        {
+            AppEnv.Log("Açılış görevi ayarlanamadı: " + ex.Message);
+        }
+    }
+
+    private void RemoveAutostart()
+    {
+        if (!ServerMode.IsAutostartInstalled())
+        {
+            Ui.Info(FindForm()!, T("Windows açılış görevi zaten kurulu değil."));
+            return;
+        }
+
+        if (ServerMode.RemoveAutostart(out var error))
+        {
+            _autostart.Checked = false;
+            AppEnv.Log("Sunucu modu açılış görevinden kaldırıldı.");
+            Ui.Info(FindForm()!, T("Windows açılış görevi kaldırıldı."));
+        }
+        else
+        {
+            Ui.Error(FindForm()!, T("Açılış görevi kaldırılamadı:\r\n") + error.Trim());
+        }
+    }
+
+    private void OpenServerHostLog()
+    {
+        try
+        {
+            var path = ServerMode.LogPath(AppEnv.DataFolder);
+            if (!File.Exists(path))
+            {
+                Ui.Info(FindForm()!, T("Henüz sunucu modu günlüğü yok.\r\n{0}", path));
+                return;
+            }
+
+            Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            AppEnv.LogError("Günlük açılamadı: " + ex.Message);
+        }
     }
 
     // ------------------------------------------------------------------ otomatik relay

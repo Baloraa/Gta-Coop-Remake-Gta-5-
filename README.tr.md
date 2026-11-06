@@ -1,8 +1,8 @@
-# GTACoop Remake — Türkçe Mod + Sunucu Yöneticisi
+﻿# GTACoop Remake — Türkçe Mod + Sunucu Yöneticisi
 
 **Türkçe** | [English](README.md)
 
-2.10.0 sürümü - kendi sunucu yönetimi, otomatik mod indirme, **oturum modu**,
+2.11.0 sürümü - **sunucu modu (VDS: launcher kapalıyken de çalışan sunucu, RAM sınırı)**, kendi sunucu yönetimi, otomatik mod indirme, **oturum modu**,
 **kısa kod** (ör. `Gel.com`) ile internetten sunucu bulma, **otomatik relay**,
 **UPnP doğrudan bağlantı**, **özel relay sunucusu**, **tanılama kopyalama**,
 **canlı sunucu durumu**, **Sunucu Tarayıcı** sekmesi, **P2P mod paylaşımı** (sunucusuz,

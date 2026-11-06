@@ -1,7 +1,7 @@
-# Packaging
+﻿# Packaging
 
 Bu klasör, launcher'ı paket yöneticileriyle dağıtmak için hazırlanmış manifestleri içerir.
-Sürüm numarası ve exe özeti (SHA256) her sürümde güncellenir: `2.10.0` / `ca01a6d1c75383d496ae3b15f5c45de4c8f00b916110ada36324b8b390eb36e2`.
+Sürüm numarası ve exe özeti (SHA256) her sürümde güncellenir: `2.11.0` / `7da6edb04f7d8beb684258a69a108a4106c155968b20ab4dab2b425fd440b30e`.
 
 ## winget
 
@@ -14,7 +14,7 @@ Sürüm numarası ve exe özeti (SHA256) her sürümde güncellenir: `2.10.0` / 
   ```
 
 - Yayına almak için manifestler `microsoft/winget-pkgs` deposuna PR olarak gönderilir
-  (`manifests/b/Baloraa/GTACoopRemake/2.10.0/...`). PR'ı senin adına açamam; dosyalar hazır.
+  (`manifests/b/Baloraa/GTACoopRemake/2.11.0/...`). PR'ı senin adına açamam; dosyalar hazır.
 
 ## Chocolatey
 
@@ -26,7 +26,7 @@ Sürüm numarası ve exe özeti (SHA256) her sürümde güncellenir: `2.10.0` / 
   copy ..\..\dist\GTACoopRemake\GTACoop.Launcher.exe tools  choco pack
   ```
 
-  Ardından `choco push gtacoop-remake.2.10.0.nupkg --source https://push.chocolatey.org/`
+  Ardından `choco push gtacoop-remake.2.11.0.nupkg --source https://push.chocolatey.org/`
   (Chocolatey API anahtarı gerekir).
 
 ## Kode imzalama

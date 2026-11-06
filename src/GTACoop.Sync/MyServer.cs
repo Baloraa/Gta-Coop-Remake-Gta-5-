@@ -17,6 +17,18 @@ public sealed class MyServerSettings
     public string SyncToken { get; set; } = "";
 
     /// <summary>
+    /// Sunucu modu (VDS): sunucu, launcher kapandıktan sonra da çalışmaya devam
+    /// eder. İsteğe bağlıdır ve varsayılan olarak kapalıdır.
+    /// </summary>
+    public bool ServerMode { get; set; }
+
+    /// <summary>Sunucu modunda süreç başına RAM sınırı (MB). 0 = sınırsız.</summary>
+    public int ServerModeRamMb { get; set; } = 2048;
+
+    /// <summary>Windows açılışında sunucu modunu otomatik başlat.</summary>
+    public bool ServerModeAutostart { get; set; }
+
+    /// <summary>
     /// Sunucunun varsayılan saat ayarı: "off" (oyun saati), "realtime"
     /// (bilgisayar saati) veya "fixed" (TimeHour). İstemcilere manifest
     /// üzerinden iletilir.
@@ -77,6 +89,12 @@ public sealed class MyServer : IDisposable
     private Process? _syncServer;
     private readonly Action<string> _log;
 
+    /// <summary>
+    /// Sunucu modunda süreçlerin RAM sınırı. Null ise sınırsız çalışır
+    /// (launcher'dan doğrudan başlatma).
+    /// </summary>
+    public MemoryJob? Budget { get; set; }
+
     private string BridgeRemovedMarker => Path.Combine(_serverDir, ".gtacoop-remake-bridge-removed");
 
     public MyServer(string serverDir, Action<string>? log = null)
@@ -93,6 +111,37 @@ public sealed class MyServer : IDisposable
     public string GameServerExe => Path.Combine(_serverDir, "gtaserver.core.exe");
     public bool IsGameServerRunning => _gameServer is { HasExited: false };
     public bool IsSyncServerRunning => _syncServer is { HasExited: false };
+
+    /// <summary>Çalışan sunucu süreçlerinin kimlikleri (0 = çalışmıyor).</summary>
+    public int GameServerPid => _gameServer is { HasExited: false } game ? game.Id : 0;
+    public int SyncServerPid => _syncServer is { HasExited: false } sync ? sync.Id : 0;
+
+    /// <summary>Sunucu süreçlerinin anlık bellek kullanımı (MB).</summary>
+    public long GameServerRamMb => WorkingSetMb(_gameServer);
+    public long SyncServerRamMb => WorkingSetMb(_syncServer);
+
+    private static long WorkingSetMb(Process? process)
+    {
+        try
+        {
+            return process is { HasExited: false } ? process.WorkingSet64 / (1024 * 1024) : 0;
+        }
+        catch
+        {
+            return 0;
+        }
+    }
+
+    /// <summary>Bellek sınırına yaklaşan süreçlerin çalışma kümesini boşaltır.</summary>
+    public void TrimIfNeeded()
+    {
+        if (Budget is not { IsActive: true } budget) return;
+        var threshold = budget.LimitMb * 0.75;
+        if (threshold <= 0) return;
+
+        if (GameServerRamMb > threshold && _gameServer != null) MemoryJob.Trim(_gameServer);
+        if (SyncServerRamMb > threshold && _syncServer != null) MemoryJob.Trim(_syncServer);
+    }
 
     /// <summary>Sunucu klasörünü hazırlar (şablon kopyalama + klasörler).</summary>
     public void EnsureLayout()
@@ -255,6 +304,7 @@ public sealed class MyServer : IDisposable
         _gameServer.Start();
         _gameServer.BeginOutputReadLine();
         _gameServer.BeginErrorReadLine();
+        AttachBudget(_gameServer, "Oyun sunucusu");
         _log($"Oyun sunucusu başlatıldı (PID {_gameServer.Id}).");
     }
 
@@ -295,7 +345,18 @@ public sealed class MyServer : IDisposable
         _syncServer.Start();
         _syncServer.BeginOutputReadLine();
         _syncServer.BeginErrorReadLine();
+        AttachBudget(_syncServer, "Senkronizasyon sunucusu");
         _log($"Senkronizasyon sunucusu başlatıldı: http://0.0.0.0:{settings.SyncPort}/ (PID {_syncServer.Id})");
+    }
+
+    /// <summary>RAM sınırını sürece uygular ve sonucu günlüğe yazar.</summary>
+    private void AttachBudget(Process process, string label)
+    {
+        if (Budget is not { IsActive: true } budget) return;
+
+        _log(Budget.Assign(process)
+            ? $"{label}: RAM sınırı uygulandı ({budget.LimitMb} MB)."
+            : $"{label}: RAM sınırı uygulanamadı; süreç sınırsız bellekle çalışıyor.");
     }
 
     public void StopAll()

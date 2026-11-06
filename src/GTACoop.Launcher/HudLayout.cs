@@ -9,7 +9,7 @@ namespace GTACoop.Remake;
 /// <summary>Tasarımcıdaki tek bir HUD öğesi (panel, yazı, resim, saat...).</summary>
 internal sealed class HudElement
 {
-    public string Type { get; set; } = "panel";           // panel | text | image | clock | ping | players | bar
+    public string Type { get; set; } = "panel";           // panel | text | image | clock | ping | players | bar | outline | circle | line | gradient | speed | weapon | compass | zone | coords | fps
     public double X { get; set; } = 0.02;                 // sol üst köşe (ekranın oranı)
     public double Y { get; set; } = 0.02;
     public double W { get; set; } = 0.22;
@@ -24,6 +24,15 @@ internal sealed class HudElement
     public int Rows { get; set; }
     public string Pixels { get; set; } = "";              // satırlar ';' ile, hücreler RRGGBBAA
 
+    /// <summary>Kalınlık (çerçeve, daire halkası ve çizgi için ekranın oranı).</summary>
+    public double Thickness { get; set; } = 0.006;
+
+    /// <summary>
+    /// HUD kapalıyken (F7) ya da launcher menüsü açıkken de çizilsin. PNG
+    /// logoları varsayılan olarak her zaman görünür.
+    /// </summary>
+    public bool AlwaysVisible { get; set; }
+
     [JsonIgnore]
     public string DisplayLabel => Type switch
     {
@@ -34,6 +43,16 @@ internal sealed class HudElement
         "ping" => "Ping",
         "players" => "Oyuncu listesi",
         "bar" => "Sağlık/zırh çubuğu",
+        "outline" => "Çerçeve",
+        "circle" => "Daire",
+        "line" => "Çizgi",
+        "gradient" => "Gradyan panel",
+        "speed" => "Hız göstergesi",
+        "weapon" => "Silah / mermi",
+        "compass" => "Yön (pusula)",
+        "zone" => "Bölge / sokak",
+        "coords" => "Konum (X,Y,Z)",
+        "fps" => "FPS",
         _ => Type
     };
 }
@@ -116,24 +135,39 @@ internal static class HudStore
     }
 
     /// <summary>PNG'yi assets klasörüne kopyalar ve öğeyi oyun içi ızgaraya çevirir.</summary>
-    public static void AttachImage(HudElement element, string pngPath, int cols = 64)
+    public static void AttachImage(HudElement element, string pngPath)
     {
         Directory.CreateDirectory(AssetsFolder);
         var name = Guid.NewGuid().ToString("N")[..8] + Path.GetExtension(pngPath).ToLowerInvariant();
         var target = Path.Combine(AssetsFolder, name);
         File.Copy(pngPath, target, overwrite: true);
         element.Png = name;
-        Bake(element, target, cols);
+        element.AlwaysVisible = true;
+        Bake(element, target);
     }
 
-    /// <summary>PNG'yi kaba bir renk ızgarasına indirger; oyun içinde her hücre dikdörtgen çizilir.</summary>
-    public static void Bake(HudElement element, string pngPath, int cols = 64)
+    /// <summary>
+    /// PNG'yi renk ızgarasına indirger; oyun içinde her hücre bir dikdörtgen
+    /// olarak çizilir (SHVDN 3'te dosyadan doku yükleme API'si yok). Izgara
+    /// çözünürlüğü görselin oranına göre seçilir: küçük resimlerde daha çok
+    /// sütun kullanılır, böylece detay kaybı azalır ama kare başına çizim
+    /// sayısı sınırlı kalır. Tamamen saydam hücreler boş bırakılır (çizilmez).
+    /// </summary>
+    public static void Bake(HudElement element, string pngPath)
     {
-        cols = Math.Clamp(cols, 16, 96);
         using var source = Image.FromFile(pngPath);
+        var aspect = (double)source.Height / Math.Max(1, source.Width);
 
-        var rows = Math.Max(1, (int)Math.Round(cols * (double)source.Height / source.Width));
-        rows = Math.Clamp(rows, 1, 96);
+        const int cellBudget = 5200;
+        var cols = (int)Math.Round(Math.Sqrt(cellBudget / Math.Max(0.05, aspect)));
+        cols = Math.Clamp(cols, 32, 140);
+
+        var rows = Math.Max(1, (int)Math.Round(cols * aspect));
+        if (rows > 140)
+        {
+            rows = 140;
+            cols = Math.Clamp((int)Math.Round(rows / Math.Max(0.05, aspect)), 8, 140);
+        }
 
         using var small = new Bitmap(cols, rows, PixelFormat.Format32bppArgb);
         using (var g = Graphics.FromImage(small))
@@ -150,7 +184,8 @@ internal static class HudStore
             for (var x = 0; x < cols; x++)
             {
                 var c = small.GetPixel(x, y);
-                cells[x] = c.A < 28 ? "" : $"{c.R:X2}{c.G:X2}{c.B:X2}{c.A:X2}";
+                // Çok saydam pikselleri at: ızgarada görünmez, çizim maliyeti var.
+                cells[x] = c.A < 16 ? "" : $"{c.R:X2}{c.G:X2}{c.B:X2}{c.A:X2}";
             }
             lines.Add(string.Join(",", cells));
         }

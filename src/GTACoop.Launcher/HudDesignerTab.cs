@@ -1,4 +1,4 @@
-using System.Drawing;
+﻿using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
 
@@ -42,6 +42,7 @@ public sealed class HudDesignerTab : UserControl
     private readonly CheckBox _hideVehicle = new();
     private readonly CheckBox _hideHelp = new();
     private readonly CheckBox _enabled = new();
+    private readonly CheckBox _always = new();
     private readonly TextBox _key = new();
     private readonly ComboBox _action = new();
 
@@ -102,10 +103,10 @@ public sealed class HudDesignerTab : UserControl
             Padding = new Padding(8, 24, 8, 8)
         };
 
-        Ui.StyleList(_list, (T("Öğe"), 210), (T("Tür"), 130));
+        Ui.StyleList(_list, (T("Öğe"), 190), (T("Tür"), 100));
         _list.Height = 150;
         _list.Dock = DockStyle.None;
-        _list.Width = 344;
+        _list.Width = 315;
         _list.SelectedIndexChanged += (_, _) =>
         {
             if (_syncing) return;
@@ -122,7 +123,28 @@ public sealed class HudDesignerTab : UserControl
         addRow.Controls.Add(Ui.Btn(T("+ Çubuk"), (_, _) => AddElement("bar")));
         addRow.Controls.Add(Ui.Btn(T("+ PNG Resim..."), (_, _) => AddImage()));
 
+        // Şekiller: panelin üstüne çizilen sade geometrik öğeler.
+        var shapeRow = Ui.Flow();
+        shapeRow.Controls.Add(Ui.Btn(T("+ Çerçeve"), (_, _) => AddElement("outline")));
+        shapeRow.Controls.Add(Ui.Btn(T("+ Daire"), (_, _) => AddElement("circle")));
+        shapeRow.Controls.Add(Ui.Btn(T("+ Çizgi"), (_, _) => AddElement("line")));
+        shapeRow.Controls.Add(Ui.Btn(T("+ Gradyan"), (_, _) => AddElement("gradient")));
+
+        // Bilgi öğeleri: sunucudan/oyundan canlı değer gösterir.
+        var infoRow = Ui.Flow();
+        infoRow.Controls.Add(Ui.Btn(T("+ Hız"), (_, _) => AddElement("speed")));
+        infoRow.Controls.Add(Ui.Btn(T("+ Silah"), (_, _) => AddElement("weapon")));
+        infoRow.Controls.Add(Ui.Btn(T("+ Yön"), (_, _) => AddElement("compass")));
+        infoRow.Controls.Add(Ui.Btn(T("+ Bölge"), (_, _) => AddElement("zone")));
+        infoRow.Controls.Add(Ui.Btn(T("+ Konum"), (_, _) => AddElement("coords")));
+        infoRow.Controls.Add(Ui.Btn(T("+ FPS"), (_, _) => AddElement("fps")));
+
+        // Satırlar panel genişliğine sığsın: taşarsa yatay kaydırma çubuğu çıkıyordu.
+        foreach (var row in new[] { addRow, shapeRow, infoRow })
+            row.MaximumSize = new Size(330, 0);
+
         var itemActions = Ui.Flow();
+        itemActions.MaximumSize = new Size(330, 0);
         itemActions.Controls.Add(Ui.Btn(T("Sil"), (_, _) => RemoveElement()));
         itemActions.Controls.Add(Ui.Btn(T("Yukarı"), (_, _) => MoveElement(-1)));
         itemActions.Controls.Add(Ui.Btn(T("Aşağı"), (_, _) => MoveElement(1)));
@@ -130,6 +152,8 @@ public sealed class HudDesignerTab : UserControl
         var itemsBody = Stack();
         itemsBody.Controls.Add(_list);
         itemsBody.Controls.Add(addRow);
+        itemsBody.Controls.Add(shapeRow);
+        itemsBody.Controls.Add(infoRow);
         itemsBody.Controls.Add(itemActions);
         itemsGroup.Controls.Add(itemsBody);
 
@@ -156,7 +180,7 @@ public sealed class HudDesignerTab : UserControl
         var posGrid = new TableLayoutPanel
         {
             Dock = DockStyle.None,
-            Width = 348,
+            Width = 330,
             Height = 66,
             ColumnCount = 4,
             AutoSize = false,
@@ -178,7 +202,7 @@ public sealed class HudDesignerTab : UserControl
         var styleGrid = new TableLayoutPanel
         {
             Dock = DockStyle.None,
-            Width = 348,
+            Width = 330,
             Height = 34,
             ColumnCount = 4,
             AutoSize = false,
@@ -197,6 +221,18 @@ public sealed class HudDesignerTab : UserControl
         textRow.Controls.Add(Dim(T("Metin")));
         textRow.Controls.Add(_text);
 
+        _always.Text = T("Her zaman görünür (HUD kapalıyken de çiz)");
+        _always.AutoSize = true;
+        _always.CheckedChanged += (_, _) =>
+        {
+            if (_syncing || _selected == null) return;
+            _selected.AlwaysVisible = _always.Checked;
+            _canvas.Invalidate();
+        };
+
+        var alwaysRow = Ui.Flow();
+        alwaysRow.Controls.Add(_always);
+
         var hint = new Label
         {
             Dock = DockStyle.Top,
@@ -212,6 +248,7 @@ public sealed class HudDesignerTab : UserControl
         propsBody.Controls.Add(styleGrid);
         propsBody.Controls.Add(_colorBtn);
         propsBody.Controls.Add(textRow);
+        propsBody.Controls.Add(alwaysRow);
         propsBody.Controls.Add(hint);
         propsGroup.Controls.Add(propsBody);
 
@@ -226,7 +263,7 @@ public sealed class HudDesignerTab : UserControl
         Ui.StyleList(_shortcutList, (T("Tuş"), 80), (T("Eylem"), 270));
         _shortcutList.Height = 110;
         _shortcutList.Dock = DockStyle.None;
-        _shortcutList.Width = 344;
+        _shortcutList.Width = 330;
         _shortcutList.SelectedIndexChanged += (_, _) =>
         {
             if (_syncing) return;
@@ -332,8 +369,8 @@ public sealed class HudDesignerTab : UserControl
             group.Margin = new Padding(2, 2, 2, 8);
         }
 
-        itemsGroup.Height = 438;
-        propsGroup.Height = 312;
+        itemsGroup.Height = 620;
+        propsGroup.Height = 400;
         keysGroup.Height = 246;
         optionsGroup.Height = 380;
 
@@ -571,11 +608,12 @@ public sealed class HudDesignerTab : UserControl
             if (index >= 0) _list.SelectedIndices.Add(index);
 
             var enabled = element != null;
-            foreach (var control in new Control[] { _x, _y, _w, _h, _font, _opacity, _text, _colorBtn })
+            foreach (var control in new Control[] { _x, _y, _w, _h, _font, _opacity, _text, _colorBtn, _always })
                 control.Enabled = enabled;
 
             if (element != null)
             {
+                _always.Checked = element.AlwaysVisible;
                 _x.Value = (decimal)Math.Clamp(element.X, 0, 0.98);
                 _y.Value = (decimal)Math.Clamp(element.Y, 0, 0.98);
                 _w.Value = (decimal)Math.Clamp(element.W, 0.01, 1);
@@ -605,6 +643,7 @@ public sealed class HudDesignerTab : UserControl
         _selected.FontSize = (double)_font.Value;
         _selected.Opacity = (double)_opacity.Value / 100.0;
         _selected.Text = _text.Text;
+        _selected.AlwaysVisible = _always.Checked;
 
         var index = _layout.Elements.IndexOf(_selected);
         if (index >= 0 && index < _list.Items.Count)
@@ -645,19 +684,28 @@ public sealed class HudDesignerTab : UserControl
 
     private void AddElement(string type)
     {
+        var (w, h) = type switch
+        {
+            "panel" => (0.24, 0.10),
+            "gradient" => (0.22, 0.22),
+            "outline" => (0.18, 0.14),
+            "circle" => (0.10, 0.10),
+            "line" => (0.16, 0.10),
+            "bar" => (0.18, 0.03),
+            _ => (0.2, 0.032)
+        };
+
         var element = new HudElement
         {
             Type = type,
             X = 0.03,
             Y = 0.03,
-            W = type == "panel" ? 0.24 : 0.2,
-            H = type == "panel" ? 0.1 : 0.032,
+            W = w,
+            H = h,
+            Thickness = type is "line" or "outline" or "circle" ? 0.005 : 0.006,
             Text = type switch
             {
                 "text" => T("Yeni yazı"),
-                "clock" => "",
-                "ping" => "",
-                "players" => "",
                 _ => ""
             }
         };
@@ -891,6 +939,72 @@ internal sealed class HudCanvas : Panel
                 using (var armor = new SolidBrush(Color.FromArgb(127, 179, 255)))
                     g.FillRectangle(armor, box.Left + 1, box.Top + box.Height * 0.55f + 1,
                         (box.Width - 2) * 0.35f, box.Height * 0.45f - 2);
+                break;
+
+            case "outline":
+            {
+                var width = Math.Max(1f, (float)element.Thickness * view.Height);
+                using var pen = new Pen(Parse(element.Color), width);
+                g.DrawRectangle(pen, box.X, box.Y, box.Width, box.Height);
+                break;
+            }
+
+            case "circle":
+            {
+                var width = Math.Max(1f, (float)element.Thickness * view.Height);
+                using var pen = new Pen(Parse(element.Color), width);
+                if (width * 2 >= Math.Min(box.Width, box.Height))
+                {
+                    using var brush = new SolidBrush(Parse(element.Color));
+                    g.FillEllipse(brush, box);
+                }
+                else
+                {
+                    g.DrawEllipse(pen, box);
+                }
+                break;
+            }
+
+            case "line":
+            {
+                var width = Math.Max(1f, (float)element.Thickness * view.Height);
+                using var pen = new Pen(Parse(element.Color), width);
+                g.DrawLine(pen, box.Left, box.Top, box.Right, box.Bottom);
+                break;
+            }
+
+            case "gradient":
+            {
+                var baseColor = Parse(element.Color);
+                using var brush = new LinearGradientBrush(
+                    new PointF(box.Left, box.Top), new PointF(box.Left, box.Bottom),
+                    Color.FromArgb(alpha, baseColor), Color.FromArgb(0, baseColor));
+                g.FillRectangle(brush, box);
+                break;
+            }
+
+            case "speed":
+                DrawText(g, "48 km/s", box, element, view, Parse(element.Color));
+                break;
+
+            case "weapon":
+                DrawText(g, "Carbine Rifle  120", box, element, view, Parse(element.Color));
+                break;
+
+            case "compass":
+                DrawText(g, "KB  312\u00B0", box, element, view, Parse(element.Color));
+                break;
+
+            case "zone":
+                DrawText(g, "Vinewood \u00B7 Alta St", box, element, view, Parse(element.Color));
+                break;
+
+            case "coords":
+                DrawText(g, "412, -982, 26", box, element, view, Parse(element.Color));
+                break;
+
+            case "fps":
+                DrawText(g, "60 FPS", box, element, view, Parse(element.Color));
                 break;
 
             case "image":

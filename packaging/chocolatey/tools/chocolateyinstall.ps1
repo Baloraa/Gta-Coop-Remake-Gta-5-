@@ -1,11 +1,11 @@
-$ErrorActionPreference = 'Stop'
+﻿$ErrorActionPreference = 'Stop'
 
 $toolsDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
 
 $packageArgs = @{
   packageName   = 'gtacoop-remake'
   fileFullPath  = Join-Path $toolsDir 'GTACoop.Launcher.exe'
-  checksum      = 'ca01a6d1c75383d496ae3b15f5c45de4c8f00b916110ada36324b8b390eb36e2'
+  checksum      = '7da6edb04f7d8beb684258a69a108a4106c155968b20ab4dab2b425fd440b30e'
   checksumType  = 'sha256'
 }
 

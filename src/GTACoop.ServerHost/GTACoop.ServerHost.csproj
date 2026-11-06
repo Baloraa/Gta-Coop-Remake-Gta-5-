@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>GTACoop.ServerHost</AssemblyName>
+    <RootNamespace>GTACoop.ServerHost</RootNamespace>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <Version>2.11.0</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\GTACoop.Sync\GTACoop.Sync.csproj" />
+  </ItemGroup>
+
+</Project>

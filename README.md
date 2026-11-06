@@ -1,4 +1,4 @@
-# GTACoop Remake
+﻿# GTACoop Remake
 
 **English** | [Türkçe](README.tr.md)
 
@@ -8,7 +8,7 @@ GTACoop Remake is not a new multiplayer engine. It is the desktop layer around G
 
 GTACoop Remake is for private Story Mode co-op. It does not touch GTA Online, does not bypass anti-cheat, and does not inject into online sessions.
 
-**Current release:** 2.10.0  
+**Current release:** 2.11.0  
 **Platform:** Windows 10/11, x64  
 **UI:** Turkish, English, and Russian  
 **License:** GNU GPL v3
@@ -289,6 +289,34 @@ This is a tool for playing with friends, not a hardened anti-cheat or privacy sy
 - Server owners are responsible for the mods they distribute. The launcher automates delivery; it does not grant permission to redistribute someone else's work.
 
 ---
+
+### 2.11.0 — Server mode (VDS) and richer HUD
+
+- New **Server Mode (VDS)** group on the *Sunucum* page, **off by default**: the dedicated
+  server (`gtaserver.core` + the addon sync server) is handed to a separate headless host, so
+  it keeps running after the launcher is closed and nobody has to be in-game. This is the same
+  idea as a FiveM FXServer: the server process needs no GTA V install and no player session.
+- **RAM budget per server process**, 0 = unlimited. The limit is enforced by a Windows job
+  object (the process is capped by the OS) and the working set is trimmed when usage passes 75 %
+  of the budget. Crashes or a too-tight limit are followed by an automatic restart.
+- **Automatic restart** when either server process exits, with a configurable delay and a restart
+  counter in the live status line (host PID, RAM limit, current RAM of both processes, restarts).
+- **Start with Windows** optionally creates a per-user logon task, and the task can be removed
+  again from the same page. The host writes `logs\server-host.log` (rotated at 8 MB);
+  **Sunucu günlüğünü aç** opens it.
+- Opening the launcher again shows the live server-mode status and reconnects to the running
+  server instead of starting a second one; the launcher no longer stops the server on exit while
+  server mode is enabled.
+- Do not want it? Untick server mode (or use **Durdur**): the server goes back to being managed
+  by the launcher exactly as before. Nothing is written into the game or server files.
+- HUD designer additions: **outline, circle, line and gradient** shapes plus live **speed, weapon
+  and ammo, compass, zone/street, coordinates and FPS** readouts.
+- PNG images are baked at a higher, aspect-aware grid resolution and are parsed once instead of
+  every frame, so logos look sharper and the in-game drawer costs less CPU.
+- Every element has **"always visible"**: PNG logos and overlays keep showing while the rest of
+  the HUD is hidden with the toggle key or while the launcher menu is open.
+- Fixed: a shortcut key could stall a frame (a sleep inside the draw loop) and right-justified
+  text made every following text right-aligned.
 
 ### 2.10.0 — Custom HUD designer (optional)
 
