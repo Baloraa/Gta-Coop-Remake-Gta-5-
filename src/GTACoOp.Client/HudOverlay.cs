@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Reflection;
 using System.Windows.Forms;
 using GTA;
 using GTA.Native;
@@ -92,6 +93,25 @@ namespace GTACoOp
         private static readonly string LayoutPath = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "GTACoopRemake", "ui", "hud.json");
+
+        private static readonly string AssetsPath = Path.Combine(
+            Path.GetDirectoryName(LayoutPath) ?? "", "assets");
+
+        // Gerçek PNG çizimi: SHVDN 3.6+ CustomSprite dosyadan doku yükler.
+        // Daha eski bir SHVDN kuruluysa ızgara yedeğine düşülür.
+        private static readonly Dictionary<string, SpriteImage?> SpriteCache =
+            new Dictionary<string, SpriteImage?>(StringComparer.OrdinalIgnoreCase);
+        private static readonly HashSet<string> SpriteFailed =
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        private sealed class SpriteImage
+        {
+            public object Instance = null!;
+            public PropertyInfo? Position;
+            public PropertyInfo? Size;
+            public PropertyInfo? Enabled;
+            public MethodInfo? Draw;
+        }
 
         private readonly HashSet<Keys> _heldKeys = new HashSet<Keys>();
 
@@ -582,7 +602,7 @@ namespace GTACoOp
                 }
 
                 case "image":
-                    DrawPixels(e, x, y, w, h);
+                    if (!TryDrawSprite(e, x, y, w, h)) DrawPixels(e, x, y, w, h);
                     break;
             }
         }
@@ -780,7 +800,88 @@ namespace GTACoOp
                 ParseColor("#7FB3FF", 255));
         }
 
-        /// <summary>Resim: birleştirilmiş renk şeritlerini çizer (hücre hücre değil).</summary>
+        /// <summary>
+        /// PNG'yi oyunun kendi doku çizicisiyle (CustomSprite) çizer: piksel piksel
+        /// ızgara yerine tek bir sprite, yani resim tam ve keskin görünür.
+        /// SHVDN sürümü CustomSprite içermiyorsa false döner.
+        /// </summary>
+        private static bool TryDrawSprite(Element e, float x, float y, float w, float h)
+        {
+            var name = e.png;
+            if (string.IsNullOrWhiteSpace(name)) return false;
+            if (SpriteFailed.Contains(name)) return false;
+
+            if (!SpriteCache.TryGetValue(name, out var image))
+            {
+                image = CreateSprite(name);
+                SpriteCache[name] = image;
+                if (image == null) SpriteFailed.Add(name);
+            }
+
+            if (image == null) return false;
+
+            try
+            {
+                // SHVDN konum/boyutu 1080p piksel biriminde bekler; ekran
+                // oranlarımızı o birime çeviriyoruz.
+                var width = GTA.UI.Screen.Width;
+                var height = GTA.UI.Screen.Height;
+
+                image.Position?.SetValue(image.Instance,
+                    new System.Drawing.PointF(x * width, y * height));
+                image.Size?.SetValue(image.Instance,
+                    new System.Drawing.SizeF(w * width, h * height));
+                image.Enabled?.SetValue(image.Instance, true);
+                image.Draw?.Invoke(image.Instance, null);
+                return true;
+            }
+            catch
+            {
+                SpriteFailed.Add(name);
+                return false;
+            }
+        }
+
+        private static SpriteImage? CreateSprite(string png)
+        {
+            try
+            {
+                var path = Path.Combine(AssetsPath, png);
+                if (!File.Exists(path)) return null;
+
+                var type = typeof(Game).Assembly.GetType("GTA.UI.CustomSprite");
+                if (type == null) return null;
+
+                var ctor = type.GetConstructor(new[]
+                {
+                    typeof(string), typeof(System.Drawing.SizeF), typeof(System.Drawing.PointF),
+                    typeof(System.Drawing.Color)
+                });
+
+                if (ctor == null) return null;
+
+                var instance = ctor.Invoke(new object[]
+                {
+                    path, new System.Drawing.SizeF(1f, 1f), new System.Drawing.PointF(0f, 0f),
+                    System.Drawing.Color.White
+                });
+
+                return new SpriteImage
+                {
+                    Instance = instance,
+                    Position = type.GetProperty("Position"),
+                    Size = type.GetProperty("Size"),
+                    Enabled = type.GetProperty("Enabled"),
+                    Draw = type.GetMethod("Draw", Type.EmptyTypes)
+                };
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        /// <summary>Yedek çizim: birleştirilmiş renk şeritleri (hücre hücre değil).</summary>
         private static void DrawPixels(Element e, float x, float y, float w, float h)
         {
             var runs = e.Runs;

@@ -986,6 +986,30 @@ public sealed class ServersTab : UserControl
             }
             catch { /* çakışma denetimi kritik değil */ }
 
+            // Kendi makinemizde çalışan sunucuya genel/relay adresiyle bağlanmak
+            // çoğu router'da çalışmaz (NAT loopback kapalı) ve istemci
+            // "no response from remote host" hatası verir. Oyun portu bu makinede
+            // dinleniyorsa bağlantı doğrudan loopback üzerinden kurulur.
+            if (!LocalAddresses.IsLocalAddress(gameHost))
+            {
+                var hostedHere = false;
+                try
+                {
+                    using var portProbe = new System.Net.Sockets.UdpClient(gamePort);
+                }
+                catch (System.Net.Sockets.SocketException)
+                {
+                    hostedHere = true;
+                }
+
+                if (hostedHere)
+                {
+                    AppEnv.Log($"Oyun portu {gamePort} bu makinede dinleniyor; " +
+                               $"bağlantı 127.0.0.1 üzerinden kurulacak ({gameHost} yerine).");
+                    gameHost = "127.0.0.1";
+                }
+            }
+
             // "Bağlan ve Oyna" açıkça bağlanma isteğidir; AutoConnect her zaman açılır.
             ClientSettingsEditor.Apply(gameFolder, AppEnv.Settings.Username, gameHost,
                 gamePort, sel.Password, autoConnect: true,
@@ -1168,6 +1192,28 @@ public sealed class ServersTab : UserControl
                     throw new SyncException(T(
                         "Bu sunucuya doğrudan ulaşılamaz: adres özel bir ağda ve otomatik relay bilgisi yok. " +
                         "Sunucu sahibinden güncel kısa kodu isteyin."));
+                }
+            }
+
+            // Aynı NAT loopback sorunu modsuz bağlantıda da geçerli: oyun portu
+            // bu makinede dinleniyorsa loopback'e geç.
+            if (!LocalAddresses.IsLocalAddress(gameHost))
+            {
+                var hostedHere = false;
+                try
+                {
+                    using var portProbe = new System.Net.Sockets.UdpClient(gamePort);
+                }
+                catch (System.Net.Sockets.SocketException)
+                {
+                    hostedHere = true;
+                }
+
+                if (hostedHere)
+                {
+                    AppEnv.Log($"Oyun portu {gamePort} bu makinede dinleniyor; " +
+                               $"bağlantı 127.0.0.1 üzerinden kurulacak ({gameHost} yerine).");
+                    gameHost = "127.0.0.1";
                 }
             }
 

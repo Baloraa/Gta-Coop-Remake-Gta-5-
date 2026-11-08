@@ -8,7 +8,7 @@ GTACoop Remake is not a new multiplayer engine. It is the desktop layer around G
 
 GTACoop Remake is for private Story Mode co-op. It does not touch GTA Online, does not bypass anti-cheat, and does not inject into online sessions.
 
-**Current release:** 2.11.1  
+**Current release:** 2.11.2  
 **Platform:** Windows 10/11, x64  
 **UI:** Turkish, English, and Russian  
 **License:** GNU GPL v3
@@ -289,6 +289,17 @@ This is a tool for playing with friends, not a hardened anti-cheat or privacy sy
 - Server owners are responsible for the mods they distribute. The launcher automates delivery; it does not grant permission to redistribute someone else's work.
 
 ---
+
+### 2.11.2 — Real PNG images and joining your own server
+
+- **HUD images are now real textures.** The in-game renderer uses SHVDN's `CustomSprite`, so the
+  PNG is uploaded as a texture and drawn in one call at full resolution and sharpness instead of
+  being rebuilt from thousands of coloured rectangles. On an older ScriptHookVDotNet that has no
+  `CustomSprite`, the previous strip renderer is used automatically, so nothing breaks.
+- **Joining your own server from the launcher works.** If the saved entry uses a public or relay
+  address, the router usually has NAT loopback disabled and the client ends with "no response from
+  remote host". When the game port is already open on this machine, the launcher now connects to
+  `127.0.0.1` instead. Joining someone else's server is unchanged.
 
 ### 2.11.1 — HUD visibility and complete images
 

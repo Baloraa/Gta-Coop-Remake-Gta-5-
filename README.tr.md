@@ -2,7 +2,7 @@
 
 **Türkçe** | [English](README.md)
 
-2.11.1 sürümü - **HUD görünürlük ve resim düzeltmesi**, **sunucu modu (VDS: launcher kapalıyken de çalışan sunucu, RAM sınırı)**, kendi sunucu yönetimi, otomatik mod indirme, **oturum modu**,
+2.11.2 sürümü - **gerçek PNG desteği ve kendi sunucuna bağlanma düzeltmesi**, **HUD görünürlük ve resim düzeltmesi**, **sunucu modu (VDS: launcher kapalıyken de çalışan sunucu, RAM sınırı)**, kendi sunucu yönetimi, otomatik mod indirme, **oturum modu**,
 **kısa kod** (ör. `Gel.com`) ile internetten sunucu bulma, **otomatik relay**,
 **UPnP doğrudan bağlantı**, **özel relay sunucusu**, **tanılama kopyalama**,
 **canlı sunucu durumu**, **Sunucu Tarayıcı** sekmesi, **P2P mod paylaşımı** (sunucusuz,
