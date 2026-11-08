@@ -729,6 +729,44 @@ public sealed class ServersTab : UserControl
 
     // ------------------------------------------------------------------ bağlantı
 
+    /// <summary>
+    /// Kendi sunucumuz bu bilgisayarda çalışıyorsa kayıtlı oyun portu eski
+    /// olabilir (sunucu sonradan başka porta taşınmış, liste/kısa kod kaydı
+    /// varsayılan 4499'da kalmış). Bu durumda istemci 127.0.0.1:4499'a bağlanıp
+    /// "no response from remote host" alıyordu. Sunucu ayarlarındaki canlı port
+    /// dinleniyorsa onu kullan.
+    /// </summary>
+    private static int ResolveOwnServerGamePort(ServerEntry sel, int gamePort)
+    {
+        try
+        {
+            if (!LocalAddresses.IsLocalAddress(sel.Host)) return gamePort;
+
+            var own = MyServerSettings.Load(AppEnv.DataFolder);
+            if (own.GamePort is < 1 or > 65535 || own.GamePort == gamePort) return gamePort;
+
+            if (!string.Equals((own.ServerName ?? "").Trim(), (sel.Name ?? "").Trim(),
+                    StringComparison.OrdinalIgnoreCase))
+                return gamePort;
+
+            try
+            {
+                using var probe = new System.Net.Sockets.UdpClient(own.GamePort);
+                return gamePort; // port boş: kendi sunucumuz çalışmıyor
+            }
+            catch (System.Net.Sockets.SocketException)
+            {
+                AppEnv.Log($"Kayıtlı oyun portu {gamePort} güncel değil; " +
+                           $"kendi sunucunun portu kullanılacak: {own.GamePort}");
+                return own.GamePort;
+            }
+        }
+        catch
+        {
+            return gamePort;
+        }
+    }
+
     private async Task ConnectAsync(bool launch, ServerEntry? entry = null)
     {
         if (_busy)
@@ -787,7 +825,13 @@ public sealed class ServersTab : UserControl
             var syncHost = sel.Host;
             var syncPort = sel.SyncPort;
             var gameHost = sel.Host;
-            var gamePort = sel.GamePort;
+            var gamePort = ResolveOwnServerGamePort(sel, sel.GamePort);
+            if (gamePort != sel.GamePort)
+            {
+                // Listede de doğru port görünsün.
+                sel.GamePort = gamePort;
+                AppEnv.SaveSettings();
+            }
             var syncViaRelay = false;
             var gameViaRelay = false;
             var fallbackHost = "";
@@ -1127,7 +1171,7 @@ public sealed class ServersTab : UserControl
             DisposeActiveRelay();
 
             var gameHost = sel.Host;
-            var gamePort = sel.GamePort;
+            var gamePort = ResolveOwnServerGamePort(sel, sel.GamePort);
             var fallbackHost = "";
             var fallbackPort = 0;
 
