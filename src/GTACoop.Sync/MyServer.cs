@@ -146,16 +146,26 @@ public sealed class MyServer : IDisposable
     /// <summary>Sunucu klasörünü hazırlar (şablon kopyalama + klasörler).</summary>
     public void EnsureLayout()
     {
+        if (!Directory.Exists(Distribution.ServerTemplate))
+            throw new SyncException(
+                $"Sunucu şablonu bulunamadı: {Distribution.ServerTemplate}\n" +
+                "Dağıtım klasörünün uygulamayla birlikte geldiğinden emin olun.");
+
         if (!File.Exists(GameServerExe))
         {
-            if (!Directory.Exists(Distribution.ServerTemplate))
-                throw new SyncException(
-                    $"Sunucu şablonu bulunamadı: {Distribution.ServerTemplate}\n" +
-                    "Dağıtım klasörünün uygulamayla birlikte geldiğinden emin olun.");
-
             _log("Sunucu dosyaları hazırlanıyor (şablondan kopyalanıyor)...");
             CopyTree(Distribution.ServerTemplate, _serverDir);
             _log("Sunucu dosyaları hazır.");
+        }
+        else
+        {
+            // Klasör yarım kalmış olabilir (kesilen kopyalama, elle silinen dosya,
+            // başka bir sürümün artığı). Eksik şablon dosyaları tamamlanır; var
+            // olan dosyalara dokunulmaz. Bu olmadan gtaserver.core,
+            // runtimeconfig.json olmadığı için hiç açılmıyordu.
+            var repaired = RestoreMissing(Distribution.ServerTemplate, _serverDir);
+            if (repaired > 0)
+                _log($"Sunucu dosyaları tamamlandı ({repaired} eksik dosya kopyalandı).");
         }
 
         Directory.CreateDirectory(AddonsDir);
@@ -418,6 +428,31 @@ public sealed class MyServer : IDisposable
             proc?.Dispose();
             proc = null;
         }
+    }
+
+    /// <summary>Şablonda olup sunucu klasöründe olmayan dosyaları kopyalar.</summary>
+    private static int RestoreMissing(string source, string dest)
+    {
+        var copied = 0;
+
+        foreach (var file in Directory.GetFiles(source, "*", SearchOption.AllDirectories))
+        {
+            var target = Path.Combine(dest, Path.GetRelativePath(source, file));
+            if (File.Exists(target)) continue;
+
+            try
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+                File.Copy(file, target, overwrite: false);
+                copied++;
+            }
+            catch
+            {
+                // Tek dosya kopyalanamazsa diğerleri yine denenir.
+            }
+        }
+
+        return copied;
     }
 
     private static void CopyTree(string source, string dest)

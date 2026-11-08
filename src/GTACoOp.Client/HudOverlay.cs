@@ -26,6 +26,18 @@ namespace GTACoOp
             public byte A;
         }
 
+        /// <summary>Bir satırdaki aynı renkli hücre dizisi; tek dikdörtgende çizilir.</summary>
+        private struct Run
+        {
+            public int Col;
+            public int Row;
+            public int Len;
+            public byte R;
+            public byte G;
+            public byte B;
+            public byte A;
+        }
+
         private sealed class Element
         {
             public string type { get; set; }
@@ -43,10 +55,17 @@ namespace GTACoOp
             public int rows { get; set; }
             public string pixels { get; set; }
             public double thickness { get; set; }
-            public bool always { get; set; }
+
+            // Launcher "alwaysVisible" yazar; eski dosyalarda "always" olabilir.
+            [JsonProperty("alwaysVisible")] public bool alwaysVisible { get; set; }
+            [JsonProperty("always")] public bool alwaysLegacy { get; set; }
+
+            [JsonIgnore] public bool AlwaysVisible => alwaysVisible || alwaysLegacy;
 
             // Kare başına JSON ayrıştırması yapmamak için bir kez doldurulur.
-            [JsonIgnore] public Cell[] Cells;
+            [JsonIgnore] public Run[] Runs;
+            [JsonIgnore] public int RunCols = 1;
+            [JsonIgnore] public int RunRows = 1;
         }
 
         private sealed class Shortcut
@@ -83,6 +102,12 @@ namespace GTACoOp
         private bool _radarVisible = true;
         private bool _applied;
 
+        // Oyun her karede sınırlı sayıda çizim kabul eder; bu sınırı aşınca
+        // sonraki dikdörtgenler sessizce düşer (resmin alt kısmı kaybolur).
+        private const int MaxRectsPerFrame = 2600;
+        private const int MaxRunsPerElement = 1500;
+        private static int _frameRects;
+
         // HUD_COMPONENT_* kimlikleri: tek tek gizlenen oyun arayüzü parçaları.
         private const int HudWantedStars = 1;
         private const int HudVehicleName = 6;
@@ -95,6 +120,7 @@ namespace GTACoOp
         {
             try
             {
+                _frameRects = 0;
                 Reload();
 
                 // Özellik kapalı (varsayılan) ya da HUD kapatıldı: oyunun kendi
@@ -119,7 +145,7 @@ namespace GTACoOp
                 foreach (var element in elements)
                 {
                     if (element == null) continue;
-                    if (hudHidden && !element.always) continue;
+                    if (hudHidden && !element.AlwaysVisible) continue;
 
                     // Tek bir bozuk öğe diğerlerini (ve oyunu) etkilemesin.
                     try
@@ -215,7 +241,7 @@ namespace GTACoOp
                 if (layout?.elements != null)
                 {
                     foreach (var element in layout.elements)
-                        if (element != null) element.Cells = ParseCells(element);
+                        if (element != null) Prepare(element);
                 }
 
                 _layout = layout;
@@ -256,6 +282,148 @@ namespace GTACoOp
             }
 
             return cells;
+        }
+
+        /// <summary>
+        /// Piksel ızgarasını çizime hazırlar: yatayda aynı renkli hücreler tek
+        /// dikdörtgende birleştirilir. Izgara 5000'den fazla hücre olabildiği için
+        /// bu olmadan oyun çizim sınırına takılıyor ve resmin altı görünmüyordu.
+        /// </summary>
+        private static void Prepare(Element element)
+        {
+            element.Runs = null;
+            element.RunCols = 1;
+            element.RunRows = 1;
+
+            var cells = ParseCells(element);
+            if (cells == null) return;
+
+            var cols = element.cols;
+            var rows = element.rows;
+            List<Run>? last = null;
+
+            for (var pass = 0; pass < 8; pass++)
+            {
+                var runs = Compress(cells, cols, rows);
+                last = runs;
+
+                if (runs.Count <= MaxRunsPerElement)
+                {
+                    element.Runs = runs.ToArray();
+                    element.RunCols = cols;
+                    element.RunRows = rows;
+                    return;
+                }
+
+                if (cols <= 2 && rows <= 2) break;
+
+                cells = Downsample(cells, cols, rows, out var nextCols, out var nextRows);
+                cols = nextCols;
+                rows = nextRows;
+            }
+
+            // Sınıra inilemediyse son sürüm kullanılır; resim yine tam görünür.
+            element.Runs = last?.ToArray() ?? Array.Empty<Run>();
+            element.RunCols = cols;
+            element.RunRows = rows;
+        }
+
+        /// <summary>Bir satırdaki aynı renkli komşu hücreleri tek çizime birleştirir.</summary>
+        private static List<Run> Compress(Cell[] cells, int cols, int rows)
+        {
+            var runs = new List<Run>(cols * 2);
+
+            for (var r = 0; r < rows; r++)
+            {
+                var c = 0;
+                while (c < cols)
+                {
+                    var first = cells[r * cols + c];
+                    if (first.A < 8)
+                    {
+                        c++;
+                        continue;
+                    }
+
+                    var start = c;
+                    c++;
+
+                    while (c < cols)
+                    {
+                        var next = cells[r * cols + c];
+                        if (next.A < 8) break;
+                        if (next.R != first.R || next.G != first.G || next.B != first.B || next.A != first.A) break;
+                        c++;
+                    }
+
+                    runs.Add(new Run
+                    {
+                        Col = start,
+                        Row = r,
+                        Len = c - start,
+                        R = first.R,
+                        G = first.G,
+                        B = first.B,
+                        A = first.A
+                    });
+                }
+            }
+
+            return runs;
+        }
+
+        /// <summary>Izgarayı yarıya indirir (alfa ağırlıklı ortalama).</summary>
+        private static Cell[] Downsample(Cell[] source, int cols, int rows, out int newCols, out int newRows)
+        {
+            newCols = Math.Max(1, (cols + 1) / 2);
+            newRows = Math.Max(1, (rows + 1) / 2);
+
+            var target = new Cell[newCols * newRows];
+
+            for (var y = 0; y < newRows; y++)
+            {
+                for (var x = 0; x < newCols; x++)
+                {
+                    var alphaSum = 0;
+                    var weight = 0;
+                    var red = 0;
+                    var green = 0;
+                    var blue = 0;
+                    var count = 0;
+
+                    for (var dy = 0; dy < 2; dy++)
+                    {
+                        var sy = y * 2 + dy;
+                        if (sy >= rows) continue;
+
+                        for (var dx = 0; dx < 2; dx++)
+                        {
+                            var sx = x * 2 + dx;
+                            if (sx >= cols) continue;
+
+                            var cell = source[sy * cols + sx];
+                            alphaSum += cell.A;
+                            weight += cell.A;
+                            red += cell.R * cell.A;
+                            green += cell.G * cell.A;
+                            blue += cell.B * cell.A;
+                            count++;
+                        }
+                    }
+
+                    if (count == 0 || alphaSum == 0 || weight == 0) continue;
+
+                    target[y * newCols + x] = new Cell
+                    {
+                        R = (byte)Math.Min(255, red / weight),
+                        G = (byte)Math.Min(255, green / weight),
+                        B = (byte)Math.Min(255, blue / weight),
+                        A = (byte)Math.Min(255, alphaSum / count)
+                    };
+                }
+            }
+
+            return target;
         }
 
         /// <summary>
@@ -612,31 +780,29 @@ namespace GTACoOp
                 ParseColor("#7FB3FF", 255));
         }
 
-        /// <summary>Resim: bir kez ayrıştırılmış ızgaradan yalnızca görünür hücreleri çizer.</summary>
+        /// <summary>Resim: birleştirilmiş renk şeritlerini çizer (hücre hücre değil).</summary>
         private static void DrawPixels(Element e, float x, float y, float w, float h)
         {
-            var cells = e.Cells;
-            if (cells == null || e.cols <= 0 || e.rows <= 0) return;
+            var runs = e.Runs;
+            if (runs == null || runs.Length == 0) return;
+            if (e.RunCols <= 0 || e.RunRows <= 0) return;
 
-            var cellW = w / e.cols;
-            var cellH = h / e.rows;
+            var cellW = w / e.RunCols;
+            var cellH = h / e.RunRows;
 
-            for (var r = 0; r < e.rows; r++)
+            foreach (var run in runs)
             {
-                var rowOffset = r * e.cols;
-                for (var c = 0; c < e.cols; c++)
-                {
-                    var cell = cells[rowOffset + c];
-                    if (cell.A < 8) continue;
+                if (_frameRects >= MaxRectsPerFrame) return;
 
-                    Rect(x + c * cellW, y + r * cellH, cellW, cellH,
-                        System.Drawing.Color.FromArgb(cell.A, cell.R, cell.G, cell.B));
-                }
+                Rect(x + run.Col * cellW, y + run.Row * cellH, run.Len * cellW, cellH,
+                    System.Drawing.Color.FromArgb(run.A, run.R, run.G, run.B));
             }
         }
 
         private static void Rect(float x, float y, float w, float h, System.Drawing.Color color)
         {
+            _frameRects++;
+
             Function.Call(Hash.DRAW_RECT, x + w / 2f, y + h / 2f, w, h,
                 color.R, color.G, color.B, color.A, false);
         }

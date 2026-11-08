@@ -8,7 +8,7 @@
     <AssemblyName>GTACoop.ServerHost</AssemblyName>
     <RootNamespace>GTACoop.ServerHost</RootNamespace>
     <InvariantGlobalization>true</InvariantGlobalization>
-    <Version>2.11.0</Version>
+    <Version>2.11.1</Version>
   </PropertyGroup>
 
   <ItemGroup>

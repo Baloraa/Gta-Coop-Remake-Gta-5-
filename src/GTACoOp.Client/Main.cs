@@ -2770,7 +2770,9 @@ namespace GTACoOp
                 _menuPool.Process();
                 _chat.Tick();
                 _playerList.Tick(!_menuPool.AreAnyVisible);
-                _hud?.Tick(!_menuPool.AreAnyVisible);
+                // Dikkat: burada "menü açık mı" bilgisi geçilir. Ters
+                // çevrildiğinde HUD yalnızca F9 menüsü açıkken görünüyordu.
+                _hud?.Tick(_menuPool.AreAnyVisible);
 
                 if (_storyMissions != null)
                 {

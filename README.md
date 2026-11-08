@@ -8,7 +8,7 @@ GTACoop Remake is not a new multiplayer engine. It is the desktop layer around G
 
 GTACoop Remake is for private Story Mode co-op. It does not touch GTA Online, does not bypass anti-cheat, and does not inject into online sessions.
 
-**Current release:** 2.11.0  
+**Current release:** 2.11.1  
 **Platform:** Windows 10/11, x64  
 **UI:** Turkish, English, and Russian  
 **License:** GNU GPL v3
@@ -289,6 +289,19 @@ This is a tool for playing with friends, not a hardened anti-cheat or privacy sy
 - Server owners are responsible for the mods they distribute. The launcher automates delivery; it does not grant permission to redistribute someone else's work.
 
 ---
+
+### 2.11.1 — HUD visibility and complete images
+
+- The in-game HUD is drawn again while the menu is closed. The "a menu is open" flag was passed
+  inverted, so every element that was not marked always-visible stayed hidden until F9 was pressed.
+- **Always visible** is now actually honoured: the launcher saves the flag as `alwaysVisible` while
+  the in-game renderer read a field named `always`, so the option did nothing. Both names are
+  accepted, so layouts saved by earlier versions keep working.
+- **PNG images are drawn completely.** A baked image could be 5 000+ cells, and the game silently
+  drops draw calls past its per-frame limit, which cut off the bottom of the picture. Rows are now
+  merged into same-colour strips and the grid is coarsened only as far as needed (a 64×91 logo went
+  from 5 327 to 1 415 draw calls), with a per-frame cap as a safety net.
+- Nothing changes for users who never opened the HUD designer.
 
 ### 2.11.0 — Server mode (VDS) and richer HUD
 
