@@ -131,6 +131,36 @@ public static class ServerBrowserDiscovery
         using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
         http.DefaultRequestHeaders.UserAgent.ParseAdd("GTACoop-Remake-ServerBrowser/2.2");
 
+        // Tek bir adresi indirir; bozuk/bekleyen master tüm taramayı geciktirmesin
+        // diye her denemeye kısa bir süre tanınır.
+        async Task<List<ServerEndpoint>> DownloadAsync(string address)
+        {
+            using var requestCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            requestCts.CancelAfter(TimeSpan.FromSeconds(4));
+
+            using var resp = await http.GetAsync(address, HttpCompletionOption.ResponseHeadersRead, requestCts.Token);
+            if (!resp.IsSuccessStatusCode)
+                throw new HttpRequestException($"HTTP {(int)resp.StatusCode} {resp.ReasonPhrase}");
+
+            await using var stream = await resp.Content.ReadAsStreamAsync(requestCts.Token);
+            using var ms = new MemoryStream();
+            var buffer = new byte[32 * 1024];
+            int read;
+            while ((read = await stream.ReadAsync(buffer, requestCts.Token)) > 0)
+            {
+                if (ms.Length + read > MaxMasterBytes)
+                    throw new InvalidDataException(T("Master listesi beklenenden büyük."));
+                ms.Write(buffer, 0, read);
+            }
+
+            var body = Encoding.UTF8.GetString(ms.ToArray());
+            var endpoints = ParseMasterBody(body, out var parseError);
+            if (endpoints.Count == 0)
+                throw new InvalidDataException(parseError ?? T("Master listesi boş."));
+
+            return endpoints;
+        }
+
         foreach (var raw in urls)
         {
             ct.ThrowIfCancellationRequested();
@@ -139,42 +169,29 @@ public static class ServerBrowserDiscovery
                 !url.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
                 url = "http://" + url;
 
-            try
+            // TLS/sertifika hatası (ör. Cloudflare 526) yüzünden liste
+            // alınamıyorsa aynı adres bir de http üzerinden denenir.
+            var candidates = new List<string> { url };
+            if (url.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+                candidates.Add("http://" + url["https://".Length..]);
+
+            foreach (var candidate in candidates)
             {
-                // Bozuk/bekleyen master adresi tüm taramayı geciktirmesin:
-                // her adres için kısa bir süre tanınır, sonra yedeğe geçilir.
-                using var requestCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-                requestCts.CancelAfter(TimeSpan.FromSeconds(4));
-
-                using var resp = await http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, requestCts.Token);
-                if (!resp.IsSuccessStatusCode)
-                    throw new HttpRequestException($"HTTP {(int)resp.StatusCode} {resp.ReasonPhrase}");
-
-                await using var stream = await resp.Content.ReadAsStreamAsync(requestCts.Token);
-                using var ms = new MemoryStream();
-                var buffer = new byte[32 * 1024];
-                int read;
-                while ((read = await stream.ReadAsync(buffer, requestCts.Token)) > 0)
+                try
                 {
-                    if (ms.Length + read > MaxMasterBytes)
-                        throw new InvalidDataException(T("Master listesi beklenenden büyük."));
-                    ms.Write(buffer, 0, read);
+                    var endpoints = await DownloadAsync(candidate);
+                    if (!string.Equals(candidate, url, StringComparison.OrdinalIgnoreCase))
+                        errors.Add($"{url}: TLS hatası; {candidate} kullanıldı.");
+                    return (endpoints, candidate, errors);
                 }
-
-                var body = Encoding.UTF8.GetString(ms.ToArray());
-                var endpoints = ParseMasterBody(body, out var parseError);
-                if (endpoints.Count == 0)
-                    throw new InvalidDataException(parseError ?? T("Master listesi boş."));
-
-                return (endpoints, url, errors);
-            }
-            catch (OperationCanceledException) when (ct.IsCancellationRequested)
-            {
-                throw;
-            }
-            catch (Exception ex)
-            {
-                errors.Add($"{url}: {ex.Message}");
+                catch (OperationCanceledException) when (ct.IsCancellationRequested)
+                {
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    errors.Add($"{candidate}: {ex.Message}");
+                }
             }
         }
 

@@ -1641,7 +1641,9 @@ public sealed class ServersTab : UserControl
             if (offer == null)
             {
                 if (!quiet)
-                    AppEnv.Log($"Kısa kod güncel değil/çevrimdışı: {entry.ShortCode}; kayıtlı relay bilgisi korunuyor.");
+                    AppEnv.Log(entry.UsesRelay
+                        ? $"Kısa kod güncel değil/çevrimdışı: {entry.ShortCode}; kayıtlı relay bilgisi korunuyor."
+                        : $"Kısa kod güncel değil/çevrimdışı: {entry.ShortCode}; kayıtlı relay bilgisi yok.");
                 return entry.UsesRelay;
             }
 

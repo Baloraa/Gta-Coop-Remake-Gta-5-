@@ -8,7 +8,7 @@ GTACoop Remake is not a new multiplayer engine. It is the desktop layer around G
 
 GTACoop Remake is for private Story Mode co-op. It does not touch GTA Online, does not bypass anti-cheat, and does not inject into online sessions.
 
-**Current release:** 2.11.3  
+**Current release:** 2.11.4  
 **Platform:** Windows 10/11, x64  
 **UI:** Turkish, English, and Russian  
 **License:** GNU GPL v3
@@ -289,6 +289,14 @@ This is a tool for playing with friends, not a hardened anti-cheat or privacy sy
 - Server owners are responsible for the mods they distribute. The launcher automates delivery; it does not grant permission to redistribute someone else's work.
 
 ---
+
+### 2.11.4 — Server browser works when the master's TLS is broken
+
+- **Server browser fell back to the backup list only.** `https://master.gtacoop.com` currently
+  answers with a Cloudflare TLS error (526), so the master list could never be downloaded. When a
+  HTTPS master fails, the launcher now retries the same address over plain HTTP before giving up;
+  that address answers normally over HTTP, so the public list loads again.
+- The short-code log no longer claims that saved relay details were kept when the entry has none.
 
 ### 2.11.3 — Joining your own server uses the live game port
 
