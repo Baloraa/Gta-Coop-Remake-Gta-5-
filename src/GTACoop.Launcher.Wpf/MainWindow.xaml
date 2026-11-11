@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Window x:Class="GTACoop.Remake.Wpf.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="GTACoop Remake"
+        Width="1120" Height="820"
+        MinWidth="960" MinHeight="640"
+        WindowStartupLocation="CenterScreen"
+        Background="{StaticResource BgBrush}"
+        FontFamily="Segoe UI" FontSize="13"
+        Foreground="{StaticResource TextBrush}">
+
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="240" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <!-- Sol gezinme -->
+        <Border Grid.Column="0"
+                Background="{StaticResource SurfaceBrush}"
+                BorderBrush="{StaticResource BorderBrush}"
+                BorderThickness="0,0,1,0">
+            <DockPanel>
+                <StackPanel DockPanel.Dock="Top" Margin="18,20,18,12">
+                    <TextBlock Text="GTACoop Remake" FontSize="17" FontWeight="SemiBold" />
+                    <TextBlock Text="WPF arayüzü (geliştirme)" Style="{StaticResource Muted}" />
+                </StackPanel>
+
+                <TextBlock x:Name="VersionText"
+                           DockPanel.Dock="Bottom"
+                           Margin="18,8,18,14"
+                           Style="{StaticResource Muted}" />
+
+                <ListBox x:Name="Nav" SelectionChanged="OnNavChanged" />
+            </DockPanel>
+        </Border>
+
+        <!-- İçerik -->
+        <DockPanel Grid.Column="1">
+            <Border DockPanel.Dock="Bottom"
+                    Background="{StaticResource SurfaceBrush}"
+                    BorderBrush="{StaticResource BorderBrush}"
+                    BorderThickness="0,1,0,0"
+                    Padding="16,6">
+                <TextBlock x:Name="StatusText" Style="{StaticResource Muted}" Text="Hazır." />
+            </Border>
+
+            <ContentControl x:Name="Host" Margin="26,20,26,20" />
+        </DockPanel>
+    </Grid>
+</Window>

@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    GTACoop Remake - WPF launcher.
+    Mevcut WinForms launcher (GTACoop.Launcher) hiç değiştirilmeden yayında kalır;
+    bu proje arayüzün kademeli olarak taşındığı yeni kabuktur. Ek NuGet paketi
+    kullanmaz: WindowsDesktop çalışma zamanı makinede kurulu olduğu için indirme
+    gerektirmez.
+  -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <RootNamespace>GTACoop.Remake.Wpf</RootNamespace>
+    <AssemblyName>GTACoop.Launcher.Wpf</AssemblyName>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Version>2.12.0</Version>
+    <AssemblyTitle>GTACoop Remake</AssemblyTitle>
+  </PropertyGroup>
+
+</Project>
