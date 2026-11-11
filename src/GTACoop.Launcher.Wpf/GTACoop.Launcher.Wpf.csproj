@@ -11,6 +11,8 @@
     <OutputType>WinExe</OutputType>
     <TargetFramework>net8.0-windows</TargetFramework>
     <UseWPF>true</UseWPF>
+    <!-- Sayfalar hazır olana kadar mevcut WinForms sekmeleri barındırılır. -->
+    <UseWindowsForms>true</UseWindowsForms>
     <RootNamespace>GTACoop.Remake.Wpf</RootNamespace>
     <AssemblyName>GTACoop.Launcher.Wpf</AssemblyName>
     <ApplicationManifest>app.manifest</ApplicationManifest>
@@ -19,5 +21,8 @@
     <Version>2.12.0</Version>
     <AssemblyTitle>GTACoop Remake</AssemblyTitle>
   </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\GTACoop.Launcher\GTACoop.Launcher.csproj" />
+  </ItemGroup>
 
 </Project>

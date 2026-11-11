@@ -52,7 +52,11 @@ public sealed class GameTab : UserControl
         buttons.Controls.Add(Ui.Btn(T("Durumu Yenile"), (_, _) => RefreshStatus()));
         _clientBtn = Ui.Btn(T("İstemciyi Kur / Güncelle"), (_, _) => InstallClient());
         buttons.Controls.Add(_clientBtn);
-        buttons.Controls.Add(Ui.Btn(T("Bileşenleri Yönet..."), (_, _) => (FindForm() as MainForm)?.ShowComponentsTab()));
+        buttons.Controls.Add(Ui.Btn(T("Bileşenleri Yönet..."), (_, _) =>
+        {
+            if (FindForm() is MainForm main) main.ShowComponentsTab();
+            else MainForm.RequestNavigation("components");
+        }));
         buttons.Controls.Add(Ui.Btn(T("Oyunu Başlat"), (_, _) => LaunchGame()));
 
         // Çalıştırma dosyası seçimi ana buton satırını taşırmasın diye ayrı satırda.

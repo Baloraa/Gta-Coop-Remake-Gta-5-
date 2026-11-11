@@ -357,6 +357,14 @@ public sealed class MainForm : Form
     /// <summary>Launcher kapanırken true ise Program yeni örnek başlatır.</summary>
     public static bool RestartRequested { get; private set; }
 
+    /// <summary>
+    /// Başka bir kabuk (ör. WPF launcher) bu launcher'ın sayfalarını barındırırken
+    /// "şu bölümü aç" isteğini iletir. WinForms penceresinde hiçbir etkisi yoktur.
+    /// </summary>
+    public static event Action<string>? NavigationRequested;
+
+    public static void RequestNavigation(string section) => NavigationRequested?.Invoke(section);
+
     private void BrowseGameFolder()
     {
         using var dlg = new FolderBrowserDialog

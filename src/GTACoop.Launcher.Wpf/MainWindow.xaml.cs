@@ -1,80 +1,151 @@
-using System.Reflection;
-using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Forms.Integration;
 using System.Windows.Interop;
-using GTACoop.Remake.Wpf.Pages;
+using GTACoop.Remake;
+using Wf = System.Windows.Forms;
 
 namespace GTACoop.Remake.Wpf;
 
 public partial class MainWindow : Window
 {
-    private static readonly (string Title, string Hint)[] Sections =
+    private static readonly (string Key, string Title)[] Sections =
     {
-        ("Oyun", "GTA V klasörü, yedekleme ve başlatma ayarları buraya taşınacak."),
-        ("Sunucular", "Kayıtlı sunucular ve hızlı bağlanma buraya taşınacak."),
-        ("Sunucu Tarayıcı", "Genel sunucu listesi, LAN taraması ve filtreler buraya taşınacak."),
-        ("Sunucum", "Kendi sunucunu başlatma, portlar ve kısa kod buraya taşınacak."),
-        ("Tek Oyunculu", "Tek oyunculu mod paketleri buraya taşınacak."),
-        ("Arayüz Tasarımı", "HUD tasarımcısı ve oyuncu bildirimleri buraya taşınacak."),
-        ("Bileşenler", "SHVDN, ScriptHook ve bileşen kurulumları buraya taşınacak."),
-        ("P2P", "Dosya paylaşımı ve kod üretimi buraya taşınacak."),
-        ("Günlük", null!),
-        ("Hakkında", null!)
+        ("game", "Oyun"),
+        ("servers", "Sunucular"),
+        ("browser", "Sunucu Tarayıcı"),
+        ("myserver", "Sunucum"),
+        ("singleplayer", "Tek Oyunculu"),
+        ("hud", "Arayüz Tasarımı"),
+        ("components", "Bileşenler"),
+        ("p2p", "P2P"),
+        ("addonpeds", "Addon Peds"),
+        ("log", "Günlük"),
+        ("about", "Hakkında")
     };
 
-    private readonly Dictionary<string, FrameworkElement?> _pages = new();
+    private readonly Dictionary<string, FrameworkElement> _pages = new();
+    private readonly Dictionary<string, Wf.Form> _forms = new();
+    private readonly List<Wf.Control> _controls = new();
+
+    private ServersTab? _serversTab;
+    private MyServerTab? _myServerTab;
+    private AddonPedsTab? _addonPedsTab;
+    private bool _sessionRecovered;
 
     public MainWindow()
     {
         InitializeComponent();
 
-        VersionText.Text = "Sürüm " + Version();
+        var version = typeof(AppEnv).Assembly.GetName().Version;
+        VersionText.Text = Loc.T("Sürüm {0}", version == null ? "?" : version.ToString(3));
         SourceInitialized += (_, _) => TryDarkTitleBar();
+        Closing += (_, _) => Shutdown();
 
-        foreach (var section in Sections)
-            Nav.Items.Add(new ListBoxItem { Content = section.Title });
+        MainForm.NavigationRequested += OnNavigationRequested;
+
+        foreach (var (key, title) in Sections)
+            Nav.Items.Add(new ListBoxItem { Content = Loc.T(title), Tag = key });
 
         Nav.SelectedIndex = 0;
     }
 
-    private static string Version()
-    {
-        var info = Assembly.GetExecutingAssembly()
-            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
-            ?? Assembly.GetExecutingAssembly().GetName().Version?.ToString()
-            ?? "?";
-        return info.Split('+')[0];
-    }
-
     private void OnNavChanged(object sender, SelectionChangedEventArgs e)
     {
-        var index = Nav.SelectedIndex;
-        if (index < 0 || index >= Sections.Length) return;
+        if (Nav.SelectedItem is not ListBoxItem item || item.Tag is not string key) return;
 
-        var (title, hint) = Sections[index];
-        Host.Content = Page(title, hint);
-        StatusText.Text = title + " — hazır.";
+        Host.Content = Page(key);
+        StatusText.Text = item.Content + " — hazır.";
+
+        if (key == "addonpeds") _addonPedsTab?.RefreshList();
+        if (key == "servers" && !_sessionRecovered)
+        {
+            _sessionRecovered = true;
+            _serversTab?.RecoverSessionIfAny();
+        }
     }
 
-    private FrameworkElement Page(string title, string hint)
+    /// <summary>WinForms sekmelerinden gelen "şu bölümü aç" istekleri.</summary>
+    private void OnNavigationRequested(string key)
     {
-        if (_pages.TryGetValue(title, out var cached) && cached != null)
-            return cached;
-
-        FrameworkElement page = title switch
+        Dispatcher.Invoke(() =>
         {
-            "Günlük" => new LogPage(),
-            "Hakkında" => new AboutPage(),
-            _ => new PlaceholderPage(title, hint)
-        };
+            var index = Array.FindIndex(Sections, s => s.Key == key);
+            if (index >= 0) Nav.SelectedIndex = index;
+        });
+    }
 
-        _pages[title] = page;
-        return page;
+    private FrameworkElement Page(string key)
+    {
+        if (_pages.TryGetValue(key, out var cached)) return cached;
+
+        var control = CreateControl(key);
+        control.Dock = Wf.DockStyle.Fill;
+        _controls.Add(control);
+
+        // Sekmeler FindForm() ile iletişim kutularını açıyor; WPF içinde de
+        // bir WinForms formu sahibi olsun diye görünmez bir kap kullanılır.
+        var form = new Wf.Form
+        {
+            TopLevel = false,
+            FormBorderStyle = Wf.FormBorderStyle.None,
+            Dock = Wf.DockStyle.Fill,
+            AutoScaleMode = Wf.AutoScaleMode.Dpi,
+            AutoScaleDimensions = new System.Drawing.SizeF(96f, 96f),
+            Size = new System.Drawing.Size(880, 700),
+            BackColor = System.Drawing.Color.FromArgb(13, 13, 15)
+        };
+        form.Controls.Add(control);
+        Theme.Apply(form);
+        _forms[key] = form;
+
+        var host = new WindowsFormsHost { Child = form };
+        _pages[key] = host;
+        return host;
+    }
+
+    private Wf.Control CreateControl(string key)
+    {
+        switch (key)
+        {
+            case "game": return new GameTab();
+            case "servers": return _serversTab ??= new ServersTab();
+            case "browser": return new ServerBrowserTab(_serversTab ??= new ServersTab());
+            case "myserver": return _myServerTab ??= new MyServerTab();
+            case "singleplayer": return new SingleplayerTab();
+            case "hud": return new HudDesignerTab();
+            case "components": return new ComponentsTab();
+            case "p2p": return new P2PTab();
+            case "addonpeds": return _addonPedsTab ??= new AddonPedsTab();
+            case "log": return new LogTab();
+            default: return new AboutTab();
+        }
+    }
+
+    private void Shutdown()
+    {
+        MainForm.NavigationRequested -= OnNavigationRequested;
+
+        try { _myServerTab?.ShutdownServer(); } catch { }
+        try
+        {
+            AppEnv.Log("Launcher kapatılıyor.");
+            AppEnv.SaveSettings();
+        }
+        catch { }
+
+        foreach (var form in _forms.Values)
+        {
+            try { form.Dispose(); } catch { }
+        }
+
+        _forms.Clear();
+        _pages.Clear();
+        _controls.Clear();
     }
 
     // Koyu tema ile uyumlu başlık çubuğu (Windows 10 2004+ / Windows 11).
-    [DllImport("dwmapi.dll")]
+    [System.Runtime.InteropServices.DllImport("dwmapi.dll")]
     private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int value, int size);
 
     private void TryDarkTitleBar()

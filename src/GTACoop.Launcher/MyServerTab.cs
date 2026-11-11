@@ -226,7 +226,10 @@ public sealed class MyServerTab : UserControl
         var modsRow1 = Ui.Flow();
         modsRow1.Controls.Add(Ui.Btn(T("DLC Paketi Ekle (araç/ped)..."), (_, _) => AddDlcPack()));
         modsRow1.Controls.Add(Ui.Btn(T("Addon Peds"), (_, _) =>
-            (FindForm() as MainForm)?.ShowAddonPedsTab()));
+        {
+            if (FindForm() is MainForm main) main.ShowAddonPedsTab();
+            else MainForm.RequestNavigation("addonpeds");
+        }));
         modsRow1.Controls.Add(Ui.Btn(T("İstemci Scripti Ekle (dll + ini/xml/pdb)..."), (_, _) => AddScriptFiles()));
         modsRow1.Controls.Add(Ui.Btn(T("Script Klasörü Ekle..."), (_, _) => AddScriptFolder()));
 
