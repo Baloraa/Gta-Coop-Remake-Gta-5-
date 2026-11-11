@@ -264,6 +264,7 @@ public sealed class MyServerTab : UserControl
         };
         var controlButtons = Ui.Flow();
         controlButtons.Controls.Add(Ui.Btn(T("Sunucuyu Başlat"), (_, _) => StartServer()));
+        controlButtons.Controls.Add(Ui.Btn(T("Sunucumu Başlat ve Gir"), (_, _) => StartServerAndJoin()));
         controlButtons.Controls.Add(Ui.Btn(T("Durdur"), (_, _) => StopServer()));
         controlButtons.Controls.Add(Ui.Btn(T("Durumu Yenile"), (_, _) => RefreshStatus()));
         controlButtons.Controls.Add(Ui.Btn(T("Katılım Kodu Oluştur..."), (_, _) => ShowJoinCode()));
@@ -523,6 +524,12 @@ public sealed class MyServerTab : UserControl
             ServerModeAutostart = _autostart.Checked
         };
     }
+
+    /// <summary>
+    /// "Sunucumu başlat ve gir" isteği: sunucu adı, oyun portu, sync portu.
+    /// Bağlanma işini ana pencere yürütür.
+    /// </summary>
+    public event Action<string, int, int>? JoinRequested;
 
     private MyServer Server => _server ??= new MyServer(AppEnv.ServerDir, AppEnv.Log);
 
@@ -1001,6 +1008,28 @@ public sealed class MyServerTab : UserControl
             AppEnv.LogError(ex.Message);
             Ui.Error(FindForm()!, T("Sunucu başlatılamadı:\r\n") + ex.Message);
         }
+    }
+
+    /// <summary>
+    /// Tek düğme: sunucuyu başlatır ve çalıştıysa kendi sunucusuna bağlanma
+    /// isteğini yükseltir. Böylece port/kısa kod elle girilmez.
+    /// </summary>
+    private void StartServerAndJoin()
+    {
+        StartServer();
+
+        var info = CurrentSettings();
+        var running = Server.IsGameServerRunning || Server.IsSyncServerRunning ||
+                      ServerMode.IsRunning(AppEnv.DataFolder);
+
+        if (!running)
+        {
+            AppEnv.Log("Başlat ve gir: sunucu çalışmadığı için bağlanma isteği gönderilmedi.");
+            return;
+        }
+
+        AppEnv.Log($"Başlat ve gir: {info.Name} (oyun {info.GamePort}, sync {info.SyncPort})");
+        JoinRequested?.Invoke(info.Name, info.GamePort, info.SyncPort);
     }
 
     private void StopServer()

@@ -370,7 +370,7 @@ public static class ServerBrowserDiscovery
 
                 if (includeLan)
                 {
-                    foreach (var lanPort in new[] { 4499, 4498, 44499 })
+                    foreach (var lanPort in LanPorts())
                     {
                         try { client.DiscoverLocalPeers(lanPort); }
                         catch { }
@@ -429,6 +429,40 @@ public static class ServerBrowserDiscovery
     {
         using var udp = new UdpClient(0);
         return ((IPEndPoint)udp.Client.LocalEndPoint!).Port;
+    }
+
+    /// <summary>
+    /// LAN yayını yapılan portlar: varsayılanlar + kullanıcının kendi sunucusunun
+    /// ve kayıtlı sunucuların oyun portları. Böylece 4535 gibi özel port kullanan
+    /// sunucular da yerel ağda bulunabiliyor (eskiden yalnızca 4499/4498/44499
+    /// deneniyordu).
+    /// </summary>
+    private static IEnumerable<int> LanPorts()
+    {
+        var ports = new SortedSet<int> { 4499, 4498, 44499 };
+
+        try
+        {
+            ports.Add(GTACoop.Sync.MyServerSettings.Load(AppEnv.DataFolder).GamePort);
+        }
+        catch
+        {
+            // Ayarlar okunamazsa varsayılan portlar yeterli.
+        }
+
+        try
+        {
+            foreach (var server in AppEnv.Settings.Servers)
+            {
+                if (server.GamePort is > 0 and <= 65535) ports.Add(server.GamePort);
+            }
+        }
+        catch
+        {
+            // Kayıtlı sunucu listesi okunamazsa sorun değil.
+        }
+
+        return ports.Where(port => port is > 0 and <= 65535);
     }
 
     private static bool IsPrivateAddress(IPAddress address)

@@ -33,6 +33,10 @@ public sealed class MainForm : Form
     {
         _serverBrowserTab = new ServerBrowserTab(_serversTab);
 
+        // "Sunucumu başlat ve gir": sunucu açıldıktan sonra kendi sunucumuza bağlan.
+        _serverTab.JoinRequested += (name, gamePort, syncPort) =>
+            _ = StartAndJoinAsync(name, gamePort, syncPort);
+
         // Yüksek DPI ekranlarda (125%, 150%...) arayüzün düzgün ölçeklenmesi için:
         // pencere ve içerik, ekran ölçeğine göre orantılı büyür; tuşlar kesilmez.
         AutoScaleMode = AutoScaleMode.Dpi;
@@ -84,6 +88,58 @@ public sealed class MainForm : Form
 
         _addonPedsTab!.RefreshList();
         SelectPage(_addonPedsPage);
+    }
+
+    /// <summary>
+    /// "Sunucumu başlat ve gir" akışı: sunucunun sync portu dinlemeye başlamasını
+    /// bekler, sunucuyu listeye ekler ve bağlanır. Port yanıt vermese bile bağlanma
+    /// denenir; hata varsa Sunucular sekmesinde açık bir mesaj görünür.
+    /// </summary>
+    private async Task StartAndJoinAsync(string name, int gamePort, int syncPort)
+    {
+        try
+        {
+            if (!await WaitForPortAsync(syncPort, 24))
+                AppEnv.Log($"Başlat ve gir: sync portu {syncPort} yanıt vermedi; bağlanma yine denenecek.");
+
+            var entry = new ServerEntry
+            {
+                Name = string.IsNullOrWhiteSpace(name) ? T("Kendi Sunucum") : name,
+                Host = "127.0.0.1",
+                GamePort = gamePort,
+                SyncPort = syncPort
+            };
+
+            _serversTab.AddServerFromBrowser(entry);
+            SelectPageByContent(_serversTab);
+            await _serversTab.ConnectFromBrowserAsync(entry);
+        }
+        catch (Exception ex)
+        {
+            AppEnv.LogError("Başlat ve gir hatası: " + ex.Message);
+            Ui.Error(this, T("Sunucuya bağlanılamadı:\r\n") + ex.Message);
+        }
+    }
+
+    /// <summary>Bir TCP portu dinlemeye başlayana kadar kısa aralıklarla dener.</summary>
+    private static async Task<bool> WaitForPortAsync(int port, int attempts)
+    {
+        for (var i = 0; i < attempts; i++)
+        {
+            try
+            {
+                using var client = new System.Net.Sockets.TcpClient();
+                using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(600));
+                await client.ConnectAsync("127.0.0.1", port, cts.Token);
+                return true;
+            }
+            catch
+            {
+                await Task.Delay(500);
+            }
+        }
+
+        return false;
     }
 
     /// <summary>Pencereyi ekrana sığdır (yüksek DPI'da taşmasın).</summary>
