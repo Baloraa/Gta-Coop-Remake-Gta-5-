@@ -120,6 +120,62 @@ internal static class Theme
 
     private static bool _darkModeTried;
 
+    private static readonly HashSet<Form> Themed = new();
+
+    /// <summary>
+    /// Sonradan açılan pencereleri (sunucu düzenle, kısa kod, ped, dil...) de
+    /// temaya uyarlar. Bu pencereler kendi temalarını uygulamadığı için koyu
+    /// zeminde siyah yazılar kalıyordu.
+    /// </summary>
+    public static void WatchForms()
+    {
+        Application.Idle += (_, _) =>
+        {
+            foreach (Form form in Application.OpenForms)
+            {
+                if (form is MainForm || form.IsDisposed) continue;
+                if (!Themed.Add(form)) continue;
+
+                try { Apply(form); }
+                catch { }
+            }
+        };
+    }
+
+    /// <summary>
+    /// Metin kutularına sağ tık menüsü: Geri Al (Ctrl+Z), Kes, Kopyala,
+    /// Yapıştır, Tümünü Seç. Kısayollar metin kutusunda da çalışır.
+    /// </summary>
+    private static void AttachEditMenu(TextBoxBase box)
+    {
+        if (box.ContextMenuStrip != null) return;
+
+        var menu = new ContextMenuStrip();
+
+        ToolStripMenuItem Item(string text, string shortcut, Action action)
+        {
+            var item = new ToolStripMenuItem(text, null, (_, _) =>
+            {
+                try { action(); } catch { }
+            });
+            item.ShortcutKeyDisplayString = shortcut;
+            return item;
+        }
+
+        var undo = Item(Loc.T("Geri Al"), "Ctrl+Z", () => { if (box.CanUndo) box.Undo(); });
+        undo.Enabled = box.CanUndo;
+        box.TextChanged += (_, _) => undo.Enabled = box.CanUndo;
+
+        menu.Items.Add(undo);
+        menu.Items.Add(new ToolStripSeparator());
+        menu.Items.Add(Item(Loc.T("Kes"), "Ctrl+X", () => box.Cut()));
+        menu.Items.Add(Item(Loc.T("Kopyala"), "Ctrl+C", () => box.Copy()));
+        menu.Items.Add(Item(Loc.T("Yapıştır"), "Ctrl+V", () => box.Paste()));
+        menu.Items.Add(Item(Loc.T("Tümünü Seç"), "Ctrl+A", () => box.SelectAll()));
+
+        box.ContextMenuStrip = menu;
+    }
+
     private static void ApplyDarkTitleBar(Form form)
     {
         try
@@ -187,6 +243,7 @@ internal static class Theme
                 text.BackColor = SurfaceAlt;
                 text.ForeColor = Text;
                 text.BorderStyle = BorderStyle.FixedSingle;
+                AttachEditMenu(text);
                 break;
 
             case NumericUpDown num:

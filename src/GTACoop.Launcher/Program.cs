@@ -20,6 +20,7 @@ internal static class Program
         // Yerel denetimlerin (kaydırma çubukları, listeler) koyu çizilmesi için
         // pencere açılmadan önce uygulama karanlık moda alınır.
         Theme.InitDarkMode();
+        Theme.WatchForms();
 
         try
         {

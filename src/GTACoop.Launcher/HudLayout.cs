@@ -28,10 +28,16 @@ internal sealed class HudElement
     public double Thickness { get; set; } = 0.006;
 
     /// <summary>
-    /// HUD kapalıyken (F7) ya da launcher menüsü açıkken de çizilsin. PNG
-    /// logoları varsayılan olarak her zaman görünür.
+    /// HUD kapalıyken (F9) ya da launcher menüsü açıkken de çizilsin. Varsayılan
+    /// olarak kapalıdır: PNG'ler de diğer öğeler gibi HUD ile birlikte gizlenir.
     /// </summary>
     public bool AlwaysVisible { get; set; }
+
+    /// <summary>
+    /// Kaç saniye görünsün? 0 = süresiz. Süre dolunca öğe oturum boyunca bir daha
+    /// çizilmez ("saniye seç, sonra asla görünmesin").
+    /// </summary>
+    public double VisibleSeconds { get; set; }
 
     [JsonIgnore]
     public string DisplayLabel => Type switch
@@ -76,6 +82,22 @@ internal sealed class HudShortcut
     };
 }
 
+/// <summary>
+/// Oyuncu giriş/çıkışında gösterilecek isteğe bağlı bildirim: PNG (assets
+/// klasöründe) ve ses dosyası (wav/mp3). Resim yumuşak geçişle kaybolur.
+/// </summary>
+internal sealed class HudNotification
+{
+    public bool Enabled { get; set; }
+    public string JoinPng { get; set; } = "";
+    public string JoinSound { get; set; } = "";
+    public double JoinSeconds { get; set; } = 4;
+    public string LeavePng { get; set; } = "";
+    public string LeaveSound { get; set; } = "";
+    public double LeaveSeconds { get; set; } = 4;
+    public double FadeSeconds { get; set; } = 0.6;
+}
+
 /// <summary>Launcher'da tasarlanan, oyun içinde çizilen HUD yerleşimi.</summary>
 internal sealed class HudLayout
 {
@@ -92,12 +114,16 @@ internal sealed class HudLayout
     public bool HideHelpText { get; set; }
     public List<HudElement> Elements { get; set; } = new();
     public List<HudShortcut> Shortcuts { get; set; } = new();
+    public HudNotification Notifications { get; set; } = new();
 
     /// <summary>
     /// 2.11 öncesi kaydedilmiş yerleşimlerde "her zaman görünür" alanı yoktu; bu
     /// bayrak eski PNG'lerin bir kez taşındığını işaretler.
     /// </summary>
     public bool OptionsMigrated { get; set; }
+
+    /// <summary>PNG'lerin F9'da gizlenmesine geçişin bir kez uygulandığını işaretler.</summary>
+    public bool ImagesFollowHud { get; set; }
 }
 
 /// <summary>Yerleşim dosyalarını okur/yazar, PNG'leri oyun içi ızgaraya çevirir.</summary>
@@ -145,41 +171,55 @@ internal static class HudStore
     }
 
     /// <summary>
-    /// Eski yerleşimleri taşır: 2.11'den önce eklenen PNG'ler kullanıcının HUD
-    /// açma/kapama tuşuna bağlıydı ve HUD kapalıyken kayboluyordu. Artık varsayılan
-    /// olarak her zaman görünürler; kullanıcı isterse tek tek kapatabilir.
+    /// Eski yerleşimleri taşır: 2.11'de PNG'ler "her zaman görünür" yapılmıştı;
+    /// bu yüzden F9'a basınca ekranda kalıyorlardı. Artık PNG'ler de HUD ile
+    /// birlikte gizlenir; kullanıcı isterse tek tek "her zaman görünür" işaretler.
     /// </summary>
     private static void Migrate(HudLayout layout)
     {
-        if (layout.OptionsMigrated) return;
+        layout.Elements ??= new List<HudElement>();
+        layout.Shortcuts ??= new List<HudShortcut>();
+        layout.Notifications ??= new HudNotification();
 
-        foreach (var element in layout.Elements)
+        if (!layout.OptionsMigrated)
+            layout.OptionsMigrated = true;
+
+        if (!layout.ImagesFollowHud)
         {
-            if (element != null && string.Equals(element.Type, "image", StringComparison.OrdinalIgnoreCase))
-                element.AlwaysVisible = true;
-        }
+            foreach (var element in layout.Elements)
+            {
+                if (element != null &&
+                    string.Equals(element.Type, "image", StringComparison.OrdinalIgnoreCase))
+                    element.AlwaysVisible = false;
+            }
 
-        layout.OptionsMigrated = true;
+            layout.ImagesFollowHud = true;
+        }
     }
 
-    /// <summary>PNG'yi assets klasörüne kopyalar ve öğeyi oyun içi ızgaraya çevirir.</summary>
-    public static void AttachImage(HudElement element, string pngPath)
+    /// <summary>Bir dosyayı (PNG/ses) assets klasörüne kopyalar ve yeni adını döndürür.</summary>
+    public static string AttachAsset(string sourcePath)
     {
         Directory.CreateDirectory(AssetsFolder);
-        var name = Guid.NewGuid().ToString("N")[..8] + Path.GetExtension(pngPath).ToLowerInvariant();
-        var target = Path.Combine(AssetsFolder, name);
-        File.Copy(pngPath, target, overwrite: true);
-        element.Png = name;
-        element.AlwaysVisible = true;
+        var name = Guid.NewGuid().ToString("N")[..8] + Path.GetExtension(sourcePath).ToLowerInvariant();
+        File.Copy(sourcePath, Path.Combine(AssetsFolder, name), overwrite: true);
+        return name;
+    }
+
+    /// <summary>PNG'yi assets klasörüne kopyalar ve öğeyi oyun içi çizime hazırlar.</summary>
+    public static void AttachImage(HudElement element, string pngPath)
+    {
+        var target = Path.Combine(AssetsFolder, AttachAsset(pngPath));
+        element.Png = Path.GetFileName(target);
+        element.AlwaysVisible = false;
         Bake(element, target);
     }
 
     /// <summary>
-    /// PNG'yi renk ızgarasına indirger; oyun içinde her hücre bir dikdörtgen
-    /// olarak çizilir (SHVDN 3'te dosyadan doku yükleme API'si yok). Izgara
-    /// çözünürlüğü görselin oranına göre seçilir: küçük resimlerde daha çok
-    /// sütun kullanılır, böylece detay kaybı azalır ama kare başına çizim
-    /// sayısı sınırlı kalır. Tamamen saydam hücreler boş bırakılır (çizilmez).
+    /// PNG'yi renk ızgarasına indirger; SHVDN'in CustomSprite'ı yoksa oyun içinde
+    /// her hücre bir dikdörtgen olarak çizilir. Izgara çözünürlüğü görselin oranına
+    /// göre seçilir: küçük resimlerde daha çok sütun kullanılır, böylece detay kaybı
+    /// azalır ama kare başına çizim sayısı sınırlı kalır.
     /// </summary>
     public static void Bake(HudElement element, string pngPath)
     {

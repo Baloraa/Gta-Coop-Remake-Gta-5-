@@ -8,7 +8,7 @@ GTACoop Remake is not a new multiplayer engine. It is the desktop layer around G
 
 GTACoop Remake is for private Story Mode co-op. It does not touch GTA Online, does not bypass anti-cheat, and does not inject into online sessions.
 
-**Current release:** 2.11.4  
+**Current release:** 2.12.0  
 **Platform:** Windows 10/11, x64  
 **UI:** Turkish, English, and Russian  
 **License:** GNU GPL v3
@@ -289,6 +289,19 @@ This is a tool for playing with friends, not a hardened anti-cheat or privacy sy
 - Server owners are responsible for the mods they distribute. The launcher automates delivery; it does not grant permission to redistribute someone else's work.
 
 ---
+
+### 2.12.0 — HUD notifications, timed elements, and the F9 image fix
+
+- **F9 now really hides images.** Sprites are disabled when the HUD is hidden instead of
+  being skipped only in the draw loop, so PNGs no longer stay on screen. New images hide
+  with the HUD by default ("always visible" is still available per element).
+- **Visible duration per element.** Any HUD element can be given a number of seconds; once
+  it elapses the element is never drawn again in that session (0 = forever).
+- **Player join/leave alert.** Choose a PNG and a WAV/MP3 in *Arayüz Tasarımı → Oyuncu
+  giriş/çıkış bildirimi*, set how many seconds it stays, and it fades in and out at the top
+  of the screen — optional sound included, like a stream donation alert.
+- Dialogs now follow the dark theme, so labels no longer stay black on dark backgrounds.
+- Right-click any text box for Undo (Ctrl+Z), Cut, Copy, Paste and Select All.
 
 ### 2.11.4 — Server browser works when the master's TLS is broken
 

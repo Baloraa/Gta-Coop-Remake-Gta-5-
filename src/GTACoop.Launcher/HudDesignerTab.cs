@@ -32,6 +32,14 @@ public sealed class HudDesignerTab : UserControl
     private readonly NumericUpDown _h = Num(0.01m, 1m, 0.01m, 3);
     private readonly NumericUpDown _font = Num(0.1m, 1.5m, 0.05m, 2);
     private readonly NumericUpDown _opacity = Num(0, 100, 5, 0);
+    private readonly NumericUpDown _seconds = Num(0, 600, 1, 0);
+    private readonly CheckBox _notifyEnabled = new();
+    private readonly NumericUpDown _joinSeconds = Num(0, 60, 1, 0);
+    private readonly NumericUpDown _leaveSeconds = Num(0, 60, 1, 0);
+    private readonly Label _joinPngLabel = new();
+    private readonly Label _leavePngLabel = new();
+    private readonly Label _joinSoundLabel = new();
+    private readonly Label _leaveSoundLabel = new();
     private readonly TextBox _text = new();
     private readonly Button _colorBtn = new();
     private readonly CheckBox _hideHud = new();
@@ -174,7 +182,7 @@ public sealed class HudDesignerTab : UserControl
         _colorBtn.Margin = new Padding(4, 3, 4, 3);
         _colorBtn.Click += (_, _) => PickColor();
 
-        foreach (var num in new[] { _x, _y, _w, _h, _font, _opacity })
+        foreach (var num in new[] { _x, _y, _w, _h, _font, _opacity, _seconds })
             num.ValueChanged += (_, _) => ApplyProperties();
 
         var posGrid = new TableLayoutPanel
@@ -221,6 +229,10 @@ public sealed class HudDesignerTab : UserControl
         textRow.Controls.Add(Dim(T("Metin")));
         textRow.Controls.Add(_text);
 
+        var secondsRow = Ui.Flow();
+        secondsRow.Controls.Add(Dim(T("Görünme süresi (sn, 0 = süresiz)")));
+        secondsRow.Controls.Add(_seconds);
+
         _always.Text = T("Her zaman görünür (HUD kapalıyken de çiz)");
         _always.AutoSize = true;
         _always.CheckedChanged += (_, _) =>
@@ -248,6 +260,7 @@ public sealed class HudDesignerTab : UserControl
         propsBody.Controls.Add(styleGrid);
         propsBody.Controls.Add(_colorBtn);
         propsBody.Controls.Add(textRow);
+        propsBody.Controls.Add(secondsRow);
         propsBody.Controls.Add(alwaysRow);
         propsBody.Controls.Add(hint);
         propsGroup.Controls.Add(propsBody);
@@ -296,6 +309,84 @@ public sealed class HudDesignerTab : UserControl
         keysBody.Controls.Add(keyRow);
         keysBody.Controls.Add(_shortcutList);
         keysGroup.Controls.Add(keysBody);
+
+        // --- oyuncu giriş/çıkış bildirimi
+        var notifyGroup = new DarkGroup
+        {
+            Text = T("Oyuncu giriş/çıkış bildirimi"),
+            Dock = DockStyle.Top,
+            Padding = new Padding(8, 24, 8, 8)
+        };
+
+        _notifyEnabled.Text = T("Bildirimleri göster (resim ve/veya ses)");
+        _notifyEnabled.AutoSize = true;
+        _notifyEnabled.Checked = _layout.Notifications.Enabled;
+        _notifyEnabled.CheckedChanged += (_, _) =>
+        {
+            if (_syncing) return;
+            _layout.Notifications.Enabled = _notifyEnabled.Checked;
+            SaveLayout(silent: true);
+        };
+
+        foreach (var label in new[] { _joinPngLabel, _leavePngLabel, _joinSoundLabel, _leaveSoundLabel })
+        {
+            label.AutoSize = true;
+            label.MaximumSize = new Size(340, 0);
+            label.ForeColor = Color.DimGray;
+            label.Margin = new Padding(4, 0, 4, 6);
+        }
+
+        _joinSeconds.Value = (decimal)Math.Clamp(_layout.Notifications.JoinSeconds, 0, 60);
+        _leaveSeconds.Value = (decimal)Math.Clamp(_layout.Notifications.LeaveSeconds, 0, 60);
+        _joinSeconds.ValueChanged += (_, _) =>
+        {
+            if (_syncing) return;
+            _layout.Notifications.JoinSeconds = (double)_joinSeconds.Value;
+            SaveLayout(silent: true);
+        };
+        _leaveSeconds.ValueChanged += (_, _) =>
+        {
+            if (_syncing) return;
+            _layout.Notifications.LeaveSeconds = (double)_leaveSeconds.Value;
+            SaveLayout(silent: true);
+        };
+
+        var joinRow = Ui.Flow();
+        joinRow.MaximumSize = new Size(330, 0);
+        joinRow.Controls.Add(Ui.Btn(T("Giriş resmi..."), (_, _) => PickNotificationImage(join: true)));
+        joinRow.Controls.Add(Ui.Btn(T("Giriş sesi..."), (_, _) => PickNotificationSound(join: true)));
+        joinRow.Controls.Add(Dim(T("sn")));
+        joinRow.Controls.Add(_joinSeconds);
+
+        var leaveRow = Ui.Flow();
+        leaveRow.MaximumSize = new Size(330, 0);
+        leaveRow.Controls.Add(Ui.Btn(T("Çıkış resmi..."), (_, _) => PickNotificationImage(join: false)));
+        leaveRow.Controls.Add(Ui.Btn(T("Çıkış sesi..."), (_, _) => PickNotificationSound(join: false)));
+        leaveRow.Controls.Add(Dim(T("sn")));
+        leaveRow.Controls.Add(_leaveSeconds);
+
+        var notifyNote = new Label
+        {
+            AutoSize = true,
+            MaximumSize = new Size(360, 0),
+            ForeColor = Color.DimGray,
+            Padding = new Padding(4, 2, 4, 2),
+            Text = T("Resim ekranın üst ortasında yumuşak geçişle belirir ve seçtiğin saniye sonunda kaybolur. Ses wav veya mp3 olabilir; seçtiğin dosya ui/assets klasörüne kopyalanır.")
+        };
+
+        var notifyBody = Stack();
+        notifyBody.Controls.Add(_notifyEnabled);
+        notifyBody.Controls.Add(joinRow);
+        notifyBody.Controls.Add(_joinPngLabel);
+        notifyBody.Controls.Add(_joinSoundLabel);
+        notifyBody.Controls.Add(leaveRow);
+        notifyBody.Controls.Add(_leavePngLabel);
+        notifyBody.Controls.Add(_leaveSoundLabel);
+        notifyBody.Controls.Add(Ui.Btn(T("Bildirim dosyalarını temizle"), (_, _) => ClearNotifications()));
+        notifyBody.Controls.Add(notifyNote);
+        notifyGroup.Controls.Add(notifyBody);
+
+        RefreshNotificationLabels();
 
         // --- ayarlar
         var optionsGroup = new DarkGroup
@@ -362,7 +453,7 @@ public sealed class HudDesignerTab : UserControl
         optionsBody.Controls.Add(note);
         optionsGroup.Controls.Add(optionsBody);
 
-        foreach (var group in new[] { itemsGroup, propsGroup, keysGroup, optionsGroup })
+        foreach (var group in new[] { itemsGroup, propsGroup, keysGroup, notifyGroup, optionsGroup })
         {
             group.Dock = DockStyle.None;
             group.Width = 386;
@@ -370,13 +461,15 @@ public sealed class HudDesignerTab : UserControl
         }
 
         itemsGroup.Height = 620;
-        propsGroup.Height = 400;
+        propsGroup.Height = 440;
         keysGroup.Height = 246;
+        notifyGroup.Height = 330;
         optionsGroup.Height = 380;
 
         right.Controls.Add(itemsGroup);
         right.Controls.Add(propsGroup);
         right.Controls.Add(keysGroup);
+        right.Controls.Add(notifyGroup);
         right.Controls.Add(optionsGroup);
 
         var root = new TableLayoutPanel
@@ -608,7 +701,7 @@ public sealed class HudDesignerTab : UserControl
             if (index >= 0) _list.SelectedIndices.Add(index);
 
             var enabled = element != null;
-            foreach (var control in new Control[] { _x, _y, _w, _h, _font, _opacity, _text, _colorBtn, _always })
+            foreach (var control in new Control[] { _x, _y, _w, _h, _font, _opacity, _seconds, _text, _colorBtn, _always })
                 control.Enabled = enabled;
 
             if (element != null)
@@ -620,6 +713,7 @@ public sealed class HudDesignerTab : UserControl
                 _h.Value = (decimal)Math.Clamp(element.H, 0.01, 1);
                 _font.Value = (decimal)Math.Clamp(element.FontSize, 0.1, 1.5);
                 _opacity.Value = (decimal)Math.Clamp(element.Opacity * 100, 0, 100);
+                _seconds.Value = (decimal)Math.Clamp(element.VisibleSeconds, 0, 600);
                 _text.Text = element.Text;
                 _colorBtn.BackColor = ParseColor(element.Color);
             }
@@ -644,6 +738,7 @@ public sealed class HudDesignerTab : UserControl
         _selected.Opacity = (double)_opacity.Value / 100.0;
         _selected.Text = _text.Text;
         _selected.AlwaysVisible = _always.Checked;
+        _selected.VisibleSeconds = (double)_seconds.Value;
 
         var index = _layout.Elements.IndexOf(_selected);
         if (index >= 0 && index < _list.Items.Count)
@@ -751,6 +846,76 @@ public sealed class HudDesignerTab : UserControl
             AppEnv.LogError("Resim eklenemedi: " + ex.Message);
             Ui.Error(FindForm()!, T("Resim eklenemedi:\r\n") + ex.Message);
         }
+    }
+
+    private void RefreshNotificationLabels()
+    {
+        _joinPngLabel.Text = T("Giriş resmi: ") + ShowName(_layout.Notifications.JoinPng);
+        _joinSoundLabel.Text = T("Giriş sesi: ") + ShowName(_layout.Notifications.JoinSound);
+        _leavePngLabel.Text = T("Çıkış resmi: ") + ShowName(_layout.Notifications.LeavePng);
+        _leaveSoundLabel.Text = T("Çıkış sesi: ") + ShowName(_layout.Notifications.LeaveSound);
+    }
+
+    private static string ShowName(string name) => string.IsNullOrWhiteSpace(name) ? "-" : name;
+
+    private void PickNotificationImage(bool join)
+    {
+        using var dlg = new OpenFileDialog
+        {
+            Title = T("Bildirim resmi seç"),
+            Filter = "PNG resmi (*.png)|*.png|Resim (*.jpg;*.jpeg)|*.jpg;*.jpeg"
+        };
+        if (dlg.ShowDialog(this) != DialogResult.OK) return;
+
+        try
+        {
+            var name = HudStore.AttachAsset(dlg.FileName);
+            if (join) _layout.Notifications.JoinPng = name;
+            else _layout.Notifications.LeavePng = name;
+
+            RefreshNotificationLabels();
+            SaveLayout(silent: true);
+        }
+        catch (Exception ex)
+        {
+            AppEnv.LogError("Bildirim resmi eklenemedi: " + ex.Message);
+            Ui.Error(FindForm()!, T("Resim eklenemedi:\r\n") + ex.Message);
+        }
+    }
+
+    private void PickNotificationSound(bool join)
+    {
+        using var dlg = new OpenFileDialog
+        {
+            Title = T("Bildirim sesi seç"),
+            Filter = "Ses dosyası (*.wav;*.mp3)|*.wav;*.mp3"
+        };
+        if (dlg.ShowDialog(this) != DialogResult.OK) return;
+
+        try
+        {
+            var name = HudStore.AttachAsset(dlg.FileName);
+            if (join) _layout.Notifications.JoinSound = name;
+            else _layout.Notifications.LeaveSound = name;
+
+            RefreshNotificationLabels();
+            SaveLayout(silent: true);
+        }
+        catch (Exception ex)
+        {
+            AppEnv.LogError("Bildirim sesi eklenemedi: " + ex.Message);
+            Ui.Error(FindForm()!, T("Ses eklenemedi:\r\n") + ex.Message);
+        }
+    }
+
+    private void ClearNotifications()
+    {
+        _layout.Notifications.JoinPng = "";
+        _layout.Notifications.JoinSound = "";
+        _layout.Notifications.LeavePng = "";
+        _layout.Notifications.LeaveSound = "";
+        RefreshNotificationLabels();
+        SaveLayout(silent: true);
     }
 
     private void RemoveElement()

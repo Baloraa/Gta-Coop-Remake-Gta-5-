@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using System.Windows.Forms;
 using GTA;
@@ -57,6 +58,9 @@ namespace GTACoOp
             public string pixels { get; set; }
             public double thickness { get; set; }
 
+            // Kaç saniye görünsün (0 = süresiz). Süre dolunca oturum boyunca çizilmez.
+            public double visibleSeconds { get; set; }
+
             // Launcher "alwaysVisible" yazar; eski dosyalarda "always" olabilir.
             [JsonProperty("alwaysVisible")] public bool alwaysVisible { get; set; }
             [JsonProperty("always")] public bool alwaysLegacy { get; set; }
@@ -88,6 +92,28 @@ namespace GTACoOp
             public bool hideHelpText { get; set; }
             public List<Element> elements { get; set; }
             public List<Shortcut> shortcuts { get; set; }
+            public AlertConfig notifications { get; set; }
+        }
+
+        /// <summary>Oyuncu giriş/çıkışında gösterilen isteğe bağlı resim ve ses.</summary>
+        private sealed class AlertConfig
+        {
+            public bool enabled { get; set; }
+            public string joinPng { get; set; }
+            public string joinSound { get; set; }
+            public double joinSeconds { get; set; }
+            public string leavePng { get; set; }
+            public string leaveSound { get; set; }
+            public double leaveSeconds { get; set; }
+            public double fadeSeconds { get; set; }
+        }
+
+        private sealed class Alert
+        {
+            public string Png;
+            public DateTime Started;
+            public double Seconds;
+            public double Fade;
         }
 
         private static readonly string LayoutPath = Path.Combine(
@@ -110,6 +136,7 @@ namespace GTACoOp
             public PropertyInfo? Position;
             public PropertyInfo? Size;
             public PropertyInfo? Enabled;
+            public PropertyInfo? Color;
             public MethodInfo? Draw;
         }
 
@@ -121,6 +148,14 @@ namespace GTACoOp
         private bool _hudVisible = true;
         private bool _radarVisible = true;
         private bool _applied;
+
+        // Görünme süresi sayacı ve oyuncu giriş/çıkış bildirimi durumu.
+        private DateTime _startedAt = DateTime.UtcNow;
+        private readonly Dictionary<long, DateTime> _seenPlayers = new Dictionary<long, DateTime>();
+        private readonly HashSet<string> _expiredSprites = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private DateTime _lastPlayerScan = DateTime.MinValue;
+        private bool _playersPrimed;
+        private Alert _alert;
 
         // Oyun her karede sınırlı sayıda çizim kabul eder; bu sınırı aşınca
         // sonraki dikdörtgenler sessizce düşer (resmin alt kısmı kaybolur).
@@ -156,16 +191,39 @@ namespace GTACoOp
                 // HUD gizliyken ya da launcher menüsü açıkken oyun arayüzüne
                 // dokunulmaz; yalnızca "her zaman görünür" işaretli öğeler çizilir.
                 var hudHidden = menuVisible || !_hudVisible;
-                if (hudHidden) Restore();
-                else ApplyGameHudHiding();
+                if (hudHidden)
+                {
+                    // HUD gizlenince daha önce çizilmiş PNG'ler ekranda kalmasın.
+                    SetSpritesEnabled(false);
+                    Restore();
+                }
+                else
+                {
+                    ApplyGameHudHiding();
+                }
 
                 var elements = _layout.elements;
                 if (elements == null) return;
+
+                var elapsed = (DateTime.UtcNow - _startedAt).TotalSeconds;
 
                 foreach (var element in elements)
                 {
                     if (element == null) continue;
                     if (hudHidden && !element.AlwaysVisible) continue;
+
+                    // "Kaç saniye görünsün" süresi dolduysa öğe oturum boyunca
+                    // bir daha çizilmez; resimse sprite'ı da kapatılır.
+                    if (element.visibleSeconds > 0 && elapsed >= element.visibleSeconds)
+                    {
+                        if (!string.IsNullOrWhiteSpace(element.png))
+                        {
+                            _expiredSprites.Add(element.png);
+                            SetSpriteEnabled(element.png, false);
+                        }
+
+                        continue;
+                    }
 
                     // Tek bir bozuk öğe diğerlerini (ve oyunu) etkilemesin.
                     try
@@ -177,6 +235,8 @@ namespace GTACoOp
                         // Sonraki karede yeniden denenir.
                     }
                 }
+
+                if (!hudHidden) TickAlerts();
             }
             catch
             {
@@ -241,6 +301,127 @@ namespace GTACoOp
             }
         }
 
+        /// <summary>Oyuncu giriş/çıkış bildirimlerini izler (resim + isteğe bağlı ses).</summary>
+        private void TickAlerts()
+        {
+            DrawAlert();
+
+            var config = _layout?.notifications;
+            if (config == null || !config.enabled) return;
+            if (DateTime.UtcNow < _lastPlayerScan.AddMilliseconds(400)) return;
+            _lastPlayerScan = DateTime.UtcNow;
+
+            var opponents = Main.Opponents;
+            if (opponents == null) return;
+
+            List<long> current;
+            try
+            {
+                lock (opponents) current = new List<long>(opponents.Keys);
+            }
+            catch
+            {
+                return;
+            }
+
+            // Sunucuya ilk girişte mevcut oyuncular "yeni gelen" sayılmasın.
+            if (!_playersPrimed)
+            {
+                _playersPrimed = true;
+                _seenPlayers.Clear();
+                foreach (var key in current) _seenPlayers[key] = DateTime.UtcNow;
+                return;
+            }
+
+            var joined = false;
+            var left = false;
+
+            foreach (var key in current)
+            {
+                if (_seenPlayers.ContainsKey(key)) continue;
+                _seenPlayers[key] = DateTime.UtcNow;
+                joined = true;
+            }
+
+            foreach (var key in _seenPlayers.Keys.ToList())
+            {
+                if (current.Contains(key)) continue;
+                _seenPlayers.Remove(key);
+                left = true;
+            }
+
+            if (joined) ShowAlert(config.joinPng, config.joinSeconds, config.joinSound, config.fadeSeconds);
+            else if (left) ShowAlert(config.leavePng, config.leaveSeconds, config.leaveSound, config.fadeSeconds);
+        }
+
+        private void ShowAlert(string png, double seconds, string sound, double fade)
+        {
+            if (string.IsNullOrWhiteSpace(png)) return;
+            if (seconds <= 0) seconds = 4;
+            if (fade <= 0) fade = 0.6;
+
+            _alert = new Alert
+            {
+                Png = png,
+                Started = DateTime.UtcNow,
+                Seconds = seconds,
+                Fade = fade
+            };
+
+            PlaySound(sound);
+        }
+
+        /// <summary>Bildirim resmini seçilen süre boyunca yumuşak geçişle gösterir.</summary>
+        private void DrawAlert()
+        {
+            var alert = _alert;
+            if (alert == null) return;
+
+            var elapsed = (DateTime.UtcNow - alert.Started).TotalSeconds;
+            if (elapsed >= alert.Seconds)
+            {
+                _alert = null;
+                return;
+            }
+
+            var alpha = 1.0;
+            if (alert.Fade > 0)
+            {
+                if (elapsed < alert.Fade) alpha = elapsed / alert.Fade;
+                else if (elapsed > alert.Seconds - alert.Fade)
+                    alpha = Math.Max(0, (alert.Seconds - elapsed) / alert.Fade);
+            }
+
+            const float width = 0.36f;
+            const float height = 0.20f;
+            DrawSprite(alert.Png, (1f - width) / 2f, 0.10f, width, height, (float)alpha);
+        }
+
+        /// <summary>Seçilen ses dosyasını (wav/mp3) oyunu kilitlemeden çalar.</summary>
+        private static void PlaySound(string file)
+        {
+            if (string.IsNullOrWhiteSpace(file)) return;
+
+            var path = Path.Combine(AssetsPath, file);
+            if (!File.Exists(path)) return;
+
+            try
+            {
+                var reader = new NAudio.Wave.AudioFileReader(path);
+                var output = new NAudio.Wave.WaveOutEvent();
+                output.Init(reader);
+                output.PlaybackStopped += (_, _) =>
+                {
+                    try { output.Dispose(); reader.Dispose(); } catch { }
+                };
+                output.Play();
+            }
+            catch
+            {
+                // Ses aygıtı yoksa bildirim sessiz gösterilir.
+            }
+        }
+
         private void Reload()
         {
             if (DateTime.UtcNow < _nextCheck) return;
@@ -266,6 +447,13 @@ namespace GTACoOp
 
                 _layout = layout;
                 _stamp = stamp;
+
+                // Yeni yerleşim: süre sayaçları ve önbellekler baştan başlar.
+                _startedAt = DateTime.UtcNow;
+                _expiredSprites.Clear();
+                _seenPlayers.Clear();
+                _playersPrimed = false;
+                _alert = null;
             }
             catch
             {
@@ -806,10 +994,14 @@ namespace GTACoOp
         /// SHVDN sürümü CustomSprite içermiyorsa false döner.
         /// </summary>
         private static bool TryDrawSprite(Element e, float x, float y, float w, float h)
+            => DrawSprite(e.png, x, y, w, h, 1f);
+
+        /// <summary>PNG'yi verilen saydamlıkla çizer (bildirimlerde yumuşak geçiş).</summary>
+        private static bool DrawSprite(string name, float x, float y, float w, float h, float alpha)
         {
-            var name = e.png;
             if (string.IsNullOrWhiteSpace(name)) return false;
             if (SpriteFailed.Contains(name)) return false;
+            if (alpha <= 0.01f) return false;
 
             if (!SpriteCache.TryGetValue(name, out var image))
             {
@@ -831,6 +1023,8 @@ namespace GTACoOp
                     new System.Drawing.PointF(x * width, y * height));
                 image.Size?.SetValue(image.Instance,
                     new System.Drawing.SizeF(w * width, h * height));
+                image.Color?.SetValue(image.Instance, System.Drawing.Color.FromArgb(
+                    (int)Math.Round(Math.Max(0, Math.Min(1, alpha)) * 255), 255, 255, 255));
                 image.Enabled?.SetValue(image.Instance, true);
                 image.Draw?.Invoke(image.Instance, null);
                 return true;
@@ -840,6 +1034,22 @@ namespace GTACoOp
                 SpriteFailed.Add(name);
                 return false;
             }
+        }
+
+        /// <summary>Tüm PNG'leri anında gizler (F9/ara menü); çizim sırasında yeniden açılır.</summary>
+        private static void SetSpritesEnabled(bool enabled)
+        {
+            foreach (var image in SpriteCache.Values)
+            {
+                if (image == null) continue;
+                try { image.Enabled?.SetValue(image.Instance, enabled); } catch { }
+            }
+        }
+
+        private static void SetSpriteEnabled(string name, bool enabled)
+        {
+            if (!SpriteCache.TryGetValue(name, out var image) || image == null) return;
+            try { image.Enabled?.SetValue(image.Instance, enabled); } catch { }
         }
 
         private static SpriteImage? CreateSprite(string png)
@@ -872,6 +1082,7 @@ namespace GTACoOp
                     Position = type.GetProperty("Position"),
                     Size = type.GetProperty("Size"),
                     Enabled = type.GetProperty("Enabled"),
+                    Color = type.GetProperty("Color"),
                     Draw = type.GetMethod("Draw", Type.EmptyTypes)
                 };
             }
