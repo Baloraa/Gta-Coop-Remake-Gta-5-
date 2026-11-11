@@ -8,7 +8,7 @@ GTACoop Remake is not a new multiplayer engine. It is the desktop layer around G
 
 GTACoop Remake is for private Story Mode co-op. It does not touch GTA Online, does not bypass anti-cheat, and does not inject into online sessions.
 
-**Current release:** 2.12.0  
+**Current release:** 2.13.0  
 **Platform:** Windows 10/11, x64  
 **UI:** Turkish, English, and Russian  
 **License:** GNU GPL v3
@@ -289,6 +289,15 @@ This is a tool for playing with friends, not a hardened anti-cheat or privacy sy
 - Server owners are responsible for the mods they distribute. The launcher automates delivery; it does not grant permission to redistribute someone else's work.
 
 ---
+
+### 2.13.0 — Custom-port servers on LAN, one-click start & join
+
+- **LAN scan finds servers on custom ports.** The local-network broadcast only tried
+  4499/4498/44499, so a server on 4535 was invisible in Server Browser → LAN. The scan now
+  also tries your own server's configured game port and the ports of saved servers.
+- **"Sunucumu Başlat ve Gir" button.** One click starts your server, waits for the sync port
+  to accept connections, adds `127.0.0.1` to the server list and connects automatically
+  (with mod sync); failures stay visible in the Servers status line and the log.
 
 ### 2.12.0 — HUD notifications, timed elements, and the F9 image fix
 
