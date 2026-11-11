@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Window
+    x:Class="GTACoop.Remake.WinUI.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="GTACoop Remake">
+
+    <Grid Background="{StaticResource GtBackgroundBrush}">
+        <NavigationView x:Name="Nav"
+                        PaneDisplayMode="Left"
+                        IsBackButtonVisible="Collapsed"
+                        IsSettingsVisible="False"
+                        SelectionChanged="OnNavSelectionChanged"
+                        Background="Transparent"
+                        Header="GTACoop Remake">
+            <NavigationView.MenuItems>
+                <NavigationViewItem Content="Sunucular" Tag="servers" Icon="List" />
+                <NavigationViewItem Content="Sunucum" Tag="myserver" Icon="Play" />
+                <NavigationViewItem Content="Sunucu Tarayıcı" Tag="browser" Icon="World" />
+                <NavigationViewItem Content="Oyun" Tag="game" Icon="Repair" />
+                <NavigationViewItem Content="Arayüz Tasarımı" Tag="hud" Icon="Edit" />
+                <NavigationViewItem Content="Bileşenler" Tag="components" Icon="Setting" />
+                <NavigationViewItem Content="P2P" Tag="p2p" Icon="Share" />
+                <NavigationViewItem Content="Günlük" Tag="log" Icon="Document" />
+                <NavigationViewItem Content="Hakkında" Tag="about" Icon="Help" />
+            </NavigationView.MenuItems>
+
+            <Grid Padding="28">
+                <StackPanel Spacing="10" VerticalAlignment="Center" HorizontalAlignment="Center">
+                    <TextBlock x:Name="SectionTitle"
+                               Text="Sunucular"
+                               FontSize="28"
+                               FontWeight="SemiBold"
+                               Foreground="{StaticResource GtTextBrush}"
+                               HorizontalAlignment="Center" />
+                    <TextBlock x:Name="SectionHint"
+                               Text="WinUI 3 kabuğu hazır. Sayfalar sırayla buraya taşınacak."
+                               Foreground="{StaticResource GtMutedBrush}"
+                               HorizontalAlignment="Center" />
+                    <Border Background="{StaticResource GtSurfaceBrush}"
+                            BorderBrush="{StaticResource GtBorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="6"
+                            Padding="14,10">
+                        <TextBlock Text="Yayınlanan sürüm hâlâ WinForms launcher; bu pencere özellik eşitliği sağlanana kadar geliştirme aşamasında."
+                                   Foreground="{StaticResource GtAccentBrush}"
+                                   TextWrapping="Wrap" />
+                    </Border>
+                </StackPanel>
+            </Grid>
+        </NavigationView>
+    </Grid>
+</Window>
