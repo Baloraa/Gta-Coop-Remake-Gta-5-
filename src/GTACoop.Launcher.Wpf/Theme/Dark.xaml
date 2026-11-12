@@ -27,7 +27,8 @@
         <Setter Property="TextWrapping" Value="Wrap" />
     </Style>
 
-    <Style x:Key="Muted" TargetType="TextBlock">
+    <!-- Anahtar "Muted" rengiyle çakıştığı için stil "MutedText" adını taşır. -->
+    <Style x:Key="MutedText" TargetType="TextBlock">
         <Setter Property="Foreground" Value="{StaticResource MutedBrush}" />
         <Setter Property="TextWrapping" Value="Wrap" />
     </Style>

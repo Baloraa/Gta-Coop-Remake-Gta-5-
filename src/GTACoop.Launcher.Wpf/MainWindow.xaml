@@ -27,14 +27,14 @@
                                Foreground="{StaticResource AccentBrush}" />
                     <TextBlock Text="COOP REMAKE" FontSize="19" FontWeight="SemiBold"
                                Margin="0,2,0,3" />
-                    <TextBlock Text="GTA V multiplayer companion" Style="{StaticResource Muted}"
+                    <TextBlock Text="GTA V multiplayer companion" Style="{StaticResource MutedText}"
                                FontSize="11" />
                 </StackPanel>
 
                 <StackPanel DockPanel.Dock="Bottom" Margin="18,8,18,16">
                     <Border Height="1" Background="{StaticResource BorderBrush}" Margin="0,0,0,10" />
-                    <TextBlock x:Name="VersionText" Style="{StaticResource Muted}" />
-                    <TextBlock Text="Unofficial community project" Style="{StaticResource Muted}"
+                    <TextBlock x:Name="VersionText" Style="{StaticResource MutedText}" />
+                    <TextBlock Text="Unofficial community project" Style="{StaticResource MutedText}"
                                FontSize="10" Margin="0,3,0,0" />
                 </StackPanel>
 
@@ -49,14 +49,14 @@
                     BorderBrush="{StaticResource BorderBrush}"
                     BorderThickness="0,1,0,0"
                     Padding="18,9">
-                <TextBlock x:Name="StatusText" Style="{StaticResource Muted}" Text="Hazır." />
+                <TextBlock x:Name="StatusText" Style="{StaticResource MutedText}" Text="Hazır." />
             </Border>
 
             <StackPanel Margin="28,22,28,8">
                 <TextBlock x:Name="PageTitle" Text="Genel Bakış" FontSize="23"
                            FontWeight="SemiBold" />
                 <TextBlock x:Name="PageSubtitle" Text="Oturumunu ve araçlarını tek yerden yönet."
-                           Style="{StaticResource Muted}" Margin="0,4,0,0" />
+                           Style="{StaticResource MutedText}" Margin="0,4,0,0" />
             </StackPanel>
 
             <ContentControl x:Name="Host" Margin="28,10,28,24" />
