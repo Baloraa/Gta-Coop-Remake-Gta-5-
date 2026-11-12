@@ -3,6 +3,7 @@ using System.Windows.Controls;
 using System.Windows.Forms.Integration;
 using System.Windows.Interop;
 using GTACoop.Remake;
+using GTACoop.Sync;
 using Wf = System.Windows.Forms;
 
 namespace GTACoop.Remake.Wpf;
@@ -32,7 +33,9 @@ public partial class MainWindow : Window
     private ServersTab? _serversTab;
     private MyServerTab? _myServerTab;
     private AddonPedsTab? _addonPedsTab;
+    private GameTab? _gameTab;
     private bool _sessionRecovered;
+    private bool _languageReady;
 
     public MainWindow()
     {
@@ -45,10 +48,69 @@ public partial class MainWindow : Window
 
         MainForm.NavigationRequested += OnNavigationRequested;
 
+        // Bölüm simgeleri: soldaki menüde her satır bir simgeyle başlar.
+        var icons = new[] { "⌂", "▶", "☰", "◎", "◈", "✦", "▣", "⚙", "⇄", "☺", "✎", "ⓘ" };
+        var i = 0;
         foreach (var (key, title) in Sections)
-            Nav.Items.Add(new ListBoxItem { Content = Loc.T(title), Tag = key });
+        {
+            var icon = i < icons.Length ? icons[i] : "•";
+            i++;
+            Nav.Items.Add(new ListBoxItem { Content = icon + "   " + Loc.T(title), Tag = key });
+        }
 
+        SyncText.Language = Loc.Language;
+        LangCombo.SelectionChanged -= OnLanguageChanged;
+        LangCombo.Items.Add("Türkçe");
+        LangCombo.Items.Add("English");
+        LangCombo.Items.Add("Русский");
+        LangCombo.SelectedIndex = Math.Clamp(Loc.LanguageIndex, 0, 2);
+        LangCombo.SelectionChanged += OnLanguageChanged;
+        _languageReady = true;
+
+        Loaded += (_, _) => ClampToWorkArea();
         Nav.SelectedIndex = 0;
+    }
+
+    /// <summary>Pencere ekrandan taşmasın; içerik sağdan kesilmesin.</summary>
+    private void ClampToWorkArea()
+    {
+        var area = SystemParameters.WorkArea;
+        if (Width > area.Width - 20) Width = Math.Max(MinWidth, area.Width - 20);
+        if (Height > area.Height - 20) Height = Math.Max(MinHeight, area.Height - 20);
+        Left = Math.Max(area.Left, Math.Min(Left, area.Right - Width));
+        Top = Math.Max(area.Top, Math.Min(Top, area.Bottom - Height));
+    }
+
+    /// <summary>Dil seçimi: ayarı yazar ve onay verilirse launcher'ı yeniden başlatır.</summary>
+    private void OnLanguageChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!_languageReady) return;
+
+        var newLang = LangCombo.SelectedIndex switch { 1 => "en", 2 => "ru", _ => "tr" };
+        if (newLang == AppEnv.Settings.Language) return;
+
+        AppEnv.Settings.Language = newLang;
+        AppEnv.SaveSettings();
+
+        var answer = System.Windows.MessageBox.Show(this,
+            "Dil değiştirildi. Uygulamak için launcher yeniden başlatılsın mı?\n\n" +
+            "Language changed. Restart the launcher to apply it?",
+            "GTACoop Remake", MessageBoxButton.YesNo, MessageBoxImage.Question);
+        if (answer != MessageBoxResult.Yes) return;
+
+        try
+        {
+            var exe = Environment.ProcessPath;
+            if (!string.IsNullOrEmpty(exe))
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(exe)
+                {
+                    UseShellExecute = true,
+                    WorkingDirectory = AppContext.BaseDirectory
+                });
+        }
+        catch { }
+
+        System.Windows.Application.Current.Shutdown();
     }
 
     private void OnNavChanged(object sender, SelectionChangedEventArgs e)
@@ -62,6 +124,7 @@ public partial class MainWindow : Window
             : "GTACoop Remake · " + Sections.First(s => s.Key == key).Title;
         StatusText.Text = item.Content + " — hazır.";
 
+        if (key == "game") _gameTab?.RefreshStatus();
         if (key == "addonpeds") _addonPedsTab?.RefreshList();
         if (key == "servers" && !_sessionRecovered)
         {
@@ -244,7 +307,7 @@ public partial class MainWindow : Window
     {
         switch (key)
         {
-            case "game": return new GameTab();
+            case "game": return _gameTab ??= new GameTab();
             case "servers": return _serversTab ??= new ServersTab();
             case "browser": return new ServerBrowserTab(_serversTab ??= new ServersTab());
             case "myserver": return _myServerTab ??= new MyServerTab();

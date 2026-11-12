@@ -60,7 +60,7 @@ public sealed class MyServerTab : UserControl
         {
             Dock = DockStyle.Top,
             AutoSize = false,
-            Height = 50,
+            Height = 76,
             Text = T("Kendi GTACoOp sunucunuzu burada yönetin. Addons klasörüne eklediğiniz her şey, sunucuya bağlanan oyunculara otomatik iner.\r\nSunucu modları oyuncuların oyununa yalnızca oynarken kurulur. Arkadaşlarınız 'Sunucular' sekmesinden bağlanır."),
             ForeColor = Color.DimGray,
             Padding = new Padding(4, 4, 4, 4)
@@ -259,7 +259,7 @@ public sealed class MyServerTab : UserControl
         {
             Text = T("Sunucu Kontrolü"),
             Dock = DockStyle.Top,
-            Height = 230,
+            Height = 300,
             Padding = new Padding(8)
         };
         var controlButtons = Ui.Flow();
@@ -301,14 +301,15 @@ public sealed class MyServerTab : UserControl
         {
             Text = T("Oyuncular (canlı)"),
             Dock = DockStyle.Top,
-            Height = 252,
+            Height = 300,
             Padding = new Padding(8)
         };
 
         Ui.StyleList(_playersList,
             (T("Oyuncu"), 280),
             (T("Ping"), 90),
-            (T("Sağlık"), 90));
+            // -2: son sütun kalan genişliği doldurur, sağda beyaz şerit kalmaz.
+            (T("Sağlık"), -2));
         _playersList.Dock = DockStyle.Top;
         _playersList.Height = 140;
         _playersList.MultiSelect = false;
@@ -338,6 +339,7 @@ public sealed class MyServerTab : UserControl
         {
             Text = T("Sunucu Modu (VDS) — isteğe bağlı"),
             Dock = DockStyle.Top,
+            Height = 360,
             Padding = new Padding(8)
         };
 
@@ -384,9 +386,9 @@ public sealed class MyServerTab : UserControl
         ramRow.Controls.Add(_ramMb);
 
         var serverModeButtons = Ui.Flow();
+        // Durdur / Durumu yenile yukarıdaki "Sunucu Kontrolü" grubunda zaten var;
+        // aynı düğmeleri iki kez gösterme.
         serverModeButtons.Controls.Add(Ui.Btn(T("Sunucu modunu başlat"), (_, _) => StartServer()));
-        serverModeButtons.Controls.Add(Ui.Btn(T("Durdur"), (_, _) => StopServer()));
-        serverModeButtons.Controls.Add(Ui.Btn(T("Durumu yenile"), (_, _) => RefreshStatus()));
         serverModeButtons.Controls.Add(Ui.Btn(T("Açılış görevini kaldır"), (_, _) => RemoveAutostart()));
         serverModeButtons.Controls.Add(Ui.Btn(T("Sunucu günlüğünü aç"), (_, _) => OpenServerHostLog()));
 
@@ -400,7 +402,7 @@ public sealed class MyServerTab : UserControl
             Dock = DockStyle.Fill,
             FlowDirection = FlowDirection.TopDown,
             WrapContents = false,
-            AutoScroll = true,
+            AutoScroll = false,
             Padding = new Padding(0)
         };
         serverModeBody.Controls.Add(serverModeNote);
@@ -451,7 +453,8 @@ public sealed class MyServerTab : UserControl
         if (control is TextBox tb)
         {
             tb.Text = value ?? "";
-            tb.Width = 320;
+            // Şifre/token/MOTD gibi alanlar 320 pikselde kesiliyordu.
+            tb.Width = 520;
         }
         else if (control is NumericUpDown num)
         {

@@ -27,14 +27,14 @@ public sealed class GameTab : UserControl
         {
             Text = T("Oyun Durumu"),
             Dock = DockStyle.Top,
-            Height = 272,
+            Height = 352,
             Padding = new Padding(10)
         };
         statusGroup.Controls.Add(_table);
 
         _summary.Dock = DockStyle.Top;
         _summary.AutoSize = false;
-        _summary.Height = 24;
+        _summary.Height = 28;
         _summary.Font = new Font("Segoe UI", 9.5f, FontStyle.Bold);
 
         _backupInfo.Dock = DockStyle.Top;
@@ -69,7 +69,7 @@ public sealed class GameTab : UserControl
         {
             Text = T("Oyuncu"),
             Dock = DockStyle.Top,
-            Height = 100,
+            Height = 140,
             Padding = new Padding(10, 6, 10, 6)
         };
 

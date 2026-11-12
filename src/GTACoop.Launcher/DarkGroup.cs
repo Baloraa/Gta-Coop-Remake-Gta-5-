@@ -17,7 +17,7 @@ internal sealed class DarkGroup : GroupBox
                  ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
         BackColor = Theme.Surface;
         ForeColor = Theme.Accent;
-        Padding = new Padding(10, 26, 10, 8);
+        Padding = new Padding(10, 30, 10, 8);
     }
 
     protected override void OnPaint(PaintEventArgs e)
@@ -31,9 +31,13 @@ internal sealed class DarkGroup : GroupBox
         var text = Text ?? string.Empty;
         var size = TextRenderer.MeasureText(g, text, Font);
         const int gapLeft = 9;
-        var gapWidth = size.Width + 10;
+        var gapWidth = size.Width + 12;
 
-        var frame = new Rectangle(0, 9, Width - 1, Height - 10);
+        // Başlık şeridi yazı tipinin gerçek yüksekliğine göre ölçülür: sabit
+        // 18 piksel, alt uzantılı harflerin (y, g, ş) altını kesiyordu.
+        var band = Math.Max(24, Font.Height + 6);
+
+        var frame = new Rectangle(0, band - 2, Width - 1, Height - band + 2);
         if (frame.Width > 10 && frame.Height > 10)
         {
             using var path = Rounded(frame, 6);
@@ -43,11 +47,11 @@ internal sealed class DarkGroup : GroupBox
             // Başlık, çerçevenin üst çizgisinin üstüne oturur; çizgi
             // başlığın altında kalmasın diye o aralık yeniden boyanır.
             using (var fill = new SolidBrush(Theme.Surface))
-                g.FillRectangle(fill, gapLeft, 8, gapWidth, 3);
+                g.FillRectangle(fill, gapLeft, band - 4, gapWidth, 6);
         }
 
         TextRenderer.DrawText(g, text, Font,
-            new Rectangle(gapLeft + 2, 0, Math.Max(20, gapWidth), 18), Theme.Accent,
+            new Rectangle(gapLeft + 2, 0, Math.Max(20, gapWidth), band - 2), Theme.Accent,
             TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix);
     }
 

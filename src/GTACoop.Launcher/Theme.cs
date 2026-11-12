@@ -236,6 +236,9 @@ internal static class Theme
                 break;
 
             case ListView list:
+                // Sütunların sağında kalan boş alan Windows'ta beyaz kalıyordu.
+                list.BackColor = Surface;
+                list.ForeColor = Text;
                 StyleList(list);
                 break;
 
@@ -270,7 +273,10 @@ internal static class Theme
 
             case Button button:
                 button.FlatStyle = FlatStyle.Flat;
+                button.UseVisualStyleBackColor = false;
                 button.BackColor = SurfaceAlt;
+                // Windows varsayılanı koyu zeminde siyah yazı bırakıyor;
+                // düğme yazısı her durumda açık renk olmalı.
                 button.ForeColor = Text;
                 button.FlatAppearance.BorderColor = Border;
                 button.FlatAppearance.BorderSize = 1;
