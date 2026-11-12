@@ -386,9 +386,9 @@ public sealed class MyServerTab : UserControl
         ramRow.Controls.Add(_ramMb);
 
         var serverModeButtons = Ui.Flow();
-        // Durdur / Durumu yenile yukarıdaki "Sunucu Kontrolü" grubunda zaten var;
-        // aynı düğmeleri iki kez gösterme.
         serverModeButtons.Controls.Add(Ui.Btn(T("Sunucu modunu başlat"), (_, _) => StartServer()));
+        serverModeButtons.Controls.Add(Ui.Btn(T("Durdur"), (_, _) => StopServer()));
+        serverModeButtons.Controls.Add(Ui.Btn(T("Durumu yenile"), (_, _) => RefreshStatus()));
         serverModeButtons.Controls.Add(Ui.Btn(T("Açılış görevini kaldır"), (_, _) => RemoveAutostart()));
         serverModeButtons.Controls.Add(Ui.Btn(T("Sunucu günlüğünü aç"), (_, _) => OpenServerHostLog()));
 
