@@ -27,20 +27,20 @@
                                Foreground="{StaticResource AccentBrush}" />
                     <TextBlock Text="COOP REMAKE" FontSize="16" FontWeight="SemiBold"
                                Margin="0,1,0,2" />
-                    <TextBlock Text="GTA V multiplayer companion" Style="{StaticResource MutedText}"
-                               FontSize="11" />
+                    <TextBlock x:Name="TaglineText" Text="GTA V multiplayer companion"
+                               Style="{StaticResource MutedText}" FontSize="11" />
                 </StackPanel>
 
                 <StackPanel DockPanel.Dock="Bottom" Margin="14,6,14,12">
                     <Border Height="1" Background="{StaticResource BorderBrush}" Margin="0,0,0,8" />
-                    <TextBlock Text="Dil / Language" Style="{StaticResource MutedText}"
-                               FontSize="10" Margin="2,0,0,4" />
+                    <TextBlock x:Name="LanguageLabel" Text="Dil / Language"
+                               Style="{StaticResource MutedText}" FontSize="10" Margin="2,0,0,4" />
                     <ComboBox x:Name="LangCombo" Margin="0,0,0,10"
                               ToolTip="Dil / Language / Язык"
                               SelectionChanged="OnLanguageChanged" />
                     <TextBlock x:Name="VersionText" Style="{StaticResource MutedText}" />
-                    <TextBlock Text="Unofficial community project" Style="{StaticResource MutedText}"
-                               FontSize="10" Margin="0,3,0,0" />
+                    <TextBlock x:Name="UnofficialText" Text="Unofficial community project"
+                               Style="{StaticResource MutedText}" FontSize="10" Margin="0,3,0,0" />
                 </StackPanel>
 
                 <ListBox x:Name="Nav" SelectionChanged="OnNavChanged" Margin="10,0,10,0" />

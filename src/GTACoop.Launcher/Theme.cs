@@ -283,6 +283,18 @@ internal static class Theme
                 list.BackColor = Surface;
                 list.ForeColor = Text;
                 StyleList(list);
+
+                // Seçilen satır bazen siyah kalıyordu (yeniden çizim eksikliği):
+                // çift tampon + seçim değişiminde yeniden çizim.
+                try
+                {
+                    typeof(Control).GetProperty("DoubleBuffered",
+                            System.Reflection.BindingFlags.Instance |
+                            System.Reflection.BindingFlags.NonPublic)
+                        ?.SetValue(list, true);
+                }
+                catch { }
+                list.SelectedIndexChanged += (_, _) => list.Invalidate();
                 if (list.IsHandleCreated)
                 {
                     try { SetWindowTheme(list.Handle, "DarkMode_Explorer", null); } catch { }

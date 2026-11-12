@@ -43,6 +43,9 @@ public partial class MainWindow : Window
 
         var version = typeof(AppEnv).Assembly.GetName().Version;
         VersionText.Text = Loc.T("Sürüm {0}", version == null ? "?" : version.ToString(3));
+        TaglineText.Text = Loc.T("GTA V multiplayer companion");
+        LanguageLabel.Text = Loc.T("Dil / Language");
+        UnofficialText.Text = Loc.T("Unofficial community project");
         SourceInitialized += (_, _) => TryDarkTitleBar();
         Closing += (_, _) => Shutdown();
 
@@ -143,11 +146,12 @@ public partial class MainWindow : Window
         if (Nav.SelectedItem is not ListBoxItem item || item.Tag is not string key) return;
 
         Host.Content = Page(key);
-        PageTitle.Text = Sections.First(s => s.Key == key).Title;
+        var title = Loc.T(Sections.First(s => s.Key == key).Title);
+        PageTitle.Text = title;
         PageSubtitle.Text = key == "home"
-            ? "Oturumunu ve araçlarını tek yerden yönet."
-            : "GTACoop Remake · " + Sections.First(s => s.Key == key).Title;
-        StatusText.Text = item.Content + " — hazır.";
+            ? Loc.T("Oturumunu ve araçlarını tek yerden yönet.")
+            : "GTACoop Remake · " + title;
+        StatusText.Text = string.Format(Loc.T("{0} — hazır."), title);
 
         if (key == "game") _gameTab?.RefreshStatus();
         if (key == "addonpeds") _addonPedsTab?.RefreshList();
@@ -220,7 +224,7 @@ public partial class MainWindow : Window
         var heroContent = new StackPanel();
         heroContent.Children.Add(new TextBlock
         {
-            Text = "Birlikte oynayın. Dünyayı paylaşın.",
+            Text = Loc.T("Birlikte oynayın. Dünyayı paylaşın."),
             FontSize = 25,
             FontWeight = FontWeights.SemiBold,
             Foreground = (System.Windows.Media.Brush)FindResource("TextBrush"),
@@ -228,33 +232,37 @@ public partial class MainWindow : Window
         });
         heroContent.Children.Add(new TextBlock
         {
-            Text = "GTA V co-op oturumlarını, sunucularını ve modlarını GTACoop Remake üzerinden yönet.",
+            Text = Loc.T("GTA V co-op oturumlarını, sunucularını ve modlarını GTACoop Remake üzerinden yönet."),
             FontSize = 14,
             Foreground = (System.Windows.Media.Brush)FindResource("MutedBrush"),
             Margin = new Thickness(0, 0, 0, 18)
         });
         var heroActions = new WrapPanel();
-        heroActions.Children.Add(CreateDashboardButton("Oyuna Git", "game"));
-        heroActions.Children.Add(CreateDashboardButton("Sunucularım", "servers"));
-        heroActions.Children.Add(CreateDashboardButton("Sunucu Bul", "browser"));
+        heroActions.Children.Add(CreateDashboardButton(Loc.T("Oyuna Git"), "game"));
+        heroActions.Children.Add(CreateDashboardButton(Loc.T("Sunucularım"), "servers"));
+        heroActions.Children.Add(CreateDashboardButton(Loc.T("Sunucu Bul"), "browser"));
         heroContent.Children.Add(heroActions);
         hero.Child = heroContent;
         root.Children.Add(hero);
 
         var cards = new WrapPanel();
         cards.Children.Add(CreateDashboardCard(
-            "Sunucuya Katıl", "Arkadaşının sunucusuna bağlan veya kayıtlı sunucularını yönet.", "Sunucuları Aç", "servers"));
+            Loc.T("Sunucuya Katıl"), Loc.T("Arkadaşının sunucusuna bağlan veya kayıtlı sunucularını yönet."),
+            Loc.T("Sunucuları Aç"), "servers"));
         cards.Children.Add(CreateDashboardCard(
-            "Kendi Sunucun", "Kendi co-op oturumunu oluştur, ayarlarını düzenle ve arkadaşlarını davet et.", "Sunucumu Yönet", "myserver"));
+            Loc.T("Kendi Sunucun"), Loc.T("Kendi co-op oturumunu oluştur, ayarlarını düzenle ve arkadaşlarını davet et."),
+            Loc.T("Sunucumu Yönet"), "myserver"));
         cards.Children.Add(CreateDashboardCard(
-            "Modlar ve İçerik", "Addon ped paketlerini ve sunucu içeriklerini yönet.", "Addon Peds", "addonpeds"));
+            Loc.T("Modlar ve İçerik"), Loc.T("Addon ped paketlerini ve sunucu içeriklerini yönet."),
+            Loc.T("Addon Peds"), "addonpeds"));
         cards.Children.Add(CreateDashboardCard(
-            "HUD Tasarımcısı", "Oyun içi bildirim ve arayüz düzenini kişiselleştir.", "Tasarımı Aç", "hud"));
+            Loc.T("HUD Tasarımcısı"), Loc.T("Oyun içi bildirim ve arayüz düzenini kişiselleştir."),
+            Loc.T("Tasarımı Aç"), "hud"));
         root.Children.Add(cards);
 
         root.Children.Add(new TextBlock
         {
-            Text = "İpucu: Sunucuya katılmadan önce oyun klasörünün ve modlarının doğru algılandığını Oyun sekmesinden kontrol et.",
+            Text = Loc.T("İpucu: Sunucuya katılmadan önce oyun klasörünün ve modlarının doğru algılandığını Oyun sekmesinden kontrol et."),
             Foreground = (System.Windows.Media.Brush)FindResource("MutedBrush"),
             Margin = new Thickness(2, 18, 2, 0),
             TextWrapping = TextWrapping.Wrap

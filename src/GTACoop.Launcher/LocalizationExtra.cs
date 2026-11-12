@@ -89,6 +89,38 @@ public static partial class Loc
         ["Paket seçin: açıklama ve sürüm bilgisi burada görünür."] =
             "Select a pack to see its description and version.",
 
+        // --- WPF kabuğu (pano, kartlar, durum satırı)
+        ["GTA V multiplayer companion"] = "GTA V multiplayer companion",
+        ["Dil / Language"] = "Language",
+        ["Unofficial community project"] = "Unofficial community project",
+        ["Genel Bakış"] = "Overview",
+        ["Oturumunu ve araçlarını tek yerden yönet."] = "Manage your session and tools in one place.",
+        ["Birlikte oynayın. Dünyayı paylaşın."] = "Play together. Share the world.",
+        ["GTA V co-op oturumlarını, sunucularını ve modlarını GTACoop Remake üzerinden yönet."] =
+            "Manage your GTA V co-op sessions, servers and mods from GTACoop Remake.",
+        ["Oyuna Git"] = "Go to Game",
+        ["Sunucularım"] = "My Servers",
+        ["Sunucu Bul"] = "Find a Server",
+        ["Sunucuya Katıl"] = "Join a Server",
+        ["Arkadaşının sunucusuna bağlan veya kayıtlı sunucularını yönet."] =
+            "Join a friend's server or manage your saved servers.",
+        ["Sunucuları Aç"] = "Open Servers",
+        ["Kendi Sunucun"] = "Your Own Server",
+        ["Kendi co-op oturumunu oluştur, ayarlarını düzenle ve arkadaşlarını davet et."] =
+            "Create your own co-op session, edit its settings and invite friends.",
+        ["Sunucumu Yönet"] = "Manage My Server",
+        ["Modlar ve İçerik"] = "Mods and Content",
+        ["Addon ped paketlerini ve sunucu içeriklerini yönet."] =
+            "Manage add-on ped packs and server content.",
+        ["HUD Tasarımcısı"] = "HUD Designer",
+        ["Oyun içi bildirim ve arayüz düzenini kişiselleştir."] =
+            "Customise in-game notifications and layout.",
+        ["Tasarımı Aç"] = "Open Designer",
+        ["İpucu: Sunucuya katılmadan önce oyun klasörünün ve modlarının doğru algılandığını Oyun sekmesinden kontrol et."] =
+            "Tip: before joining, check on the Game tab that your game folder and mods are detected correctly.",
+        ["{0} — hazır."] = "{0} — ready.",
+        ["GTACoop Remake · {0}"] = "GTACoop Remake · {0}",
+
         // --- mod çakışma denetimi
         ["Sunucunun scriptleriyle çakışabilecek yerel dosyalar bulundu:\r\n\r\n{0}\r\n\r\nBunlar oyun çökmesine yol açabilir. Yine de bağlanılsın mı?"] =
             "Local files were found that may conflict with the server's scripts:\r\n\r\n{0}\r\n\r\nThese can cause game crashes. Connect anyway?"
