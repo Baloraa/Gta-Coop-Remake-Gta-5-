@@ -39,6 +39,16 @@ foreach ($procName in 'GTACoop.Launcher', 'GTACoop.SyncTool') {
 # --- 2) Kopyala (üzerine yaz, hiçbir şey silme) ---
 New-Item -ItemType Directory -Force -Path $installDir | Out-Null
 Copy-Item (Join-Path $distRoot '*') $installDir -Recurse -Force
+
+# Launcher artik tek dosya yayinlaniyor; eski kurulumdan kalan ayri
+# GTACoop.Launcher.dll/.pdb dosyalari kalirsa karisiklik yaratmasin.
+foreach ($stale in 'GTACoop.Launcher.dll', 'GTACoop.Launcher.pdb',
+                 'GTACoop.Launcher.deps.json', 'GTACoop.Launcher.runtimeconfig.json') {
+    $p = Join-Path $installDir $stale
+    if ((Test-Path $p) -and -not (Test-Path (Join-Path $distRoot $stale))) {
+        Remove-Item $p -Force -ErrorAction SilentlyContinue
+    }
+}
 Write-Host "[1/3] Uygulama dosyalari kuruldu." -ForegroundColor Green
 
 # --- 3) Masaüstü kısayolu (varsa güncelle, yoksa oluştur) ---

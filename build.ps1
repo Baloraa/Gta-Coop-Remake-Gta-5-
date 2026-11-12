@@ -101,6 +101,8 @@ dotnet publish (Join-Path $root "src\GTACoop.ServerHost\GTACoop.ServerHost.cspro
 if ($LASTEXITCODE -ne 0) { throw "ServerHost publish failed." }
 
 # --- Clean apphost files that can leak into the root
+# Launcher tek dosya yayinlandigi icin kok dizinde pdb/dll kalintisi olmasin.
+Remove-Item (Join-Path $dist "*.pdb") -ErrorAction SilentlyContinue
 Remove-Item (Join-Path $dist "GTACoop.SyncServer.exe") -ErrorAction SilentlyContinue
 Remove-Item (Join-Path $dist "GTACoop.SyncServer.deps.json") -ErrorAction SilentlyContinue
 Remove-Item (Join-Path $dist "GTACoop.SyncServer.runtimeconfig.json") -ErrorAction SilentlyContinue
