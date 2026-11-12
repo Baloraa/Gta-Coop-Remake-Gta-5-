@@ -51,10 +51,12 @@ New-Item -ItemType Directory -Force (Join-Path $vendor "Server\Plugins") | Out-N
 Copy-Item $pluginDll (Join-Path $vendor "Server\Plugins\GTACoop.Remake.Plugin.dll") -Force
 Write-Host "      GTACoop.Remake.Plugin.dll copied to vendor."
 
-# --- 4) Publish the launcher
-Write-Host "[4/8] Publishing launcher..."
-dotnet publish (Join-Path $root "src\GTACoop.Launcher\GTACoop.Launcher.csproj") `
-    -c Release -o $dist --nologo --no-restore
+# --- 4) Publish the launcher (WPF shell, same GTACoop.Launcher.exe name)
+# WinForms launcher hala derlenebilir: src\GTACoop.Launcher. WPF'de bir sorun
+# cikarsa o projeyi burada gosterip geri donulebilir.
+Write-Host "[4/8] Publishing launcher (WPF shell)..."
+dotnet publish (Join-Path $root "src\GTACoop.Launcher.Wpf\GTACoop.Launcher.Wpf.csproj") `
+    -c Release -o $dist --nologo
 if ($LASTEXITCODE -ne 0) { throw "Launcher publish failed." }
 
 # --- 5) Publish the sync server
