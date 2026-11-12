@@ -67,6 +67,15 @@ public partial class MainWindow : Window
         LangCombo.SelectionChanged += OnLanguageChanged;
         _languageReady = true;
 
+        // Pencere, ekranın altına taşıp alt satırları gizlemesin: doğrudan
+        // WPF'in DIP cinsinden çalışma alanına sınırla.
+        var wa = SystemParameters.WorkArea;
+        MaxWidth = wa.Width;
+        MaxHeight = wa.Height;
+        if (Width > wa.Width - 20) Width = Math.Max(760, wa.Width - 20);
+        if (Height > wa.Height - 20) Height = Math.Max(560, wa.Height - 20);
+        Left = wa.Left + (wa.Width - Width) / 2;
+        Top = wa.Top + Math.Max(0, (wa.Height - Height) / 2);
         Loaded += (_, _) => ClampToWorkArea();
         Nav.SelectedIndex = 0;
     }
@@ -74,11 +83,27 @@ public partial class MainWindow : Window
     /// <summary>Pencere ekrandan taşmasın; içerik sağdan kesilmesin.</summary>
     private void ClampToWorkArea()
     {
-        var area = SystemParameters.WorkArea;
-        if (Width > area.Width - 20) Width = Math.Max(MinWidth, area.Width - 20);
-        if (Height > area.Height - 20) Height = Math.Max(MinHeight, area.Height - 20);
-        Left = Math.Max(area.Left, Math.Min(Left, area.Right - Width));
-        Top = Math.Max(area.Top, Math.Min(Top, area.Bottom - Height));
+        // Pencere 1000 piksele kadar büyüyüp ekranın altına taşıyordu; bu yüzden
+        // alt satırlar görünmüyordu. Fiziksel çalışma alanı DIP'e çevrilip
+        // pencere kesin olarak içine alınır.
+        var handle = new WindowInteropHelper(this).Handle;
+        var work = handle != IntPtr.Zero
+            ? Wf.Screen.FromHandle(handle).WorkingArea
+            : Wf.Screen.PrimaryScreen!.WorkingArea;
+
+        var dip = PresentationSource.FromVisual(this)?.CompositionTarget?.TransformFromDevice;
+        var scaleX = dip?.M11 ?? 1.0;
+        var scaleY = dip?.M22 ?? 1.0;
+        var maxWidth = work.Width * scaleX - 20;
+        var maxHeight = work.Height * scaleY - 20;
+
+        MinWidth = Math.Min(MinWidth, maxWidth);
+        MinHeight = Math.Min(MinHeight, maxHeight);
+        if (Width > maxWidth) Width = maxWidth;
+        if (Height > maxHeight) Height = maxHeight;
+
+        Left = Math.Max(0, (work.Width * scaleX - Width) / 2 + work.Left * scaleX);
+        Top = Math.Max(0, (work.Height * scaleY - Height) / 2 + work.Top * scaleY);
     }
 
     /// <summary>Dil seçimi: ayarı yazar ve onay verilirse launcher'ı yeniden başlatır.</summary>
