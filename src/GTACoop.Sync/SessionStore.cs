@@ -64,6 +64,7 @@ public static class SessionService
         }
 
         ClientSettingsEditor.DisableAutoConnect(gameFolder, log);
+        WorldConfig.Remove(gameFolder);
         SessionStore.Clear(dataFolder);
         return true;
     }

@@ -1,5 +1,6 @@
 ﻿using System.Diagnostics;
 using System.Text;
+using System.Security.Cryptography;
 using GTACoop.Sync;
 
 // ---------------------------------------------------------------------------
@@ -119,9 +120,17 @@ app.Use(async (ctx, next) =>
         $"<- {ctx.Connection.RemoteIpAddress} {ctx.Request.Path}");
 });
 
-bool Authorized(HttpContext ctx) =>
-    string.IsNullOrEmpty(token) ||
-    (ctx.Request.Headers.TryGetValue("X-Sync-Token", out var t) && t.ToString() == token);
+bool Authorized(HttpContext ctx)
+{
+    if (string.IsNullOrEmpty(token)) return true;
+    if (!ctx.Request.Headers.TryGetValue("X-Sync-Token", out var supplied)) return false;
+
+    // Avoid a normal string comparison for the shared secret.
+    var expectedBytes = Encoding.UTF8.GetBytes(token);
+    var suppliedBytes = Encoding.UTF8.GetBytes(supplied.ToString());
+    return expectedBytes.Length == suppliedBytes.Length &&
+           CryptographicOperations.FixedTimeEquals(expectedBytes, suppliedBytes);
+}
 
 // ------------------------------------------------------------------ uç noktalar
 
@@ -201,6 +210,10 @@ app.Lifetime.ApplicationStarted.Register(() =>
     Console.WriteLine($"Devre dışı mod: {DisabledMods().Count}");
     Console.WriteLine($"Dinleniyor : http://0.0.0.0:{port}/");
     Console.WriteLine(token.Length > 0 ? "Kimlik doğrulama: AÇIK (X-Sync-Token)" : "Kimlik doğrulama: kapalı");
+    if (token.Length == 0)
+        Console.WriteLine("UYARI: --token belirtilmedi. Manifest ve dosyalar ağa açık; internete açık sunucularda token kullanın.");
+    else
+        Console.WriteLine("GÜVENLİK: Token tek başına trafiği şifrelemez. İnternet üzerinden kullanımda HTTPS/TLS reverse proxy kullanın.");
     Console.WriteLine("Durdurmak için Ctrl+C.");
 });
 

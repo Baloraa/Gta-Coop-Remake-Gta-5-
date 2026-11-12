@@ -1,0 +1,34 @@
+Bu projede GTACoop Remake 2.13.1 üzerinde çalışıyorsun. Lütfen önce ZIP içindeki `WPF-GECIS-DURUMU-TR.md` ve `VFS-TEKNIK-ANALIZ-TR.md` dosyalarını oku.
+
+KRİTİK KORUMALAR
+- Kullanıcının mevcut masaüstü uygulaması `GTACoop.Launcher.exe` adını kullanıyor. Yeni uygulama da aynı dosya adına sahip olmalı; `GTACoop.Launcher.Wpf.exe` gibi ikinci bir ürün exe'si üretme.
+- `SelfUpdater` GitHub Release asset olarak `GTACoop.Launcher.exe` arıyor. Bu ad ve güncelleme davranışı korunmalı.
+- Orijinal GTA V oyun dosyalarına yazma. Kullanıcının kendi modlarını, `scripts` klasörünü, ASI eklentilerini, OpenIV `mods` klasörünü veya `update.rpf` dosyasını izinsiz değiştirme.
+- Hiçbir özelliği kaldırma: server browser, server hosting, relay/P2P, mod sync, OIV/RPF, addon peds, HUD designer, singleplayer, logs, localization, updater, session watcher.
+- Çalışmayan veya test edilmemiş özelliği tamamlandı diye işaretleme.
+
+GÖREV 1 — WPF GEÇİŞİ
+- `src/GTACoop.Launcher.Wpf` ana uygulama projesi olarak kalmalı ve exe adı `GTACoop.Launcher.exe` olmalı.
+- Mevcut WinForms kaynakları WPF projesine linked compile olarak bağlanmıştır. `MainWindow.xaml.cs` içinde `WindowsFormsHost` ile barındırılan tüm sayfaları native WPF `Page` / `UserControl` olarak kademeli şekilde taşı.
+- Önce business logic'i UI kontrollerinden ayır; servisleri `GTACoop.Sync` içinde tut. WPF sayfaları WinForms `Control`, `Form`, `FindForm`, `MessageBox` veya `System.Drawing` bağımlılığı taşımamalı.
+- Eski UI özelliklerini tek tek eşleştir; her sayfa için mevcut aksiyonların listesi ve parity checklist oluştur.
+- Tüm sekmeler native WPF olmadan `UseWindowsForms` seçeneğini kapatma.
+- Tasarım: mevcut koyu palet, klavye erişilebilirliği, DPI ölçekleme, pencere boyutlandırma ve Türkçe/İngilizce/Rusça dil desteği korunmalı.
+
+GÖREV 2 — VFS ARAŞTIRMASI VE UYGULAMASI
+- Önce GTA V / OpenIV.asi / ScriptHookVDotNet / ASI loader için gerçekten desteklenen harici dosya mount mekanizmasını kaynak kod ve testlerle doğrula. Sadece adına VFS demek yeterli değil.
+- `VFS-TEKNIK-ANALIZ-TR.md` içindeki sınırları dikkate al. GTA V'in tüm ASI/script/RPF dosyalarını dış dizinden okuyacağı varsayımı yapma.
+- Native file-system hook veya sürüm bağımlı process injection'ı doğrulanmamış şekilde ekleme. GTA güncellemesinde oyunu bozabilecek hook'u default açma.
+- Güvenli ara hedef: sunucu içeriklerini `%LOCALAPPDATA%\GTACoopRemake\Cache\<server>` altında sakla; orijinal oyun dosyalarına dokunma; yalnızca desteklenen OpenIV `mods` overlay türleri için mount yönetimi yap; `scripts`/ASI için test edilmiş, geri alınabilir yöntem yoksa özelliği engelle ve kullanıcıya net uyarı göster.
+- Her mount için JSON ownership manifesti tut: server id, addon id, relative path, source hash, mount kind, created timestamp. Sadece bu manifestle sahipliği doğrulanan mount'u kaldır.
+- Karantina başarısızsa kaynak dosyayı asla silme. Mevcut kullanıcının dosyası varsa üzerine yazma.
+
+GÖREV 3 — DERLEME VE TEST
+- Windows üzerinde `dotnet build` ve `dotnet publish` çalıştır.
+- Çıktı kesinlikle `GTACoop.Launcher.exe` olmalı.
+- `GTACoop.Launcher.exe` ile beraber gereken runtime/deps/resource dosyalarını paketle. SelfUpdater uyumluluğunu kontrol et.
+- Unit/smoke testleri, path traversal, quarantine, world config backup/restore ve VFS mount/rollback testlerini çalıştır.
+- GTA V gerçek oyun testi yapılamadıysa açıkça yaz.
+- Sonunda: değişen dosyalar, tamamlanan WPF sayfaları, kalan WinForms sayfaları, derleme sonucu, test sonucu, bilinen riskler ve geri alma adımlarını raporla.
+
+ÖNEMLİ: Kullanıcı bu projeyi kendi masaüstünde kullanıyor. Mevcut exe'yi sessizce değiştirme. Önce yeni build'i ayrı bir staging klasörüne publish et, hash/derleme/test doğrula, sonra aynı dosya adına sahip kurulum paketi hazırla.

@@ -1,0 +1,30 @@
+name: Windows build and smoke tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Restore solution
+        run: dotnet restore GTACoopRemake.sln
+
+      - name: Build Release
+        run: dotnet build GTACoopRemake.sln --configuration Release --no-restore
+
+      - name: Run security smoke tests
+        run: dotnet run --project tests/GTACoop.Sync.SmokeTests/GTACoop.Sync.SmokeTests.csproj --configuration Release --no-build

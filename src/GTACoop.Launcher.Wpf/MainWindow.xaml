@@ -12,7 +12,7 @@
 
     <Grid>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="240" />
+            <ColumnDefinition Width="238" />
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
 
@@ -21,32 +21,45 @@
                 Background="{StaticResource SurfaceBrush}"
                 BorderBrush="{StaticResource BorderBrush}"
                 BorderThickness="0,0,1,0">
-            <DockPanel>
-                <StackPanel DockPanel.Dock="Top" Margin="18,20,18,12">
-                    <TextBlock Text="GTACoop Remake" FontSize="17" FontWeight="SemiBold" />
-                    <TextBlock Text="WPF arayüzü (geliştirme)" Style="{StaticResource Muted}" />
+            <DockPanel LastChildFill="True">
+                <StackPanel DockPanel.Dock="Top" Margin="20,22,18,20">
+                    <TextBlock Text="GTA" FontSize="12" FontWeight="Bold"
+                               Foreground="{StaticResource AccentBrush}" />
+                    <TextBlock Text="COOP REMAKE" FontSize="19" FontWeight="SemiBold"
+                               Margin="0,2,0,3" />
+                    <TextBlock Text="GTA V multiplayer companion" Style="{StaticResource Muted}"
+                               FontSize="11" />
                 </StackPanel>
 
-                <TextBlock x:Name="VersionText"
-                           DockPanel.Dock="Bottom"
-                           Margin="18,8,18,14"
-                           Style="{StaticResource Muted}" />
+                <StackPanel DockPanel.Dock="Bottom" Margin="18,8,18,16">
+                    <Border Height="1" Background="{StaticResource BorderBrush}" Margin="0,0,0,10" />
+                    <TextBlock x:Name="VersionText" Style="{StaticResource Muted}" />
+                    <TextBlock Text="Unofficial community project" Style="{StaticResource Muted}"
+                               FontSize="10" Margin="0,3,0,0" />
+                </StackPanel>
 
-                <ListBox x:Name="Nav" SelectionChanged="OnNavChanged" />
+                <ListBox x:Name="Nav" SelectionChanged="OnNavChanged" Margin="10,0,10,0" />
             </DockPanel>
         </Border>
 
         <!-- İçerik -->
-        <DockPanel Grid.Column="1">
+        <DockPanel Grid.Column="1" LastChildFill="True">
             <Border DockPanel.Dock="Bottom"
                     Background="{StaticResource SurfaceBrush}"
                     BorderBrush="{StaticResource BorderBrush}"
                     BorderThickness="0,1,0,0"
-                    Padding="16,6">
+                    Padding="18,9">
                 <TextBlock x:Name="StatusText" Style="{StaticResource Muted}" Text="Hazır." />
             </Border>
 
-            <ContentControl x:Name="Host" Margin="26,20,26,20" />
+            <StackPanel Margin="28,22,28,8">
+                <TextBlock x:Name="PageTitle" Text="Genel Bakış" FontSize="23"
+                           FontWeight="SemiBold" />
+                <TextBlock x:Name="PageSubtitle" Text="Oturumunu ve araçlarını tek yerden yönet."
+                           Style="{StaticResource Muted}" Margin="0,4,0,0" />
+            </StackPanel>
+
+            <ContentControl x:Name="Host" Margin="28,10,28,24" />
         </DockPanel>
     </Grid>
 </Window>

@@ -10,6 +10,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\GTACoop.Rpf\GTACoop.Rpf.csproj" />
+    <InternalsVisibleTo Include="GTACoop.Sync.SmokeTests" />
   </ItemGroup>
 
 </Project>

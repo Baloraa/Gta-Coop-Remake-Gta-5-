@@ -1,4 +1,4 @@
-using System.Security.Cryptography;
+﻿using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 
@@ -91,13 +91,13 @@ public sealed class ServerScanner
         var dir = Path.Combine(_addonsDir, "dlcpacks");
         if (!Directory.Exists(dir)) return;
 
-        foreach (var packDir in Directory.GetDirectories(dir))
+        foreach (var packDir in EnumerateDirectoriesSafe(dir))
         {
             var id = Path.GetFileName(packDir);
             if (id.StartsWith('.')) continue;
 
             // En sığ dlc.rpf'i bul
-            var rpf = Directory.EnumerateFiles(packDir, "dlc.rpf", SearchOption.AllDirectories)
+            var rpf = EnumerateFilesSafe(packDir, "dlc.rpf")
                 .OrderBy(p => p.Count(c => c == Path.DirectorySeparatorChar))
                 .FirstOrDefault();
 
@@ -109,6 +109,15 @@ public sealed class ServerScanner
 
             var relPackPath = Path.GetRelativePath(packDir, Path.GetDirectoryName(rpf)!);
             if (relPackPath == ".") relPackPath = "";
+
+            var mountFolder = AddonApplier.MountFolderName(id);
+            if (manifest.Addons.Any(a => a.Type == AddonType.DlcPack &&
+                    string.Equals(AddonApplier.MountFolderName(a.Id), mountFolder,
+                        StringComparison.OrdinalIgnoreCase)))
+            {
+                result.Warnings.Add($"DlcPack '{id}' atlandı: başka bir paketle aynı DLCPack klasör adına ({mountFolder}) dönüşüyor.");
+                continue;
+            }
 
             var meta = ReadAddonMeta(packDir);
             manifest.Addons.Add(new AddonInfo
@@ -137,7 +146,7 @@ public sealed class ServerScanner
 
         var preparedRoot = Path.Combine(_addonsDir, AddonPeds.PreparedDirectoryName);
 
-        foreach (var packDir in Directory.GetDirectories(dir))
+        foreach (var packDir in EnumerateDirectoriesSafe(dir))
         {
             var id = Path.GetFileName(packDir);
             if (id.StartsWith('.')) continue;
@@ -219,13 +228,13 @@ public sealed class ServerScanner
         var dir = Path.Combine(_addonsDir, "oiv");
         if (!Directory.Exists(dir)) return;
 
-        foreach (var packDir in Directory.GetDirectories(dir))
+        foreach (var packDir in EnumerateDirectoriesSafe(dir))
         {
             var id = Path.GetFileName(packDir);
             if (id.StartsWith('.')) continue;
 
             // Her OIV paketi kendi klasöründe durur; klasör içinde tek .oiv beklenir.
-            var oiv = Directory.EnumerateFiles(packDir, "*.oiv", SearchOption.AllDirectories)
+            var oiv = EnumerateFilesSafe(packDir, "*.oiv")
                 .OrderBy(p => p.Count(c => c == Path.DirectorySeparatorChar))
                 .FirstOrDefault();
             if (oiv == null)
@@ -272,7 +281,7 @@ public sealed class ServerScanner
     {
         try
         {
-            var oiv = Directory.EnumerateFiles(dir, "*.oiv", SearchOption.AllDirectories)
+            var oiv = EnumerateFilesSafe(dir, "*.oiv")
                 .OrderBy(p => p.Count(c => c == Path.DirectorySeparatorChar))
                 .FirstOrDefault();
             return oiv == null ? null : OivPackage.ReadDisplayName(oiv);
@@ -288,7 +297,7 @@ public sealed class ServerScanner
         var dir = Path.Combine(_addonsDir, "scripts");
         if (!Directory.Exists(dir)) return;
 
-        foreach (var scriptDir in Directory.GetDirectories(dir))
+        foreach (var scriptDir in EnumerateDirectoriesSafe(dir))
         {
             var id = Path.GetFileName(scriptDir);
             if (id.StartsWith('.')) continue;
@@ -318,7 +327,7 @@ public sealed class ServerScanner
         var dir = Path.Combine(_addonsDir, "asi");
         if (!Directory.Exists(dir)) return;
 
-        foreach (var asiDir in Directory.GetDirectories(dir))
+        foreach (var asiDir in EnumerateDirectoriesSafe(dir))
         {
             var id = Path.GetFileName(asiDir);
             if (id.StartsWith('.')) continue;
@@ -360,8 +369,10 @@ public sealed class ServerScanner
     /// <summary>ASI dosyası oyun köküne kurulabilir mi? (tek dosya adı + izinli uzantı)</summary>
     public static bool IsAllowedAsiFile(string relPath)
     {
-        var p = relPath.Replace('\\', '/').TrimStart('/');
-        if (p.Contains("..") || p.Contains('/')) return false;
+        string p;
+        try { p = AddonPathSafety.NormalizeRelativePath(relPath).Replace('\\', '/'); }
+        catch (SyncException) { return false; }
+        if (p.Contains('/')) return false;
         var ext = Path.GetExtension(p);
         return AsiExtensions.Contains(ext, StringComparer.OrdinalIgnoreCase);
     }
@@ -371,7 +382,7 @@ public sealed class ServerScanner
         var dir = Path.Combine(_addonsDir, "files");
         if (!Directory.Exists(dir)) return;
 
-        foreach (var fileDir in Directory.GetDirectories(dir))
+        foreach (var fileDir in EnumerateDirectoriesSafe(dir))
         {
             var id = Path.GetFileName(fileDir);
             if (id.StartsWith('.')) continue;
@@ -410,7 +421,7 @@ public sealed class ServerScanner
         if (!Directory.Exists(dir)) return;
 
         // Tekil dll dosyaları
-        foreach (var dll in Directory.GetFiles(dir, "*.dll"))
+        foreach (var dll in EnumerateImmediateFilesSafe(dir, "*.dll"))
         {
             var id = Path.GetFileNameWithoutExtension(dll);
             manifest.Addons.Add(new AddonInfo
@@ -425,7 +436,7 @@ public sealed class ServerScanner
         }
 
         // Alt klasörler (eklenti + bağımlılıkları)
-        foreach (var sub in Directory.GetDirectories(dir))
+        foreach (var sub in EnumerateDirectoriesSafe(dir))
         {
             var id = Path.GetFileName(sub);
             if (id.StartsWith('.')) continue;
@@ -448,16 +459,91 @@ public sealed class ServerScanner
     /// <summary>ClientFiles hedef yolu izinli mi? (güvenlik sınırı)</summary>
     public static bool IsAllowedClientPath(string relPath)
     {
-        var p = relPath.Replace('\\', '/').TrimStart('/');
-        if (p.Contains("..")) return false;
+        string p;
+        try { p = AddonPathSafety.NormalizeRelativePath(relPath).Replace('\\', '/'); }
+        catch (SyncException) { return false; }
         return p.StartsWith("scripts/", StringComparison.OrdinalIgnoreCase)
             || p.StartsWith("mods/GTACoop/", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// Enumerates only ordinary files. Addon folders are untrusted server input:
+    /// do not follow symlinks/junctions that could publish files outside Addons.
+    /// </summary>
+    internal static IEnumerable<string> EnumerateFilesSafe(string root, string pattern)
+    {
+        if (!Directory.Exists(root) || IsReparsePoint(root)) yield break;
+
+        var pending = new Stack<string>();
+        pending.Push(root);
+        while (pending.Count > 0)
+        {
+            var current = pending.Pop();
+            string[] files;
+            string[] directories;
+            try
+            {
+                files = Directory.GetFiles(current, pattern, SearchOption.TopDirectoryOnly);
+                directories = Directory.GetDirectories(current);
+            }
+            catch (UnauthorizedAccessException) { continue; }
+            catch (IOException) { continue; }
+
+            foreach (var file in files)
+            {
+                if (!IsReparsePoint(file))
+                    yield return file;
+            }
+
+            // Reverse order keeps the traversal stable on typical filesystems.
+            for (var i = directories.Length - 1; i >= 0; i--)
+            {
+                var directory = directories[i];
+                if (!IsReparsePoint(directory))
+                    pending.Push(directory);
+            }
+        }
+    }
+
+    private static IEnumerable<string> EnumerateDirectoriesSafe(string root)
+    {
+        if (!Directory.Exists(root) || IsReparsePoint(root)) return Array.Empty<string>();
+        try
+        {
+            return Directory.GetDirectories(root)
+                .Where(directory => !IsReparsePoint(directory))
+                .ToArray();
+        }
+        catch (UnauthorizedAccessException) { return Array.Empty<string>(); }
+        catch (IOException) { return Array.Empty<string>(); }
+    }
+
+    private static IEnumerable<string> EnumerateImmediateFilesSafe(string root, string pattern)
+    {
+        if (!Directory.Exists(root) || IsReparsePoint(root)) return Array.Empty<string>();
+        try
+        {
+            return Directory.GetFiles(root, pattern, SearchOption.TopDirectoryOnly)
+                .Where(file => !IsReparsePoint(file))
+                .ToArray();
+        }
+        catch (UnauthorizedAccessException) { return Array.Empty<string>(); }
+        catch (IOException) { return Array.Empty<string>(); }
+    }
+
+    private static bool IsReparsePoint(string path)
+    {
+        try { return (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0; }
+        catch (FileNotFoundException) { return true; }
+        catch (DirectoryNotFoundException) { return true; }
+        catch (UnauthorizedAccessException) { return true; }
+        catch (IOException) { return true; }
     }
 
     private List<AddonFileInfo> HashTree(string root, ScanResult result, string addonId)
     {
         var list = new List<AddonFileInfo>();
-        foreach (var file in Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories))
+        foreach (var file in EnumerateFilesSafe(root, "*"))
         {
             var rel = Path.GetRelativePath(root, file).Replace('\\', '/');
             if (rel.StartsWith('.')) continue;

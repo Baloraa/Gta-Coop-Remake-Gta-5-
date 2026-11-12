@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Security.Cryptography;
@@ -28,16 +28,61 @@ public sealed class SyncClient : IDisposable
     public SyncClient(string host, int syncPort, string token = "", Action<string>? log = null)
     {
         _log = log;
-        var h = host.Trim();
-        if (h.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
-            h.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
-            h = h[(h.IndexOf("://", StringComparison.Ordinal) + 3)..];
-        if (h.Contains(':')) h = h[..h.IndexOf(':')];
+        if (syncPort is < 1 or > 65535)
+            throw new ArgumentOutOfRangeException(nameof(syncPort), "Sync port 1-65535 aralığında olmalıdır.");
 
-        var baseUrl = $"http://{h}:{syncPort}/";
+        var address = (host ?? string.Empty).Trim();
+        if (address.Length == 0)
+            throw new ArgumentException("Sunucu adresi boş olamaz.", nameof(host));
+
+        // HTTPS şeması kullanıcı tarafından verilmişse koru. Eski kod şemayı
+        // çıkarıp her durumda HTTP kurduğu için TLS reverse-proxy adresleri
+        // sessizce şifresiz bağlantıya düşüyordu.
+        var scheme = "http";
+        if (address.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+        {
+            scheme = "https";
+            address = address[8..];
+        }
+        else if (address.StartsWith("http://", StringComparison.OrdinalIgnoreCase))
+        {
+            address = address[7..];
+        }
+
+        // Bu alan yalnızca host/IP kabul eder; URL path/query parçalarını sessizce
+        // yutmak yerine reddet. IPv6 adresleri köşeli parantezle desteklenir.
+        address = address.TrimEnd('/');
+        if (address.Contains('/') || address.Contains('\\') || address.Contains('?') || address.Contains('#'))
+            throw new ArgumentException("Sunucu alanına yalnızca IP adresi veya alan adı girin.", nameof(host));
+
+        if (address.StartsWith("[", StringComparison.Ordinal))
+        {
+            var closingBracket = address.IndexOf(']');
+            if (closingBracket < 0)
+                throw new ArgumentException("IPv6 adresi köşeli parantez içinde olmalıdır.", nameof(host));
+            if (closingBracket + 1 < address.Length && address[closingBracket + 1] != ':')
+                throw new ArgumentException("Geçersiz IPv6 sunucu adresi.", nameof(host));
+            address = address[..(closingBracket + 1)];
+        }
+        else if (address.Count(c => c == ':') == 1)
+        {
+            // Kullanıcı host:eskiPort yazmışsa portu SyncPort ayarı belirler.
+            address = address[..address.IndexOf(':')];
+        }
+        else if (address.Contains(':'))
+        {
+            throw new ArgumentException("IPv6 adresini [2001:db8::1] biçiminde yazın.", nameof(host));
+        }
+
+        if (!Uri.CheckHostName(address.Trim('[', ']')).Equals(UriHostNameType.Dns) &&
+            !Uri.CheckHostName(address.Trim('[', ']')).Equals(UriHostNameType.IPv4) &&
+            !Uri.CheckHostName(address.Trim('[', ']')).Equals(UriHostNameType.IPv6))
+            throw new ArgumentException("Geçersiz sunucu adresi.", nameof(host));
+
+        var baseUrl = $"{scheme}://{address}:{syncPort}/";
         _http = new HttpClient
         {
-            BaseAddress = new Uri(baseUrl),
+            BaseAddress = new Uri(baseUrl, UriKind.Absolute),
             Timeout = TimeSpan.FromMinutes(60)
         };
         if (!string.IsNullOrEmpty(token))
@@ -49,14 +94,14 @@ public sealed class SyncClient : IDisposable
     {
         try
         {
-            var resp = await _http.GetAsync("api/v1/ping", ct);
+            using var resp = await _http.GetAsync("api/v1/ping", ct);
             if (!resp.IsSuccessStatusCode)
                 throw new SyncException($"Sunucu hata döndürdü: {(int)resp.StatusCode} {resp.ReasonPhrase}");
             var text = await resp.Content.ReadAsStringAsync(ct);
-            var doc = System.Text.Json.JsonDocument.Parse(text);
+            using var doc = System.Text.Json.JsonDocument.Parse(text);
             return doc.RootElement.TryGetProperty("serverName", out var n) ? n.GetString() ?? "" : "";
         }
-        catch (TaskCanceledException)
+        catch (TaskCanceledException) when (!ct.IsCancellationRequested)
         {
             throw new SyncException("Sunucu yanıt vermedi (zaman aşımı). Adres ve bağlantı noktasını kontrol edin.");
         }
@@ -72,8 +117,7 @@ public sealed class SyncClient : IDisposable
         try
         {
             var manifest = await _http.GetFromJsonAsync<Manifest>("api/v1/manifest", SyncJson.Options, ct);
-            if (manifest == null)
-                throw new SyncException("Sunucudan geçersiz manifest alındı.");
+            AddonPathSafety.ValidateManifest(manifest);
             return manifest;
         }
         catch (HttpRequestException ex)
@@ -97,6 +141,11 @@ public sealed class SyncClient : IDisposable
         string addonId, AddonFileInfo file, string destPath,
         IProgress<long>? bytesProgress = null, CancellationToken ct = default)
     {
+        AddonPathSafety.ValidateFiles(new[] { file });
+        if (string.IsNullOrWhiteSpace(addonId) || addonId.Length > 128 ||
+            addonId.Contains('/') || addonId.Contains('\\') || addonId.Contains(':'))
+            throw new SyncException("Geçersiz eklenti kimliği.");
+
         var url = "api/v1/files/" + Uri.EscapeDataString(addonId) + "/" + EscapePath(file.Path);
         var tmp = destPath + ".part";
         Directory.CreateDirectory(Path.GetDirectoryName(destPath)!);

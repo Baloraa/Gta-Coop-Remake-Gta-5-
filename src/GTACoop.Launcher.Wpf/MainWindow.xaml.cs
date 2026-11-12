@@ -11,6 +11,7 @@ public partial class MainWindow : Window
 {
     private static readonly (string Key, string Title)[] Sections =
     {
+        ("home", "Genel Bakış"),
         ("game", "Oyun"),
         ("servers", "Sunucular"),
         ("browser", "Sunucu Tarayıcı"),
@@ -55,6 +56,10 @@ public partial class MainWindow : Window
         if (Nav.SelectedItem is not ListBoxItem item || item.Tag is not string key) return;
 
         Host.Content = Page(key);
+        PageTitle.Text = Sections.First(s => s.Key == key).Title;
+        PageSubtitle.Text = key == "home"
+            ? "Oturumunu ve araçlarını tek yerden yönet."
+            : "GTACoop Remake · " + Sections.First(s => s.Key == key).Title;
         StatusText.Text = item.Content + " — hazır.";
 
         if (key == "addonpeds") _addonPedsTab?.RefreshList();
@@ -78,6 +83,12 @@ public partial class MainWindow : Window
     private FrameworkElement Page(string key)
     {
         if (_pages.TryGetValue(key, out var cached)) return cached;
+        if (key == "home")
+        {
+            var dashboard = BuildHomePage();
+            _pages[key] = dashboard;
+            return dashboard;
+        }
 
         var control = CreateControl(key);
         control.Dock = Wf.DockStyle.Fill;
@@ -102,6 +113,131 @@ public partial class MainWindow : Window
         var host = new WindowsFormsHost { Child = form };
         _pages[key] = host;
         return host;
+    }
+
+
+    private FrameworkElement BuildHomePage()
+    {
+        var root = new StackPanel { Orientation = System.Windows.Controls.Orientation.Vertical };
+
+        var hero = new Border
+        {
+            Background = (System.Windows.Media.Brush)FindResource("SurfaceBrush"),
+            BorderBrush = (System.Windows.Media.Brush)FindResource("BorderBrush"),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(12),
+            Padding = new Thickness(24),
+            Margin = new Thickness(0, 0, 0, 18)
+        };
+        var heroContent = new StackPanel();
+        heroContent.Children.Add(new TextBlock
+        {
+            Text = "Birlikte oynayın. Dünyayı paylaşın.",
+            FontSize = 25,
+            FontWeight = FontWeights.SemiBold,
+            Foreground = (System.Windows.Media.Brush)FindResource("TextBrush"),
+            Margin = new Thickness(0, 0, 0, 8)
+        });
+        heroContent.Children.Add(new TextBlock
+        {
+            Text = "GTA V co-op oturumlarını, sunucularını ve modlarını GTACoop Remake üzerinden yönet.",
+            FontSize = 14,
+            Foreground = (System.Windows.Media.Brush)FindResource("MutedBrush"),
+            Margin = new Thickness(0, 0, 0, 18)
+        });
+        var heroActions = new WrapPanel();
+        heroActions.Children.Add(CreateDashboardButton("Oyuna Git", "game"));
+        heroActions.Children.Add(CreateDashboardButton("Sunucularım", "servers"));
+        heroActions.Children.Add(CreateDashboardButton("Sunucu Bul", "browser"));
+        heroContent.Children.Add(heroActions);
+        hero.Child = heroContent;
+        root.Children.Add(hero);
+
+        var cards = new WrapPanel();
+        cards.Children.Add(CreateDashboardCard(
+            "Sunucuya Katıl", "Arkadaşının sunucusuna bağlan veya kayıtlı sunucularını yönet.", "Sunucuları Aç", "servers"));
+        cards.Children.Add(CreateDashboardCard(
+            "Kendi Sunucun", "Kendi co-op oturumunu oluştur, ayarlarını düzenle ve arkadaşlarını davet et.", "Sunucumu Yönet", "myserver"));
+        cards.Children.Add(CreateDashboardCard(
+            "Modlar ve İçerik", "Addon ped paketlerini ve sunucu içeriklerini yönet.", "Addon Peds", "addonpeds"));
+        cards.Children.Add(CreateDashboardCard(
+            "HUD Tasarımcısı", "Oyun içi bildirim ve arayüz düzenini kişiselleştir.", "Tasarımı Aç", "hud"));
+        root.Children.Add(cards);
+
+        root.Children.Add(new TextBlock
+        {
+            Text = "İpucu: Sunucuya katılmadan önce oyun klasörünün ve modlarının doğru algılandığını Oyun sekmesinden kontrol et.",
+            Foreground = (System.Windows.Media.Brush)FindResource("MutedBrush"),
+            Margin = new Thickness(2, 18, 2, 0),
+            TextWrapping = TextWrapping.Wrap
+        });
+
+        return new ScrollViewer
+        {
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+            Content = root
+        };
+    }
+
+    private System.Windows.Controls.Button CreateDashboardButton(string label, string destination)
+    {
+        var button = new System.Windows.Controls.Button
+        {
+            Content = label,
+            MinWidth = 112,
+            Margin = new Thickness(0, 0, 8, 0),
+            Padding = new Thickness(14, 9, 14, 9)
+        };
+        button.Click += (_, _) => NavigateTo(destination);
+        return button;
+    }
+
+    private Border CreateDashboardCard(string title, string description, string action, string destination)
+    {
+        var card = new Border
+        {
+            Background = (System.Windows.Media.Brush)FindResource("SurfaceBrush"),
+            BorderBrush = (System.Windows.Media.Brush)FindResource("BorderBrush"),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(10),
+            Padding = new Thickness(16),
+            Margin = new Thickness(0, 0, 12, 12),
+            Width = 270,
+            MinHeight = 166
+        };
+        var content = new StackPanel();
+        content.Children.Add(new TextBlock
+        {
+            Text = title,
+            FontSize = 16,
+            FontWeight = FontWeights.SemiBold,
+            Margin = new Thickness(0, 0, 0, 7)
+        });
+        content.Children.Add(new TextBlock
+        {
+            Text = description,
+            Foreground = (System.Windows.Media.Brush)FindResource("MutedBrush"),
+            TextWrapping = TextWrapping.Wrap,
+            MinHeight = 52,
+            Margin = new Thickness(0, 0, 0, 12)
+        });
+        var button = new System.Windows.Controls.Button
+        {
+            Content = action,
+            HorizontalAlignment = System.Windows.HorizontalAlignment.Left,
+            Padding = new Thickness(12, 7, 12, 7)
+        };
+        button.Click += (_, _) => NavigateTo(destination);
+        content.Children.Add(button);
+        card.Child = content;
+        return card;
+    }
+
+    private void NavigateTo(string key)
+    {
+        var index = Array.FindIndex(Sections, s => s.Key == key);
+        if (index >= 0) Nav.SelectedIndex = index;
     }
 
     private Wf.Control CreateControl(string key)

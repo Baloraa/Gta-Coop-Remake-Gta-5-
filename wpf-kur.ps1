@@ -1,9 +1,9 @@
-# =============================================================================
+﻿# =============================================================================
 #  GTACoop Remake - WPF Launcher Kur / Güncelle
-#  dist\GTACoopRemake-Wpf klasörünü şuraya kopyalar:
-#      %LOCALAPPDATA%\Programs\GTACoop Remake WPF
-#  Masaüstü ve Başlat menüsüne "GTACoop Remake (WPF)" kısayolu ekler.
-#  WinForms sürümünün kurulumuna ve kısayollarına dokunmaz.
+#  dist\GTACoopRemake-Wpf klasörünü mevcut uygulama klasörüne kopyalar:
+#      %LOCALAPPDATA%\Programs\GTACoop Remake
+#  Mevcut GTACoop.Launcher.exe adını ve GTACoop Remake kısayolunu korur.
+#  Var olan exe'yi ilk kurulumda .pre-wpf.bak olarak yedekler.
 #  Kullanım:  powershell -ExecutionPolicy Bypass -File wpf-kur.ps1
 # =============================================================================
 
@@ -11,12 +11,12 @@ $ErrorActionPreference = 'Stop'
 
 $root       = Split-Path -Parent $MyInvocation.MyCommand.Path
 $src        = Join-Path $root 'dist\GTACoopRemake-Wpf'
-$exeName    = 'GTACoop.Launcher.Wpf.exe'
-$installDir = Join-Path $env:LOCALAPPDATA 'Programs\GTACoop Remake WPF'
+$exeName    = 'GTACoop.Launcher.exe'
+$installDir = Join-Path $env:LOCALAPPDATA 'Programs\GTACoop Remake'
 $target     = Join-Path $installDir $exeName
-$shortcut   = 'GTACoop Remake (WPF).lnk'
+$shortcut   = 'GTACoop Remake.lnk'
 
-Write-Host "== GTACoop Remake WPF Kurulum ==" -ForegroundColor Cyan
+Write-Host "== GTACoop Remake Kurulum ==" -ForegroundColor Cyan
 Write-Host "Kaynak : $src"
 Write-Host "Hedef  : $installDir"
 Write-Host ""
@@ -26,14 +26,17 @@ if (-not (Test-Path (Join-Path $src $exeName))) {
     exit 1
 }
 
-$proc = Get-Process -Name 'GTACoop.Launcher.Wpf' -ErrorAction SilentlyContinue
+$proc = Get-Process -Name 'GTACoop.Launcher' -ErrorAction SilentlyContinue
 if ($proc) {
-    Write-Host "HATA: 'GTACoop.Launcher.Wpf' su anda calisiyor. Lutfen kapatip tekrar deneyin." -ForegroundColor Red
+    Write-Host "HATA: 'GTACoop.Launcher' su anda calisiyor. Lutfen kapatip tekrar deneyin." -ForegroundColor Red
     exit 1
 }
 
-# --- 1) Kopyala (uzerine yaz, hicbir sey silme)
+# --- 1) Kopyala (mevcut exe'nin yedegini bir kez al)
 New-Item -ItemType Directory -Force -Path $installDir | Out-Null
+$existingExe = Join-Path $installDir $exeName
+$backupExe = Join-Path $installDir ($exeName + '.pre-wpf.bak')
+if ((Test-Path $existingExe) -and -not (Test-Path $backupExe)) { Copy-Item $existingExe $backupExe -Force }
 Copy-Item (Join-Path $src '*') $installDir -Recurse -Force
 Write-Host "[1/3] Uygulama dosyalari kuruldu." -ForegroundColor Green
 
@@ -46,7 +49,7 @@ $s = $ws.CreateShortcut($lnkPath)
 $s.TargetPath = $target
 $s.WorkingDirectory = $installDir
 $s.IconLocation = "$target,0"
-$s.Description = 'GTACoop Remake - GTA V mod ve sunucu yoneticisi (WPF)'
+$s.Description = 'GTACoop Remake - GTA V mod ve sunucu yoneticisi'
 $s.Save()
 Write-Host "[2/3] Masaustu kisayolu hazir: $shortcut" -ForegroundColor Green
 
@@ -56,13 +59,13 @@ $sm = $ws.CreateShortcut($startMenu)
 $sm.TargetPath = $target
 $sm.WorkingDirectory = $installDir
 $sm.IconLocation = "$target,0"
-$sm.Description = 'GTACoop Remake - GTA V mod ve sunucu yoneticisi (WPF)'
+$sm.Description = 'GTACoop Remake - GTA V mod ve sunucu yoneticisi'
 $sm.Save()
 Write-Host "[3/3] Baslat menusu kisayolu hazir." -ForegroundColor Green
 
 Write-Host ""
-Write-Host "TAMAM! GTACoop Remake (WPF) kuruldu:" -ForegroundColor Cyan
+Write-Host "TAMAM! GTACoop Remake guncellendi:" -ForegroundColor Cyan
 Write-Host "  $target"
-Write-Host "Masaustu ve Baslat menusundeki 'GTACoop Remake (WPF)' kisayolundan acabilirsiniz."
+Write-Host "Masaustu ve Baslat menusundeki 'GTACoop Remake' kisayolundan acabilirsiniz."
 Write-Host ""
-Write-Host "Not: WinForms surumu ve kendi kisayolu degismedi." -ForegroundColor Yellow
+Write-Host "Not: Ayni exe adi ve ayni masaustu kisayolu kullanilir. Kurulumdan once mevcut exe yedeklenmelidir." -ForegroundColor Yellow

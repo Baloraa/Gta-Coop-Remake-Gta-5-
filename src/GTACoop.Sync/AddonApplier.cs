@@ -1,4 +1,5 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
+using System.Security.Cryptography;
 using System.Text;
 using GTACoop.Rpf;
 
@@ -51,6 +52,12 @@ public sealed class AddonApplier
     /// <summary>Manifest ile yerel durumu karşılaştırıp kurulum planı çıkarır.</summary>
     public InstallPlan BuildPlan(Manifest manifest, SyncState state)
     {
+        AddonPathSafety.ValidateManifest(manifest);
+        if (state is null)
+            throw new ArgumentNullException(nameof(state));
+        if (state.Addons is null)
+            throw new SyncException("Yerel eşitleme durumu geçersiz: eklenti listesi eksik.");
+
         var plan = new InstallPlan();
 
         foreach (var addon in manifest.Addons)
@@ -480,6 +487,10 @@ public sealed class AddonApplier
                 SyncText.T("Atlandı: {0} (paket kurulamıyor)", blocked.Addon.DisplayName), 0));
         }
 
+        // Sunucu içeriği kaldırıldığında oyun klasöründen kalıcı silme yapma:
+        // dosyaları uygulama verisindeki geri alınabilir karantinaya taşı.
+        var syncQuarantine = QuarantineRoot(dataFolder, DateTime.Now);
+
         // 1) Sunucudan kaldırılanları temizle
         foreach (var inst in plan.ToRemove)
         {
@@ -487,7 +498,7 @@ public sealed class AddonApplier
             progress?.Report(new SyncProgress(
                 SyncText.Translate($"Kaldırılıyor: {inst.Id}"), 0));
             _log(SyncText.Translate($"Kaldırılıyor: {inst.Id} ({inst.Type})"));
-            Uninstall(inst,
+            Uninstall(inst, syncQuarantine,
                 protectedDlclistEntries: DlclistEntriesStillNeededByOthers(inst, state.Addons));
             state.Addons.Remove(inst);
             SyncStateStore.Save(dataFolder, state); // çökme güvenliği: artımlı kayıt
@@ -504,9 +515,7 @@ public sealed class AddonApplier
             // DLC güncellemelerinde eski sürümün önbelleğini EZMEYELİM: hedef
             // klasör eski önbelleğe junction olabilir. Sürüm başına ayrı önbellek
             // kullanınca indirme/kurulum başarısız olsa bile eski DLC sağlam kalır.
-            var addonCacheDir = addon.Type is AddonType.DlcPack or AddonType.OivPackage
-                ? Path.Combine(serverCacheDir, Safe(addon.Id) + "__" + Safe(version))
-                : Path.Combine(serverCacheDir, Safe(addon.Id));
+            var addonCacheDir = GetAddonCacheDirectory(serverCacheDir, addon, version);
 
             // Güncelleme senaryosu. DLC ve OIV paketlerinde eski dosyaları önceden
             // SİLMEYİZ: yeni sürüm başarıyla kurulana kadar eski sürüm korunur.
@@ -517,7 +526,7 @@ public sealed class AddonApplier
                 _log(SyncText.T("Güncelleniyor: {0} ({1} -> {2})", addon.Id, old.Version, version));
                 if (addon.Type is not (AddonType.DlcPack or AddonType.OivPackage))
                 {
-                    Uninstall(old);
+                    Uninstall(old, syncQuarantine);
                     state.Addons.Remove(old);
                 }
             }
@@ -576,6 +585,8 @@ public sealed class AddonApplier
 
         state.LastSyncUtc = DateTime.UtcNow;
         SyncStateStore.Save(dataFolder, state);
+        if (_quarantineMoved > 0)
+            _log($"Önceki sunucu dosyaları geri alınabilir biçimde saklandı: {syncQuarantine}");
         AddonPeds.WriteClientConfig(_gameFolder, manifest, state.Addons);
         WorldConfig.Write(_gameFolder, manifest);
         progress?.Report(new SyncProgress(
@@ -587,6 +598,7 @@ public sealed class AddonApplier
         SyncClient client, AddonInfo addon, string addonCacheDir,
         IProgress<SyncProgress>? progress, long doneBytes, long totalBytes, CancellationToken ct)
     {
+        AddonPathSafety.ValidateFiles(addon.Files);
         Directory.CreateDirectory(addonCacheDir);
         var sidecarPath = addonCacheDir.TrimEnd('\\', '/') + ".files.json";
         var sidecar = SyncJson.Load<Dictionary<string, string>>(sidecarPath) ?? new();
@@ -595,7 +607,7 @@ public sealed class AddonApplier
         foreach (var file in addon.Files)
         {
             ct.ThrowIfCancellationRequested();
-            var dest = Path.Combine(addonCacheDir, file.Path.Replace('/', Path.DirectorySeparatorChar));
+            var dest = AddonPathSafety.GetChildPath(addonCacheDir, file.Path);
 
             bool cached = File.Exists(dest)
                 && sidecar.TryGetValue(file.Path, out var knownSha)
@@ -1210,12 +1222,18 @@ public sealed class AddonApplier
         var root = Path.GetDirectoryName(newCache);
         if (string.IsNullOrWhiteSpace(root)) return null;
 
-        var oldCache = Path.GetFullPath(Path.Combine(root,
-            Safe(old.Id) + "__" + Safe(old.Version)));
         var prefix = root.TrimEnd('\\', '/') + Path.DirectorySeparatorChar;
-        return oldCache.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)
-            ? oldCache
-            : null;
+        var oldAddon = new AddonInfo { Id = old.Id, Type = old.Type };
+        var typedCache = Path.GetFullPath(GetAddonCacheDirectory(root, oldAddon, old.Version));
+        var legacyCache = Path.GetFullPath(Path.Combine(root,
+            Safe(old.Id) + "__" + Safe(old.Version)));
+        if (!typedCache.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) ||
+            !legacyCache.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            return null;
+
+        // Prefer the type-scoped cache, but keep rollback compatibility with
+        // installs created before cache names included the addon type and hash.
+        return Directory.Exists(typedCache) ? typedCache : legacyCache;
     }
 
     private bool RpfEditsIntact(IReadOnlyList<RpfEditRecord> edits)
@@ -1271,15 +1289,27 @@ public sealed class AddonApplier
     private bool TryGamePath(string rel, out string full)
     {
         full = "";
-        var normalized = (rel ?? "").Replace('\\', '/').TrimStart('/');
-        if (normalized.Length == 0 || normalized.Contains("..")) return false;
-        var root = Path.GetFullPath(_gameFolder).TrimEnd('\\', '/') +
-                   Path.DirectorySeparatorChar;
-        var candidate = Path.GetFullPath(Path.Combine(_gameFolder,
-            normalized.Replace('/', Path.DirectorySeparatorChar)));
-        if (!candidate.StartsWith(root, StringComparison.OrdinalIgnoreCase)) return false;
-        full = candidate;
-        return true;
+        try
+        {
+            full = AddonPathSafety.GetChildPath(_gameFolder, rel);
+            return true;
+        }
+        catch (SyncException)
+        {
+            return false;
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
+        catch (NotSupportedException)
+        {
+            return false;
+        }
+        catch (PathTooLongException)
+        {
+            return false;
+        }
     }
 
     private static void MoveFileSafe(string source, string destination)
@@ -1295,6 +1325,13 @@ public sealed class AddonApplier
             File.Copy(source, destination, overwrite: true);
             File.Delete(source);
         }
+    }
+
+    private static string FileHash(string path)
+    {
+        using var sha = SHA256.Create();
+        using var stream = File.OpenRead(path);
+        return Convert.ToHexString(sha.ComputeHash(stream)).ToLowerInvariant();
     }
 
     private static bool FileHashMatches(string path, string expected)
@@ -1443,12 +1480,16 @@ public sealed class AddonApplier
                 return;
 
             // Yalnızca bu eklentiye ait önbellek klasörünü temizle.
-            // Ad tam eşleşmeli (eski biçim) veya "<id>__<sürüm>" olmalı;
+            // Ad eski biçimle ya da yeni tür kapsamlı cache anahtarıyla tam eşleşmeli;
             // böylece "testdlc_other" gibi başka bir eklentinin önbelleği silinmez.
             var oldName = Path.GetFileName(oldCache);
             var cacheKey = Safe(old.Id);
-            if (!string.Equals(oldName, cacheKey, StringComparison.OrdinalIgnoreCase) &&
-                !oldName.StartsWith(cacheKey + "__", StringComparison.OrdinalIgnoreCase))
+            var typedOldName = Path.GetFileName(GetAddonCacheDirectory(cacheRoot,
+                new AddonInfo { Id = old.Id, Type = old.Type }, old.Version));
+            var isLegacyCache = string.Equals(oldName, cacheKey, StringComparison.OrdinalIgnoreCase) ||
+                oldName.StartsWith(cacheKey + "__", StringComparison.OrdinalIgnoreCase);
+            var isTypeScopedCache = string.Equals(oldName, typedOldName, StringComparison.OrdinalIgnoreCase);
+            if (!isLegacyCache && !isTypeScopedCache)
                 return;
 
             // Eski önbellek yeni önbelleğin üst klasörüyse silme.
@@ -1474,7 +1515,7 @@ public sealed class AddonApplier
 
     /// <summary>
     /// OIV güncellemesi başarılı olduktan sonra eski sürümün indirme önbelleğini
-    /// temizler. Yalnızca bu eklentiye ait "&lt;id&gt;__&lt;sürüm&gt;" klasörü silinir.
+    /// temizler. Yalnızca bu eklentinin tür kapsamlı veya eski biçimli cache klasörü silinir.
     /// </summary>
     private void CleanupOldOivCache(InstalledAddon old, string newCacheDir)
     {
@@ -1485,13 +1526,11 @@ public sealed class AddonApplier
             var newCache = Path.GetFullPath(newCacheDir);
             var cacheRoot = Path.GetDirectoryName(newCache);
             if (string.IsNullOrWhiteSpace(cacheRoot)) return;
-
-            var oldCache = Path.GetFullPath(Path.Combine(cacheRoot,
-                Safe(old.Id) + "__" + Safe(old.Version)));
-            if (string.Equals(oldCache, newCache, StringComparison.OrdinalIgnoreCase))
-                return;
-
             var rootPrefix = cacheRoot.TrimEnd('\\', '/') + Path.DirectorySeparatorChar;
+
+            var oldCache = OldOivCacheDir(old, newCache);
+            if (oldCache == null || string.Equals(oldCache, newCache, StringComparison.OrdinalIgnoreCase))
+                return;
             if (!oldCache.StartsWith(rootPrefix, StringComparison.OrdinalIgnoreCase))
                 return;
             if (!Directory.Exists(oldCache)) return;
@@ -1559,6 +1598,7 @@ public sealed class AddonApplier
         SyncClient client, Manifest manifest, string serverCacheDir,
         IProgress<SyncProgress>? progress = null, CancellationToken ct = default)
     {
+        AddonPathSafety.ValidateManifest(manifest);
         var addons = manifest.Addons.Where(a => a.Type != AddonType.ServerPlugin).ToList();
         long totalBytes = addons.Sum(a => a.TotalSize);
         long doneBytes = 0;
@@ -1569,9 +1609,7 @@ public sealed class AddonApplier
             var version = ServerScanner.ComputeVersion(addon);
             // Ön indirme de DLC'lerde sürüm başına ayrı önbellek kullanmalı;
             // aksi halde eski sürüme junction olan hedef klasörün dosyaları ezilir.
-            var addonCacheDir = addon.Type is (AddonType.DlcPack or AddonType.OivPackage)
-                ? Path.Combine(serverCacheDir, Safe(addon.Id) + "__" + Safe(version))
-                : Path.Combine(serverCacheDir, Safe(addon.Id));
+            var addonCacheDir = GetAddonCacheDirectory(serverCacheDir, addon, version);
             doneBytes = await DownloadAddonAsync(
                 client, addon, addonCacheDir, progress, doneBytes, totalBytes, ct);
         }
@@ -1588,7 +1626,8 @@ public sealed class AddonApplier
 
         foreach (var file in addon.Files)
         {
-            var rel = file.Path.Replace('\\', '/').TrimStart('/');
+            var safeSourceRelative = AddonPathSafety.NormalizeRelativePath(file.Path).Replace(Path.DirectorySeparatorChar, '/');
+            var rel = safeSourceRelative;
             if (forceRoot != null)
             {
                 // Sunucudaki klasör yapısı bazen "scripts/..." ile gelir
@@ -1600,16 +1639,15 @@ public sealed class AddonApplier
                     rel = root + "/" + rel;
             }
 
-            if (rel.Contains(".."))
-                throw new SyncException($"Güvenlik: geçersiz hedef yol: {rel}");
+            rel = AddonPathSafety.NormalizeRelativePath(rel).Replace(Path.DirectorySeparatorChar, '/');
 
             if (addon.Type == AddonType.ClientFiles && !ServerScanner.IsAllowedClientPath(rel))
                 throw new SyncException($"Güvenlik: izin verilmeyen hedef yol: {rel}");
             if (addon.Type == AddonType.AsiPlugin && !ServerScanner.IsAllowedAsiFile(rel))
                 throw new SyncException($"Güvenlik: izin verilmeyen ASI dosyası: {rel}");
 
-            var dest = Path.Combine(_gameFolder, rel.Replace('/', Path.DirectorySeparatorChar));
-            var src = Path.Combine(cacheDir, file.Path.Replace('/', Path.DirectorySeparatorChar));
+            var dest = AddonPathSafety.GetChildPath(_gameFolder, rel);
+            var src = AddonPathSafety.GetChildPath(cacheDir, file.Path);
 
             var action = CopyFileWithPolicy(src, dest, file.Sha256, out var keptExisting);
             if (action)
@@ -1774,8 +1812,9 @@ public sealed class AddonApplier
     }
 
     /// <summary>
-    /// Bir sunucunun tüm eklentilerini kaldırır. Dosyalar SİLİNMEZ; veri klasöründeki
-    /// 'removed' karantinasına (tarihli klasör) taşınır. Yalnızca en yeni 3 çalıştırma saklanır.
+    /// Bir sunucunun tüm eklentilerini kaldırır. Dosyalar doğrudan silinmez;
+    /// veri klasöründeki 'removed' karantinasına (tarihli klasör) taşınır.
+    /// Karantina geçmişi otomatik olarak temizlenmez; kullanıcı geri alabilsin diye korunur.
     /// </summary>
     public void UninstallAll(SyncState state, string dataFolder)
     {
@@ -1802,8 +1841,7 @@ public sealed class AddonApplier
 
         if (_quarantineMoved > 0)
         {
-            _log($"Modlar silinmedi; güvenli klasöre taşındı: {quarantine}");
-            PruneQuarantineRoot(dataFolder, keep: 3, _log);
+            _log($"Modlar silinmedi; geri alınabilir karantinaya taşındı: {quarantine}");
         }
         else
         {
@@ -1843,29 +1881,11 @@ public sealed class AddonApplier
     public static string QuarantineRoot(string dataFolder, DateTime when) =>
         Path.Combine(dataFolder, "removed", when.ToString("yyyyMMdd-HHmmss"));
 
-    /// <summary>Yalnızca en yeni <paramref name="keep"/> karantina çalıştırmasını bırakır.</summary>
-    private static void PruneQuarantineRoot(string dataFolder, int keep, Action<string>? log)
-    {
-        try
-        {
-            var root = Path.Combine(dataFolder, "removed");
-            if (!Directory.Exists(root)) return;
-            foreach (var dir in Directory.GetDirectories(root).OrderByDescending(d => d).Skip(keep))
-            {
-                try
-                {
-                    Directory.Delete(dir, recursive: true);
-                    log?.Invoke($"Eski karantina klasörü silindi: {Path.GetFileName(dir)}");
-                }
-                catch { }
-            }
-        }
-        catch { }
-    }
-
     private void MoveFileToQuarantine(string full, string relPath, string quarantineRoot)
     {
         var dest = Path.Combine(quarantineRoot, relPath.Replace('/', Path.DirectorySeparatorChar));
+        if (File.Exists(dest))
+            dest += ".duplicate-" + Guid.NewGuid().ToString("N")[..8];
         try
         {
             Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
@@ -1876,24 +1896,19 @@ public sealed class AddonApplier
             }
             catch (IOException)
             {
-                // Farklı disk olabilir: kopyala + kaynağı sil.
+                // Farklı disk olabilir. Önce kopyala ve SHA-256 ile doğrula;
+                // doğrulama başarısızsa kaynak dosyayı kesinlikle silme.
                 File.Copy(full, dest, overwrite: true);
+                if (!FileHashMatches(dest, FileHash(full)))
+                    throw new IOException("Karantina kopyası doğrulanamadı.");
                 File.Delete(full);
             }
             _quarantineMoved++;
         }
         catch (Exception ex)
         {
-            // Taşınamıyorsa oyunu temiz bırakmak için silmeyi dene.
-            try
-            {
-                File.Delete(full);
-                _log($"UYARI: karantinaya taşınamadı, silindi: {relPath} ({ex.Message})");
-            }
-            catch
-            {
-                _log($"UYARI: taşınamadı ve silinemedi: {relPath} ({ex.Message})");
-            }
+            // Güvenlik: karantina başarısızsa kaynak dosyayı ASLA silme.
+            _log($"UYARI: karantinaya taşınamadı; orijinal dosya korundu: {relPath} ({ex.Message})");
         }
     }
 
@@ -1912,6 +1927,8 @@ public sealed class AddonApplier
         catch { }
 
         var dest = Path.Combine(quarantineRoot, relDest.Replace('/', Path.DirectorySeparatorChar));
+        if (Directory.Exists(dest))
+            dest += ".duplicate-" + Guid.NewGuid().ToString("N")[..8];
         for (int i = 0; i < 4; i++)
         {
             try
@@ -1924,8 +1941,11 @@ public sealed class AddonApplier
                 }
                 catch (IOException)
                 {
-                    // Farklı disk olabilir: kopyala + kaynağı sil.
+                    // Farklı disk olabilir. Kopyayı dosya listesi ve SHA-256 ile
+                    // doğrulamadan kaynak klasöre dokunma.
                     CopyDirectoryRecursive(dir, dest);
+                    if (!DirectoryTreesMatch(dir, dest))
+                        throw new IOException("Karantina klasör kopyası doğrulanamadı.");
                     Directory.Delete(dir, recursive: true);
                 }
                 _quarantineMoved++;
@@ -1935,14 +1955,35 @@ public sealed class AddonApplier
             {
                 if (i == 3)
                 {
-                    // Son çare: oyun yine de eski hâline dönsün.
-                    _log($"UYARI: karantinaya taşınamadı: {relDest} ({ex.Message})");
-                    DeleteDirectoryWithRetry(dir, _log);
+                    // Güvenlik: karantina başarısızsa kaynak klasöre dokunma.
+                    _log($"UYARI: karantinaya taşınamadı; orijinal klasör korundu: {relDest} ({ex.Message})");
                     return;
                 }
                 Thread.Sleep(250 * (i + 1));
             }
         }
+    }
+
+    private static bool DirectoryTreesMatch(string source, string copy)
+    {
+        try
+        {
+            var sourceFiles = Directory.GetFiles(source, "*", SearchOption.AllDirectories);
+            var copyFiles = Directory.GetFiles(copy, "*", SearchOption.AllDirectories);
+            if (sourceFiles.Length != copyFiles.Length) return false;
+
+            foreach (var sourceFile in sourceFiles)
+            {
+                var relative = Path.GetRelativePath(source, sourceFile);
+                var copyFile = Path.Combine(copy, relative);
+                if (!File.Exists(copyFile)) return false;
+                if (new FileInfo(sourceFile).Length != new FileInfo(copyFile).Length) return false;
+                if (!string.Equals(FileHash(sourceFile), FileHash(copyFile), StringComparison.OrdinalIgnoreCase))
+                    return false;
+            }
+            return true;
+        }
+        catch { return false; }
     }
 
     private static void CopyDirectoryRecursive(string src, string dst)
@@ -1951,12 +1992,33 @@ public sealed class AddonApplier
         foreach (var file in Directory.GetFiles(src))
             File.Copy(file, Path.Combine(dst, Path.GetFileName(file)), overwrite: true);
         foreach (var sub in Directory.GetDirectories(src))
+        {
+            // Never follow junctions/symlinks while creating a recovery copy.
+            try
+            {
+                if ((new DirectoryInfo(sub).Attributes & FileAttributes.ReparsePoint) != 0)
+                    continue;
+            }
+            catch { continue; }
             CopyDirectoryRecursive(sub, Path.Combine(dst, Path.GetFileName(sub)));
+        }
     }
 
     // ------------------------------------------------------------------ dlclist
 
     public static string MountFolderName(string addonId) => "gcs_" + Safe(addonId);
+
+    private static string GetAddonCacheDirectory(string serverCacheDir, AddonInfo addon, string version)
+    {
+        // Addon IDs live in separate server folders (scripts/, files/, asi/...).
+        // Include the type in the cache key so equal IDs from different types
+        // cannot overwrite each other's downloaded files or sidecar hashes.
+        var idHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(addon.Id)))[..8].ToLowerInvariant();
+        var key = Safe(addon.Type.ToString()) + "_" + Safe(addon.Id) + "_" + idHash;
+        if (addon.Type is AddonType.DlcPack or AddonType.OivPackage)
+            key += "__" + Safe(version);
+        return Path.Combine(serverCacheDir, key);
+    }
 
     public static string Safe(string name)
     {
@@ -2363,9 +2425,8 @@ public sealed class AddonApplier
     {
         foreach (var file in addon.Files)
         {
-            var rel = file.Path.Replace('/', Path.DirectorySeparatorChar);
-            var src = Path.Combine(cacheDir, rel);
-            var dst = Path.Combine(destRoot, rel);
+            var src = AddonPathSafety.GetChildPath(cacheDir, file.Path);
+            var dst = AddonPathSafety.GetChildPath(destRoot, file.Path);
             if (!File.Exists(src))
                 throw new SyncException($"Önbellekte eksik dosya: {file.Path}");
             Directory.CreateDirectory(Path.GetDirectoryName(dst)!);

@@ -8,6 +8,7 @@ namespace GTACoop.Sync;
 public static class WorldConfig
 {
     public const string FileName = "GTACoop-world.json";
+    private const string BackupSuffix = ".gtacoop-backup";
 
     public static void Write(string gameFolder, Manifest manifest)
     {
@@ -17,8 +18,12 @@ public static class WorldConfig
 
             var scripts = Path.Combine(gameFolder, "scripts");
             Directory.CreateDirectory(scripts);
+            var path = Path.Combine(scripts, FileName);
+            var backup = path + BackupSuffix;
+            if (File.Exists(path) && !File.Exists(backup))
+                File.Copy(path, backup, overwrite: false);
 
-            SyncJson.Save(Path.Combine(scripts, FileName), new WorldSettings
+            SyncJson.Save(path, new WorldSettings
             {
                 ServerName = manifest.ServerName,
                 TimeMode = string.IsNullOrWhiteSpace(manifest.TimeMode) ? "off" : manifest.TimeMode,
@@ -40,7 +45,15 @@ public static class WorldConfig
         {
             if (string.IsNullOrWhiteSpace(gameFolder)) return;
             var path = Path.Combine(gameFolder, "scripts", FileName);
-            if (File.Exists(path)) File.Delete(path);
+            var backup = path + BackupSuffix;
+            if (File.Exists(backup))
+            {
+                File.Move(backup, path, overwrite: true);
+            }
+            else if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
         }
         catch { }
     }

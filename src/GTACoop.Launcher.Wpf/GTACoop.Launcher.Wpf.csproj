@@ -2,28 +2,49 @@
 
   <!--
     GTACoop Remake - WPF launcher.
-    Mevcut WinForms launcher (GTACoop.Launcher) hiç değiştirilmeden yayında kalır;
-    bu proje arayüzün kademeli olarak taşındığı yeni kabuktur. Ek NuGet paketi
-    kullanmaz: WindowsDesktop çalışma zamanı makinede kurulu olduğu için indirme
-    gerektirmez.
+    Launcher logic sources are compiled into this executable so its public
+    filename remains GTACoop.Launcher.exe. Some existing tabs are still hosted
+    through WindowsFormsHost and must be ported to native WPF in later steps.
   -->
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net8.0-windows</TargetFramework>
     <UseWPF>true</UseWPF>
-    <!-- Sayfalar hazır olana kadar mevcut WinForms sekmeleri barındırılır. -->
+    <!-- Eski sekmeler WPF sayfalarına taşınana kadar WindowsFormsHost kullanılır. -->
     <UseWindowsForms>true</UseWindowsForms>
     <RootNamespace>GTACoop.Remake.Wpf</RootNamespace>
-    <AssemblyName>GTACoop.Launcher.Wpf</AssemblyName>
+    <AssemblyName>GTACoop.Launcher</AssemblyName>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>..\GTACoop.Launcher\Assets\app.ico</ApplicationIcon>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <Version>2.12.0</Version>
+    <Version>2.13.1</Version>
+    <AssemblyVersion>2.13.1.0</AssemblyVersion>
+    <FileVersion>2.13.1.0</FileVersion>
     <AssemblyTitle>GTACoop Remake</AssemblyTitle>
   </PropertyGroup>
+  <!-- WPF'in varsayılan implicit using listesinde System.IO yok; WinForms
+       kaynakları Path/File/Directory/Stream kullandığı için burada eklenir. -->
   <ItemGroup>
-    <ProjectReference Include="..\GTACoop.Launcher\GTACoop.Launcher.csproj" />
+    <Using Include="System.IO" />
+  </ItemGroup>
+
+  <!-- Reuse the existing launcher logic in this EXE so the public executable
+       stays GTACoop.Launcher.exe and the self-updater still replaces one EXE. -->
+  <ItemGroup>
+    <Compile Include="..\GTACoop.Launcher\**\*.cs"
+             Exclude="..\GTACoop.Launcher\Program.cs;..\GTACoop.Launcher\bin\**\*;..\GTACoop.Launcher\obj\**\*"
+             Link="Legacy\%(RecursiveDir)%(Filename)%(Extension)" />
+    <ProjectReference Include="..\GTACoop.Sync\GTACoop.Sync.csproj" />
+    <ProjectReference Include="..\GTACoop.SyncServer\GTACoop.SyncServer.csproj" ReferenceOutputAssembly="false" />
+    <Reference Include="Lidgren.Network.MultiTarget">
+      <HintPath>..\..\vendor\Distribution\Scripts\Lidgren.Network.MultiTarget.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+    <None Remove="..\GTACoop.Launcher\Assets\avatar.png" />
+    <EmbeddedResource Include="..\GTACoop.Launcher\Assets\avatar.png" Link="Assets\avatar.png" />
+    <None Remove="..\GTACoop.Launcher\Assets\tester.png" />
+    <EmbeddedResource Include="..\GTACoop.Launcher\Assets\tester.png" Link="Assets\tester.png" />
   </ItemGroup>
 
 </Project>

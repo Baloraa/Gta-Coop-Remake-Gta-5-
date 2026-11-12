@@ -1,0 +1,62 @@
+Bu ZIP, GTACoop Remake'in kaynak kodunda güvenlik, cache kararlılığı ve test altyapısı iyileştirmeleri içerir.
+Önce AI-INCELEME-NOTLARI-TR.md dosyasının tamamını oku. Sonra Windows üzerinde aşağıdaki sırayla ilerle.
+
+ÖNEMLİ KURALLAR
+- Önce orijinal ZIP'in ve bu ZIP'in yedeğini al; mevcut çalışan co-op, relay, launcher, OIV/RPF, mod yönetimi ve oyun içi özellikleri silme.
+- AddonPathSafety kontrollerini kaldırma veya gevşetme.
+- Sembolik bağlantı/junction korumasını kaldırma.
+- Cache anahtarına eklenen AddonType + ID hash ayrımını koru; eski DLC/OIV cache formatları için rollback ve cleanup uyumluluğunu ayrıca test et.
+- DLC mount klasör adı çakışma kontrolünü koru.
+- Yeni NuGet bağımlılığı ekleme; gerekirse önce nedenini açıkla.
+- WPF kabuğunun hâlâ WinForms sekmelerini barındırdığını unutma. Tam WPF dönüşümü yapılmış gibi gösterme.
+- Gerçekten çalıştırmadığın testleri başarılı diye raporlama.
+
+1) DERLEME
+Depo kökünde:
+  dotnet restore GTACoopRemake.sln
+  dotnet build GTACoopRemake.sln -c Release --no-restore
+
+2) SMOKE TEST
+  dotnet run --project tests/GTACoop.Sync.SmokeTests/GTACoop.Sync.SmokeTests.csproj -c Release
+
+3) PUBLISH
+WPF launcher:
+  dotnet publish src/GTACoop.Launcher.Wpf/GTACoop.Launcher.Wpf.csproj -c Release -r win-x64 --self-contained false -o dist/GTACoopRemake-Wpf
+
+Mevcut WinForms launcher:
+  dotnet publish src/GTACoop.Launcher/GTACoop.Launcher.csproj -c Release -r win-x64 --self-contained false -o dist/GTACoopRemake-WinForms
+
+4) KOD KONTROLÜ
+- AddonPathSafety.GetChildPath mevcut junction/symlink bileşenini reddediyor mu?
+- ServerScanner manifest üretirken Addons dışına yönlenen symlink/junction hedefini atlıyor mu?
+- Farklı AddonType değerlerinde aynı addon ID farklı cache klasörleri oluşturuyor mu?
+- Yeni type-scoped cache anahtarı eski kurulu DLC/OIV paketlerinin rollback ve cleanup akışını bozuyor mu?
+- Aynı Safe() mount adına dönüşen iki DLC paketinden yalnızca biri manifestte kalıyor mu ve uyarı yazılıyor mu?
+- X-Sync-Token kontrolü çalışıyor mu? Token tek başına TLS değildir; HTTP ile internete açık kullanımı güvenli sayma.
+- PingAsync kullanıcı iptalini timeout olarak göstermiyor mu?
+- WPF açılışı, navigation ve barındırılan WinForms sekmeleri çalışıyor mu?
+
+5) AYRI DAĞITIM BAĞIMLILIKLARI
+- `build.ps1` içindeki `GTACoOp.Client` projesi `vendor/Build/ScriptHookVDotNet3.dll` bekliyor. Bu dosya verilen ZIP'te yok. Yerel makinede yoksa tam dağıtım build'ini bloklu olarak raporla; dosyayı uydurma veya rastgele kaynaktan indirme.
+- `GTACoop.ServerPlugin` `net10.0` hedefliyor ve solution'a bilerek dahil edilmedi. .NET 10 SDK kuruluysa ayrıca `dotnet build src/GTACoop.ServerPlugin/GTACoop.ServerPlugin.csproj -c Release` komutunu çalıştır; değilse bu adımı atlandı diye raporla.
+
+6) REGRESYON
+Test sunucusunda şu akışları kontrol et:
+- Şifresiz yerel test sunucusu ve token korumalı test sunucusu.
+- Küçük dosya, büyük dosya, HTTP Range ile devam eden indirme ve SHA-256 doğrulaması.
+- DLC/OIV kurulum ve kaldırma; update.rpf yedeği ve geri alma.
+- Script, ASI, ClientFiles ve AddonPeds senkronizasyonu.
+- Sunucuya katılma, çıkma, yeniden bağlanma, relay ve oturum temizliği.
+- Eski WinForms launcher'ın da açılması.
+
+Bir derleme/test başarısızsa önce hatanın kök nedenini bul; yalnızca gerekli en küçük değişikliği yap. Her turdan sonra aynı komutları yeniden çalıştır.
+
+7) SON RAPOR
+- Her build/publish komutunun exit code'u.
+- Hata ve uyarı sayısı.
+- Smoke testte PASS/FAIL/SKIP sayısı.
+- Değiştirilen dosyaların listesi.
+- Gerçekten test edilen özellikler ve test edilemeyenler.
+- Çözülmemiş hatalar ve dağıtım engelleri.
+
+Tüm build ve testler geçmeden paketi "hazır" veya "release" diye adlandırma. Derleme başarılı olsa bile GTA V gerçek çok oyunculu testi yapılmadıysa bunu ayrıca belirt.

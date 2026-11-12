@@ -1,4 +1,4 @@
-using System.Security.Cryptography;
+﻿using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Xml.Linq;
@@ -143,11 +143,11 @@ public static class AddonPeds
     {
         try
         {
-            if (Directory.EnumerateFiles(packDir, "*", SearchOption.AllDirectories)
+            if (ServerScanner.EnumerateFilesSafe(packDir, "*")
                 .Any(IsPedFile))
                 return true;
 
-            var direct = Directory.EnumerateFiles(packDir, "peds.rpf", SearchOption.AllDirectories)
+            var direct = ServerScanner.EnumerateFilesSafe(packDir, "peds.rpf")
                 .OrderBy(p => p.Count(c => c == Path.DirectorySeparatorChar))
                 .FirstOrDefault();
 
@@ -239,7 +239,7 @@ public static class AddonPeds
         if (extractLegacy) EnsureLooseSource(packDir, log);
 
         var groups = new Dictionary<string, LooseGroup>(StringComparer.OrdinalIgnoreCase);
-        foreach (var file in Directory.EnumerateFiles(packDir, "*", SearchOption.AllDirectories))
+        foreach (var file in ServerScanner.EnumerateFilesSafe(packDir, "*"))
         {
             if (!IsPedFile(file)) continue;
 
@@ -411,7 +411,7 @@ public static class AddonPeds
     {
         try
         {
-            return Directory.EnumerateFiles(packDir, "dlc.rpf", SearchOption.AllDirectories)
+            return ServerScanner.EnumerateFilesSafe(packDir, "dlc.rpf")
                 .OrderBy(p => p.Count(c => c == Path.DirectorySeparatorChar))
                 .ThenBy(p => p, StringComparer.OrdinalIgnoreCase)
                 .FirstOrDefault();
@@ -925,7 +925,7 @@ public static class AddonPeds
         // 1) Paket içindeki gevşek meta dosyaları (alt klasörler/streamed dahil).
         try
         {
-            foreach (var file in Directory.EnumerateFiles(packDir, "*", SearchOption.AllDirectories))
+            foreach (var file in ServerScanner.EnumerateFilesSafe(packDir, "*"))
             {
                 if (!IsMetadataFile(file)) continue;
                 AddMetadataFile(result, file, Path.GetRelativePath(packDir, file)
@@ -940,8 +940,7 @@ public static class AddonPeds
         // 2) Paketteki RPF arşivlerindeki gömülü meta (dlc.rpf/peds.rpf).
         try
         {
-            foreach (var rpf in Directory.EnumerateFiles(packDir, "*.rpf",
-                         SearchOption.AllDirectories).Take(12))
+            foreach (var rpf in ServerScanner.EnumerateFilesSafe(packDir, "*.rpf").Take(12))
                 TryReadMetadataFromRpf(result, rpf, wanted, log);
         }
         catch (Exception ex)
