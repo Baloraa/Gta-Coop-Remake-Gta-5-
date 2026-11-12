@@ -124,13 +124,18 @@
                                               Content="{TemplateBinding SelectionBoxItem}"
                                               ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
                                               TextBlock.Foreground="{TemplateBinding Foreground}" />
+                            <!-- Tıklama alanı tüm kutu: IsChecked ↔ IsDropDownOpen bağlı. -->
                             <ToggleButton x:Name="Toggle" Focusable="False" ClickMode="Press"
                                           Background="Transparent" BorderThickness="0"
-                                          HorizontalAlignment="Right" Margin="0,0,-24,0" Width="24">
+                                          HorizontalAlignment="Stretch"
+                                          IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}">
                                 <ToggleButton.Template>
                                     <ControlTemplate TargetType="ToggleButton">
-                                        <TextBlock Text="▾" Foreground="{StaticResource MutedBrush}"
-                                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        <Border Background="Transparent">
+                                            <TextBlock Text="▾" Foreground="{StaticResource MutedBrush}"
+                                                       HorizontalAlignment="Right" VerticalAlignment="Center"
+                                                       Margin="0,0,8,0" />
+                                        </Border>
                                     </ControlTemplate>
                                 </ToggleButton.Template>
                             </ToggleButton>

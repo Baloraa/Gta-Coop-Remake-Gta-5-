@@ -339,7 +339,7 @@ public sealed class MyServerTab : UserControl
         {
             Text = T("Sunucu Modu (VDS) — isteğe bağlı"),
             Dock = DockStyle.Top,
-            Height = 360,
+            Height = 420,
             Padding = new Padding(8)
         };
 

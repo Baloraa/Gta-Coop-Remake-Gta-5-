@@ -12,7 +12,7 @@ internal static class Ui
 
     public static Button Btn(string text, EventHandler onClick, int width = 0)
     {
-        var b = new Button
+        var b = new DarkButton
         {
             Text = text,
             AutoSize = width == 0,
@@ -125,6 +125,10 @@ internal static class Ui
         lv.Columns.Clear();
         foreach (var (name, width) in columns)
             lv.Columns.Add(name, width);
+
+        // Son sütun kalan genişliği doldursun: aksi halde sütunların sağında
+        // Windows'un beyaz şeridi kalıyor.
+        if (lv.Columns.Count > 0) lv.Columns[^1].Width = -2;
     }
 
     public static void Info(Form owner, string text, string title = "GTACoop Remake") =>
@@ -138,6 +142,46 @@ internal static class Ui
 
     public static bool Confirm(Form owner, string text, string title = "GTACoop Remake") =>
         MessageBox.Show(owner, SyncText.Translate(text), title, MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes;
+}
+
+/// <summary>
+/// Koyu temalı, kendi çizilen düğme. Windows pasif düğmelerin yazısını koyu
+/// griye çevirip okunamaz hale getiriyordu; burada yazı her durumda açık renk.
+/// </summary>
+internal sealed class DarkButton : Button
+{
+    public DarkButton()
+    {
+        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint |
+                 ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
+        FlatStyle = FlatStyle.Flat;
+        FlatAppearance.BorderSize = 0;
+        UseVisualStyleBackColor = false;
+        BackColor = Theme.SurfaceAlt;
+        ForeColor = Theme.Text;
+    }
+
+    private bool _hover;
+
+    protected override void OnMouseEnter(EventArgs e) { _hover = true; Invalidate(); base.OnMouseEnter(e); }
+    protected override void OnMouseLeave(EventArgs e) { _hover = false; Invalidate(); base.OnMouseLeave(e); }
+    protected override void OnEnabledChanged(EventArgs e) { Invalidate(); base.OnEnabledChanged(e); }
+
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        var g = e.Graphics;
+        var back = !Enabled ? Theme.Surface : _hover ? Color.FromArgb(32, 32, 38) : Theme.SurfaceAlt;
+        using (var brush = new SolidBrush(back))
+            g.FillRectangle(brush, ClientRectangle);
+
+        using (var pen = new Pen(Enabled ? Theme.Border : Color.FromArgb(32, 32, 38)))
+            g.DrawRectangle(pen, 0, 0, Width - 1, Height - 1);
+
+        var color = Enabled ? Theme.Text : Color.FromArgb(170, 172, 178);
+        TextRenderer.DrawText(g, Text ?? string.Empty, Font, ClientRectangle, color,
+            TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter |
+            TextFormatFlags.NoPrefix | TextFormatFlags.EndEllipsis);
+    }
 }
 
 internal static class ControlExtensions

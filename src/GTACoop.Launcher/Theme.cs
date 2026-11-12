@@ -146,6 +146,43 @@ internal static class Theme
     /// Metin kutularına sağ tık menüsü: Geri Al (Ctrl+Z), Kes, Kopyala,
     /// Yapıştır, Tümünü Seç. Kısayollar metin kutusunda da çalışır.
     /// </summary>
+    /// <summary>Açılır listeyi koyu temaya çevirir (kapalı alan dahil).</summary>
+    private static void AttachComboDraw(ComboBox combo)
+    {
+        if (combo.Tag is "gtacoop-dark-combo") return;
+        combo.Tag = "gtacoop-dark-combo";
+
+        // Görsel stil tema'sız bırakılınca Windows kutuyu BackColor ile çiziyor.
+        void Untheme()
+        {
+            try { SetWindowTheme(combo.Handle, string.Empty, string.Empty); } catch { }
+        }
+        if (combo.IsHandleCreated) Untheme();
+        else combo.HandleCreated += (_, _) => Untheme();
+
+        // DropDownList alanı Windows tarafından beyaz çiziliyor; düzenlenebilir
+        // moda alıp yazmayı kilitliyoruz, böylece alan BackColor ile çizilir.
+        if (combo.DropDownStyle == ComboBoxStyle.DropDownList)
+        {
+            combo.DropDownStyle = ComboBoxStyle.DropDown;
+            combo.KeyPress += (_, e) => e.Handled = true;
+        }
+
+        combo.DrawMode = DrawMode.OwnerDrawFixed;
+        combo.ItemHeight = Math.Max(20, combo.Font.Height + 8);
+        combo.DrawItem += (_, e) =>
+        {
+            if (e.Index < 0) return;
+            var selected = (e.State & DrawItemState.Selected) != 0;
+            using (var back = new SolidBrush(selected ? Selection : SurfaceAlt))
+                e.Graphics.FillRectangle(back, e.Bounds);
+
+            var text = Convert.ToString(combo.Items[e.Index]) ?? string.Empty;
+            TextRenderer.DrawText(e.Graphics, text, combo.Font, e.Bounds, Text,
+                TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix);
+        };
+    }
+
     private static void AttachEditMenu(TextBoxBase box)
     {
         if (box.ContextMenuStrip != null) return;
@@ -198,6 +235,11 @@ internal static class Theme
         {
             Style(child);
             if (child.HasChildren) ApplyToChildren(child);
+
+            // Kaydırma çubukları ancak pencere tanıtıcısı oluştuktan sonra
+            // koyulaştırılabilir; o yüzden oluşunca bir kez daha denenir.
+            if (!child.IsHandleCreated)
+                child.HandleCreated += (_, _) => DarkenScrollbars(child);
         }
     }
 
@@ -236,10 +278,22 @@ internal static class Theme
                 break;
 
             case ListView list:
-                // Sütunların sağında kalan boş alan Windows'ta beyaz kalıyordu.
+                // Sütunların sağında kalan boş alan ve kaydırma şeridi Windows'ta
+                // beyaz kalıyordu.
                 list.BackColor = Surface;
                 list.ForeColor = Text;
                 StyleList(list);
+                if (list.IsHandleCreated)
+                {
+                    try { SetWindowTheme(list.Handle, "DarkMode_Explorer", null); } catch { }
+                }
+                else
+                {
+                    list.HandleCreated += (_, _) =>
+                    {
+                        try { SetWindowTheme(list.Handle, "DarkMode_Explorer", null); } catch { }
+                    };
+                }
                 break;
 
             case TextBoxBase text:
@@ -259,6 +313,9 @@ internal static class Theme
                 combo.BackColor = SurfaceAlt;
                 combo.ForeColor = Text;
                 combo.FlatStyle = FlatStyle.Flat;
+                // DropDownList + Flat iken Windows kutuyu beyaz çiziyordu;
+                // liste ve kapalı alan kendimiz boyuyoruz.
+                AttachComboDraw(combo);
                 break;
 
             case CheckBox check:
