@@ -18,9 +18,9 @@
     <ApplicationIcon>..\GTACoop.Launcher\Assets\app.ico</ApplicationIcon>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <Version>2.13.3</Version>
-    <AssemblyVersion>2.13.3.0</AssemblyVersion>
-    <FileVersion>2.13.3.0</FileVersion>
+    <Version>2.13.4</Version>
+    <AssemblyVersion>2.13.4.0</AssemblyVersion>
+    <FileVersion>2.13.4.0</FileVersion>
     <!-- Tek dosya yayin: SelfUpdater yalnizca GTACoop.Launcher.exe dosyasini
          degistirdigi icin uygulama kodu da o exe'nin icinde olmali. -->
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
