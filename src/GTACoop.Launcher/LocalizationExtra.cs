@@ -89,6 +89,67 @@ public static partial class Loc
         ["Paket seçin: açıklama ve sürüm bilgisi burada görünür."] =
             "Select a pack to see its description and version.",
 
+        // --- Sunucular / Sunucu Tarayıcı / Oyun / Bileşenler
+        ["Ara (ad, adres veya kod)"] = "Search (name, address or code)",
+        ["Sırala: Favoriler"] = "Sort: Favourites",
+        ["Sırala: Ad"] = "Sort: Name",
+        ["Sırala: Ping"] = "Sort: Ping",
+        ["Sırala: Son girilenler"] = "Sort: Recently played",
+        ["Arayüz Tasarımı"] = "UI Designer",
+        ["P2P Paylaşım"] = "P2P Sharing",
+        ["Sunucu : {0}"] = "Server : {0}",
+        ["Oyun   : doğrudan ({0}:{1})"] = "Game   : direct ({0}:{1})",
+        ["Oyun   : otomatik relay (oyun sırasında launcher açık kalmalı)."] =
+            "Game   : automatic relay (the launcher must stay open while playing).",
+        ["Sync   : doğrudan ({0}:{1})"] = "Sync   : direct ({0}:{1})",
+        ["Sync   : otomatik relay ({0})"] = "Sync   : automatic relay ({0})",
+        ["Oturum bitirilemedi:\r\n"] = "The session could not be ended:\r\n",
+        ["Modlar oyun kapanınca otomatik kaldırılacak (dosyalar bilgisayarınızda kalır).\r\n\r\n"] =
+            "Mods will be removed automatically when the game closes (the files stay on your computer).\r\n\r\n",
+        ["Bu sunucunun indirilmiş mod dosyaları silinip sunucudan yeniden indirilecek.\r\n"] =
+            "This server's downloaded mod files will be deleted and downloaded again.\r\n",
+        ["DLC/OIV paketleri kurulamıyor (update.rpf güvenli değil) ({0}): {1}\r\n{2}\r\n\r\n"] =
+            "DLC/OIV packs cannot be installed (update.rpf is not safe) ({0}): {1}\r\n{2}\r\n\r\n",
+        ["Zaten bilgisayarınızda olduğu için kurulmayacak ({0}): {1}\r\n\r\n"] =
+            "Not installed because it is already on your computer ({0}): {1}\r\n\r\n",
+        ["'{0}' listeden silinsin mi?\r\n(Kurulu modlar silinmez; 'Araçlar' sekmesinden temizleyebilirsiniz.)"] =
+            "Delete '{0}' from the list?\r\n(Installed mods are not deleted; you can clean them up on the 'Tools' tab.)",
+        ["'{0}' oturumu bitirilecek ve sunucu modları oyun klasöründen kaldırılacak.\r\nKendi modlarınız ve diğer dosyalar etkilenmez. Devam edilsin mi?"] =
+            "The '{0}' session will be ended and the server mods will be removed from the game folder.\r\nYour own mods and other files are not affected. Continue?",
+        ["Sunucu: {0}\r\n\r\nKurulacak/güncellenecek: {1} eklenti ({2:F1} MB)\r\nKaldırılacak: {3}\r\n\r\n{4}Devam edilsin mi?"] =
+            "Server: {0}\r\n\r\nTo install/update: {1} plugins ({2:F1} MB)\r\nTo remove: {3}\r\n\r\n{4}Continue?",
+        ["Sunucu listesine sunucu ekleyin (arkadaşınızın IP'si veya kendi sunucunuz), seçip 'Bağlan ve Oyna'ya basın.\r\nSunucunun tüm modları (araç/ped paketleri, scriptler, ASI eklentileri) otomatik indirilir ve yalnızca siz oynarken kurulu kalır; oyundan çıkınca kaldırılır."] =
+            "Add a server to the list (a friend's IP or your own), then select it and press 'Connect && Play'.\r\nAll of the server's mods (vehicle/ped packs, scripts, ASI plugins) are downloaded automatically and stay installed only while you play; they are removed when you exit the game.",
+        ["Sunucunun scriptleriyle çakışabilecek yerel dosyalar bulundu:\r\n\r\n{0}\r\n\r\nBunlar oyun çökmesine yol açabilir. Yine de bağlanılsın mı?"] =
+            "Local files were found that may conflict with the server's scripts:\r\n\r\n{0}\r\n\r\nThese can cause game crashes. Connect anyway?",
+        ["GTA CooP sunucularını master listesinden, LAN'dan veya doğrudan adresten bulun. "] =
+            "Find GTA CooP servers on the master list, over LAN or by direct address. ",
+        ["Bağlanınca GTACoop Remake mod senkronizasyonu otomatik denenir; "] =
+            "On connect, GTACoop Remake tries to sync mods automatically; ",
+        ["Sunucu protokolü: {0} ({1}). Güncel istemci: {2}. "] =
+            "Server protocol: {0} ({1}). Current client: {2}. ",
+        ["Sunucu protokol sürümünü bildirmiyor. Eski bir GTACoOp sunucusu olabilir; "] =
+            "The server does not report its protocol version. It may be an older GTACoOp server; ",
+        ["Sunucu discovery yanıtı vermedi. Yine de doğrudan bağlanılsın mı?\r\n"] =
+            "The server did not answer discovery. Connect directly anyway?\r\n",
+        ["{0}\r\n\r\nYine de bağlanılsın mı?"] = "{0}\r\n\r\nConnect anyway?",
+        ["Oyuncu adı kaydedildi: {0}\r\nSunucuya 'Bağlan ve Oyna' dediğinizde bu ad kullanılır."] =
+            "Player name saved: {0}\r\nThis name is used when you press 'Connect && Play'.",
+        ["Seçilen çalıştırma dosyası bulunamadı:\r\n{0}"] = "The selected executable was not found:\r\n{0}",
+        ["Oyun başlatılamadı:\n"] = "The game could not be started:\n",
+        ["İstemci kurulamadı:\n"] = "The client could not be installed:\n",
+        ["İstemci kurulumu tamam.\r\n\r\nKopyalanan: {0}\r\nAtlanan: {1}"] =
+            "Client installation complete.\r\n\r\nCopied: {0}\r\nSkipped: {1}",
+        ["Enhanced v3"] = "Enhanced v3",
+        ["Bileşen kurulamadı:\r\n"] = "The component could not be installed:\r\n",
+        ["Bu bileşen zaten kurulu ve dosyaları sağlam.\r\nİndirme yapılmadı."] =
+            "This component is already installed and its files are intact.\r\nNothing was downloaded.",
+        ["Geri yükleme başarısız:\r\n"] = "Restore failed:\r\n",
+        ["Sürüm listesi alınamadı:\r\n"] = "The version list could not be fetched:\r\n",
+        ["Klasör açılamadı:\r\n"] = "The folder could not be opened:\r\n",
+        ["Yedekten geri yükleme tamamlandı: {0} dosya.\r\n{1}"] =
+            "Restored from backup: {0} files.\r\n{1}",
+
         // --- WPF kabuğu (pano, kartlar, durum satırı)
         ["GTA V multiplayer companion"] = "GTA V multiplayer companion",
         ["Dil / Language"] = "Language",
