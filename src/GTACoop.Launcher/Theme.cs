@@ -396,6 +396,9 @@ internal static class Theme
         }
     }
 
+    // Farenin üzerinde durduğu satır (indeks). ListView başına tutulur.
+    private static readonly Dictionary<ListView, int> Hover = new();
+
     /// <summary>Listeyi koyu çizer: başlık, satırlar ve varsa onay kutuları.</summary>
     private static void StyleList(ListView list)
     {
@@ -409,6 +412,39 @@ internal static class Theme
         list.DrawColumnHeader += DrawHeader;
         list.DrawItem += DrawItem;
         list.DrawSubItem += DrawSubItem;
+
+        // Windows, farenin üzerinde durduğu satırı kendi (siyah) rengiyle
+        // boyuyordu. Satır vurgusunu kendimiz çiziyoruz.
+        list.MouseMove += (s, e) =>
+        {
+            var lv = (ListView)s!;
+            var index = lv.GetItemAt(e.X, e.Y)?.Index ?? -1;
+            if (Hover.TryGetValue(lv, out var old) && old == index) return;
+            if (index >= 0) Hover[lv] = index;
+            else Hover.Remove(lv);
+            lv.Invalidate();
+        };
+        list.MouseLeave += (s, _) =>
+        {
+            var lv = (ListView)s!;
+            if (Hover.Remove(lv)) lv.Invalidate();
+        };
+    }
+
+    /// <summary>Satır arka planı: seçili → yeşil, fare üzerinde → açık gri, değilse zebra.</summary>
+    private static Color RowBack(ListView list, int index, bool selected)
+    {
+        if (selected) return Selection;
+        if (Hover.TryGetValue(list, out var hot) && hot == index) return SurfaceAlt;
+        return index % 2 == 0 ? Surface : Background;
+    }
+
+    /// <summary>Satır/sütun çizgilerini belirgin ama koyu tonda çizer.</summary>
+    private static void DrawGrid(Graphics g, Rectangle bounds, bool right)
+    {
+        using var pen = new Pen(Border);
+        g.DrawLine(pen, bounds.Left, bounds.Bottom - 1, bounds.Right, bounds.Bottom - 1);
+        if (right) g.DrawLine(pen, bounds.Right - 1, bounds.Top, bounds.Right - 1, bounds.Bottom - 1);
     }
 
     private static void DrawHeader(object? sender, DrawListViewColumnHeaderEventArgs e)
@@ -442,7 +478,7 @@ internal static class Theme
     private static void DrawItem(object? sender, DrawListViewItemEventArgs e)
     {
         var list = (ListView)sender!;
-        using var back = new SolidBrush(e.Item.Selected ? Selection : Surface);
+        using var back = new SolidBrush(RowBack(list, e.ItemIndex, e.Item.Selected));
         e.Graphics.FillRectangle(back, e.Bounds);
 
         // Satır, sütunların toplamından kısa olabilir; sağdaki boşluğu da boya.
@@ -475,12 +511,12 @@ internal static class Theme
         var list = (ListView)sender!;
         var bump = list.CheckBoxes && e.ColumnIndex == 0 ? 18 : 0;
 
-        var background = e.Item.Selected
-            ? Selection
-            : e.ItemIndex % 2 == 0 ? Surface : Background;
+        var background = RowBack(list, e.ItemIndex, e.Item.Selected);
 
         using (var back = new SolidBrush(background))
             e.Graphics.FillRectangle(back, e.Bounds);
+
+        if (list.GridLines) DrawGrid(e.Graphics, e.Bounds, true);
 
         var fore = e.Item.ForeColor == Color.Empty || IsDefaultFore(e.Item.ForeColor)
             ? Text
