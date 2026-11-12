@@ -28,7 +28,10 @@ $notes = @"
 - Tek dosya yayin: guncelleme yalnizca GTACoop.Launcher.exe dosyasini degistirir.
 "@
 
-$body = @{ tag_name = "v$Version"; name = "GTACoop Remake $Version"; body = $notes; draft = $false; prerelease = $false } | ConvertTo-Json
+$json = @{ tag_name = "v$Version"; name = "GTACoop Remake $Version"; body = $notes; draft = $false; prerelease = $false } | ConvertTo-Json -Depth 5
+# PowerShell 5.1 gövdeyi varsayılan olarak ASCII gönderiyor; Türkçe karakterler
+# JSON'u bozuyordu. Açıkça UTF-8 baytları gönderilir.
+$body = [System.Text.Encoding]::UTF8.GetBytes($json)
 $api = "https://api.github.com/repos/$Repo/releases"
 
 $existing = Invoke-RestMethod -Uri $api -Headers $headers -Method Get |
@@ -38,14 +41,14 @@ if ($existing) {
     Write-Host "Release zaten var: $($existing.html_url)"
     $release = $existing
 } else {
-    $release = Invoke-RestMethod -Uri $api -Headers $headers -Method Post -Body $body -ContentType 'application/json'
+    $release = Invoke-RestMethod -Uri $api -Headers $headers -Method Post -Body $body -ContentType 'application/json; charset=utf-8'
     Write-Host "Release olusturuldu: $($release.html_url)"
 }
 
 $assets = @(
     @{ Path = Join-Path $dist 'GTACoop.Launcher.exe'; Name = 'GTACoop.Launcher.exe'; Type = 'application/octet-stream' },
     @{ Path = Join-Path $dist 'Distribution\Scripts\GTACoOp.dll'; Name = 'GTACoOp.dll'; Type = 'application/octet-stream' },
-    @{ Path = Join-Path $dist 'GTACoop.Sync.dll'; Name = 'GTACoop.Sync.dll'; Type = 'application/octet-stream' },
+    @{ Path = Join-Path $dist 'Distribution\SyncServer\GTACoop.Sync.dll'; Name = 'GTACoop.Sync.dll'; Type = 'application/octet-stream' },
     @{ Path = Join-Path $root "dist\GTACoop-Remake-Share-$Version.zip"; Name = "GTACoop-Remake-Share-$Version.zip"; Type = 'application/zip' }
 )
 
