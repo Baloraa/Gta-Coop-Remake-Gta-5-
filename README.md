@@ -8,7 +8,7 @@ GTACoop Remake is not a new multiplayer engine. It is the desktop layer around G
 
 GTACoop Remake is for private Story Mode co-op. It does not touch GTA Online, does not bypass anti-cheat, and does not inject into online sessions.
 
-**Current release:** 2.13.0  
+**Current release:** 2.13.1  
 **Platform:** Windows 10/11, x64  
 **UI:** Turkish, English, and Russian  
 **License:** GNU GPL v3
@@ -289,6 +289,23 @@ This is a tool for playing with friends, not a hardened anti-cheat or privacy sy
 - Server owners are responsible for the mods they distribute. The launcher automates delivery; it does not grant permission to redistribute someone else's work.
 
 ---
+
+### 2.13.1 — Security hardening, smoke tests, WPF preparation
+
+- **Manifest path safety.** Addon manifest paths are canonicalized and validated: absolute paths,
+  `..` segments, Windows ADS (`:`), device names, invalid characters and duplicate entries are
+  rejected before any download starts. Symlink/junction components inside the cache or game folder
+  are refused, and server addon scans never follow links out of the addon folder.
+- **Sync hardening.** `https://` addresses stay HTTPS (previously the scheme was dropped), sync port
+  and host are validated, ping responses are disposed, user cancellation is no longer reported as a
+  timeout, and the `X-Sync-Token` comparison is constant-time with console warnings when no token or
+  TLS is configured.
+- **Cache keys are type-scoped** (addon type + id fingerprint), so `scripts/abc` and `files/abc` no
+  longer share a folder; colliding DLC mount names are dropped from the manifest with a warning.
+- **Smoke tests and CI.** A dependency-free test project (`tests/GTACoop.Sync.SmokeTests`, 13 checks)
+  plus a Windows GitHub Actions workflow.
+- **WPF shell preparation.** Same `GTACoop.Launcher.exe` name, dashboard page added, version aligned
+  with the WinForms launcher; existing tabs are still hosted WinForms controls.
 
 ### 2.13.0 — Custom-port servers on LAN, one-click start & join
 

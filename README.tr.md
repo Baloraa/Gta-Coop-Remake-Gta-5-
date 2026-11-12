@@ -2,7 +2,7 @@
 
 **Türkçe** | [English](README.md)
 
-2.13.0 sürümü - **özel portlu sunucular LAN taramasında bulunuyor + "Sunucumu Başlat ve Gir" tek tuşu**, 2.12.0 - **HUD giriş/çıkış bildirimi (resim + ses), saniye cinsinden görünme süresi, F9'da resmin kaybolması, beyaz yazı ve Ctrl+Z menüsü**, 2.11.4 - **master TLS hatasında HTTP'ye düşme (sunucu tarayıcı düzeltmesi)**, 2.11.3 - **kendi sunucuna bağlanırken güncel oyun portu**, 2.11.2 - **gerçek PNG desteği ve kendi sunucuna bağlanma düzeltmesi**, **HUD görünürlük ve resim düzeltmesi**, **sunucu modu (VDS: launcher kapalıyken de çalışan sunucu, RAM sınırı)**, kendi sunucu yönetimi, otomatik mod indirme, **oturum modu**,
+2.13.1 sürümü - **güvenlik sertleştirmesi (manifest yolu, symlink, HTTPS, sabit zamanlı token), smoke testleri ve WPF hazırlığı**, 2.13.0 - **özel portlu sunucular LAN taramasında bulunuyor + "Sunucumu Başlat ve Gir" tek tuşu**, 2.12.0 - **HUD giriş/çıkış bildirimi (resim + ses), saniye cinsinden görünme süresi, F9'da resmin kaybolması, beyaz yazı ve Ctrl+Z menüsü**, 2.11.4 - **master TLS hatasında HTTP'ye düşme (sunucu tarayıcı düzeltmesi)**, 2.11.3 - **kendi sunucuna bağlanırken güncel oyun portu**, 2.11.2 - **gerçek PNG desteği ve kendi sunucuna bağlanma düzeltmesi**, **HUD görünürlük ve resim düzeltmesi**, **sunucu modu (VDS: launcher kapalıyken de çalışan sunucu, RAM sınırı)**, kendi sunucu yönetimi, otomatik mod indirme, **oturum modu**,
 **kısa kod** (ör. `Gel.com`) ile internetten sunucu bulma, **otomatik relay**,
 **UPnP doğrudan bağlantı**, **özel relay sunucusu**, **tanılama kopyalama**,
 **canlı sunucu durumu**, **Sunucu Tarayıcı** sekmesi, **P2P mod paylaşımı** (sunucusuz,
