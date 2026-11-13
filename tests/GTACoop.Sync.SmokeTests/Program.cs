@@ -155,6 +155,44 @@ Check("existing symbolic-link directory is rejected when supported", () =>
     }
 });
 
+Check("DLC junction mount is owned, target-checked, and unmount preserves cache", () =>
+{
+    if (!OperatingSystem.IsWindows())
+        throw new SkipTestException("NTFS junction test requires Windows.");
+
+    var root = Path.Combine(Path.GetTempPath(), "gtacoop-junction-test-" + Guid.NewGuid().ToString("N"));
+    var cache = Path.Combine(root, "cache");
+    var mount = Path.Combine(root, "game", "mods", "dlcpacks", "gcs_test");
+    Directory.CreateDirectory(cache);
+    Directory.CreateDirectory(Path.GetDirectoryName(mount)!);
+    var marker = Path.Combine(cache, "dlc.rpf");
+    File.WriteAllText(marker, "cache-content");
+    try
+    {
+        if (!DlcJunction.TryCreate(mount, cache))
+            throw new SkipTestException("This Windows environment does not allow creating/verifying NTFS junctions.");
+        if (!DlcJunction.IsJunctionTo(mount, cache))
+            throw new InvalidOperationException("Created mount did not resolve to its cache target.");
+
+        bool refusedWrongOwner = false;
+        try { DlcJunction.RemoveOwned(mount, root); }
+        catch (IOException) { refusedWrongOwner = true; }
+        if (!refusedWrongOwner || !Directory.Exists(mount))
+            throw new InvalidOperationException("Mount was removed with a mismatched owner target.");
+
+        DlcJunction.RemoveOwned(mount, cache);
+        if (Directory.Exists(mount))
+            throw new InvalidOperationException("Mount point still exists after unmount.");
+        if (!File.Exists(marker) || File.ReadAllText(marker) != "cache-content")
+            throw new InvalidOperationException("Unmount modified or removed the cache target.");
+    }
+    finally
+    {
+        try { if (Directory.Exists(mount)) Directory.Delete(mount, recursive: false); } catch { }
+        try { Directory.Delete(root, recursive: true); } catch { }
+    }
+});
+
 Check("addon ped discovery does not follow symbolic links when supported", () =>
 {
     var root = Path.Combine(Path.GetTempPath(), "gtacoop-peds-root-" + Guid.NewGuid().ToString("N"));

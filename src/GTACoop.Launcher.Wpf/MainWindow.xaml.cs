@@ -40,12 +40,13 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        SidebarToggle.Content = "☰   " + Loc.T("Menüyü daralt");
 
         var version = typeof(AppEnv).Assembly.GetName().Version;
         VersionText.Text = Loc.T("Sürüm {0}", version == null ? "?" : version.ToString(3));
-        TaglineText.Text = Loc.T("GTA V multiplayer companion");
-        LanguageLabel.Text = Loc.T("Dil / Language");
-        UnofficialText.Text = Loc.T("Unofficial community project");
+        TaglineText.Text = Loc.T("GTA V çok oyunculu oyun yardımcısı");
+        LanguageLabel.Text = Loc.T("Dil");
+        UnofficialText.Text = Loc.T("Topluluk projesi");
         SourceInitialized += (_, _) => TryDarkTitleBar();
         Closing += (_, _) => Shutdown();
 
@@ -58,7 +59,7 @@ public partial class MainWindow : Window
         {
             var icon = i < icons.Length ? icons[i] : "•";
             i++;
-            Nav.Items.Add(new ListBoxItem { Content = icon + "   " + Loc.T(title), Tag = key });
+            Nav.Items.Add(new ListBoxItem { Content = icon + "   " + Loc.T(title), Tag = key, ToolTip = Loc.T(title) });
         }
 
         SyncText.Language = Loc.Language;
@@ -139,6 +140,38 @@ public partial class MainWindow : Window
         catch { }
 
         System.Windows.Application.Current.Shutdown();
+    }
+
+    private bool _sidebarCollapsed;
+
+    /// <summary>Sol gezinme panelini daraltıp içerik alanına daha fazla yer açar.</summary>
+    private void OnSidebarToggle(object sender, RoutedEventArgs e)
+    {
+        _sidebarCollapsed = SidebarToggle.IsChecked == true;
+        SidebarColumn.Width = new GridLength(_sidebarCollapsed ? 62 : 204);
+        SidebarToggle.Content = _sidebarCollapsed ? "☰" : "☰   " + Loc.T("Menüyü daralt");
+        SidebarToggle.ToolTip = _sidebarCollapsed ? Loc.T("Menüyü genişlet") : Loc.T("Menüyü daralt");
+
+        if (BrandTitleText != null) BrandTitleText.Visibility = _sidebarCollapsed ? Visibility.Collapsed : Visibility.Visible;
+        if (TaglineText != null) TaglineText.Visibility = _sidebarCollapsed ? Visibility.Collapsed : Visibility.Visible;
+        if (LanguageLabel != null) LanguageLabel.Visibility = _sidebarCollapsed ? Visibility.Collapsed : Visibility.Visible;
+        if (LangCombo != null)
+        {
+            LangCombo.Visibility = _sidebarCollapsed ? Visibility.Collapsed : Visibility.Visible;
+            LangCombo.ToolTip = Loc.T("Dil seçimi");
+        }
+        if (VersionText != null) VersionText.Visibility = _sidebarCollapsed ? Visibility.Collapsed : Visibility.Visible;
+        if (UnofficialText != null) UnofficialText.Visibility = _sidebarCollapsed ? Visibility.Collapsed : Visibility.Visible;
+        foreach (var entry in Nav.Items.OfType<ListBoxItem>())
+        {
+            if (entry.Tag is not string key) continue;
+            var section = Sections.First(x => x.Key == key);
+            var full = entry.Content?.ToString() ?? string.Empty;
+            var icon = full.Split(new[] { "   " }, StringSplitOptions.None)[0];
+            entry.Content = _sidebarCollapsed ? icon : icon + "   " + Loc.T(section.Title);
+            entry.HorizontalContentAlignment = _sidebarCollapsed ? System.Windows.HorizontalAlignment.Center : System.Windows.HorizontalAlignment.Left;
+            entry.ToolTip = Loc.T(section.Title);
+        }
     }
 
     private void OnNavChanged(object sender, SelectionChangedEventArgs e)

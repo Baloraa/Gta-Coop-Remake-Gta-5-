@@ -12,7 +12,7 @@
 
     <Grid>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="204" />
+            <ColumnDefinition x:Name="SidebarColumn" Width="204" />
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
 
@@ -22,24 +22,29 @@
                 BorderBrush="{StaticResource BorderBrush}"
                 BorderThickness="0,0,1,0">
             <DockPanel LastChildFill="True">
-                <StackPanel DockPanel.Dock="Top" Margin="16,12,14,10">
-                    <TextBlock Text="GTA" FontSize="11" FontWeight="Bold"
+                <StackPanel DockPanel.Dock="Top" Margin="12,10,10,10">
+                    <ToggleButton x:Name="SidebarToggle" Content="☰   Menüyü Daralt"
+                                  HorizontalContentAlignment="Left" Padding="8,7" Margin="0,0,0,10"
+                                  Background="Transparent" Foreground="{StaticResource TextBrush}"
+                                  BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
+                                  Cursor="Hand" Checked="OnSidebarToggle" Unchecked="OnSidebarToggle" />
+                    <TextBlock x:Name="BrandSmallText" Text="GTA" FontSize="11" FontWeight="Bold"
                                Foreground="{StaticResource AccentBrush}" />
-                    <TextBlock Text="COOP REMAKE" FontSize="16" FontWeight="SemiBold"
+                    <TextBlock x:Name="BrandTitleText" Text="COOP REMAKE" FontSize="16" FontWeight="SemiBold"
                                Margin="0,1,0,2" />
-                    <TextBlock x:Name="TaglineText" Text="GTA V multiplayer companion"
+                    <TextBlock x:Name="TaglineText" Text="GTA V çok oyunculu oyun yardımcısı"
                                Style="{StaticResource MutedText}" FontSize="11" />
                 </StackPanel>
 
                 <StackPanel DockPanel.Dock="Bottom" Margin="14,6,14,12">
                     <Border Height="1" Background="{StaticResource BorderBrush}" Margin="0,0,0,8" />
-                    <TextBlock x:Name="LanguageLabel" Text="Dil / Language"
+                    <TextBlock x:Name="LanguageLabel" Text="Dil"
                                Style="{StaticResource MutedText}" FontSize="10" Margin="2,0,0,4" />
                     <ComboBox x:Name="LangCombo" Margin="0,0,0,10"
                               ToolTip="Dil / Language / Язык"
                               SelectionChanged="OnLanguageChanged" />
                     <TextBlock x:Name="VersionText" Style="{StaticResource MutedText}" />
-                    <TextBlock x:Name="UnofficialText" Text="Unofficial community project"
+                    <TextBlock x:Name="UnofficialText" Text="Topluluk projesi"
                                Style="{StaticResource MutedText}" FontSize="10" Margin="0,3,0,0" />
                 </StackPanel>
 

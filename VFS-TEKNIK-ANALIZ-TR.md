@@ -1,30 +1,49 @@
-# GTA V VFS / dosya güvenliği — teknik analiz
+# GTA V VFS / dosya güvenliği — teknik analiz ve mevcut uygulama
 
-## Mevcut davranış
+## Bu sürümde gerçekten uygulanan yöntem
 
-GTACoop'un sunucu modları önce uygulamanın yerel sunucu önbelleğine indirilir. Ardından `AddonApplier` bazı türleri oyun klasörüne yerleştirir:
+GTACoop artık DLC paketleri için dar kapsamlı bir **NTFS junction mount** kullanır:
 
-- `DlcPack`: `mods/update/x64/dlcpacks/...` altına dosya yerleştirir ve `mods/update/update.rpf` içindeki `dlclist.xml` kaydını günceller.
-- `OivPackage`: OIV içeriğini `mods` / oyun mod yollarına uygular; gerektiğinde RPF arşivine müdahale eder.
-- `ClientScript`: `scripts/` altına kopyalanır.
-- `AsiPlugin` ve `ClientFiles`: izin verilen dosyalar oyun köküne kopyalanır.
+- Sunucu eklentisi önce GTACoop'un sunucuya özel indirme önbelleğine alınır.
+- `DlcPack` için `mods/update/x64/dlcpacks/gcs_<id>` mount noktası, önbellekteki DLC klasörüne junction ile yönlendirilmeyi dener.
+- Junction oluşturulursa DLC dosyaları oyun klasörüne tekrar kopyalanmaz. Windows/NTFS junction oluşturma veya doğrulama başarısızsa mevcut uyumluluk davranışı olarak dosyalar mount staging klasörüne kopyalanır.
+- Mount hedefi `InstalledAddon.LinkTarget` alanında, mount noktası ise `InstalledAddon.InstalledPaths` içinde senkronizasyon durumuna kaydedilir. Bu kayıt DLC mount manifesti görevi görür.
+- Kaldırma sırasında yalnızca kayıtlı hedefle birebir eşleşen junction kaldırılır. Junction hedefindeki önbellek dosyaları silinmez.
+- Hedefi eşleşmeyen veya sahipliği doğrulanamayan bağlantı/klasör korunur.
+- Güncelleme sırasında yalnızca önceki durum kaydında junction hedefi bulunan ve hâlâ aynı hedefe bağlanan mount değiştirilebilir. Eski kopya kurulumları otomatik olarak üzerine yazılmaz.
 
-`SessionService.Finish` oturum bitince sunucuya ait dosyaları kaldırır. Önceki akışta bazı kaldırma yolları doğrudan `File.Delete` / `Directory.Delete` kullanabiliyordu. Bu sürümde normal senkronizasyon kaldırmaları ve oturum sonu temizliği geri alınabilir `removed/` karantinasına taşınır; karantinaya taşıma başarısızsa kaynak dosya/klasör artık son çare olarak silinmez.
+Junction işlemi `cmd.exe` / `mklink` komutu çalıştırmak yerine Windows `DeviceIoControl` reparse-point API'siyle yapılır. Böylece kabuk komutu kaçış/karakter sorunları azaltılır ve mount hedefi ayrıca doğrulanır.
 
-`DownloadAddonAsync` içinde manifestte artık bulunmayan dosyaların silinmesi ise GTA klasöründen değil, uygulamanın yerel indirme önbelleğinden yapılır. Sunucudaki kaynak dosyalara istemci tarafından erişilmez ve sunucudan dosya silinmez.
+## Nelerin VFS olmadığı
 
-## VFS gerçeği
+Bu **genel amaçlı, oyun süreci içindeki native VFS hook'u değildir**. Yalnızca Windows dosya sistemi seviyesinde DLC klasörü yönlendirmesi yapar. OpenIV.asi'nin `mods` overlay mekanizması ve GTA'nın kendi yükleyicisi bu dosya yapısını tüketir.
 
-GTA V, ScriptHookVDotNet / ASI eklentilerinin tüm dosya türlerini harici bir dizinden otomatik okuyabileceği, herkese açık ve genel amaçlı bir .NET VFS API'si sunmaz. OpenIV.asi'nin `mods` klasörü bir overlay/redirect yaklaşımı sağlar; ancak bu, her dosya türünü oyun köküne hiç mount noktası oluşturmadan dışarıdan yükleyebilen genel VFS değildir.
+Aşağıdaki türler bu junction mount tarafından sanallaştırılmaz:
 
-Özellikle `scripts/` DLL'leri, ASI eklentileri ve bazı config dosyaları için oyun/loader'ın beklediği gerçek yollar vardır. Tamamen dosyasız mount için GTA V sürümlerine göre test edilmiş native ASI dosya sistemi hook'u veya bunu destekleyen ayrı bir loader gerekir. Böyle bir hook'u yalnızca C# launcher'a eklemek mümkün değildir; hatalı hook oyun çökmesine veya GTA güncellemelerinde uyumsuzluğa neden olabilir.
+- `OivPackage`: OIV işlemleri desteklenen `mods` yollarına fiziksel olarak uygulanmaya devam eder.
+- `ClientScript`: ScriptHookVDotNet'in beklediği `scripts/` dizinine fiziksel kurulum kullanır.
+- `AsiPlugin` ve `ClientFiles`: Loader/oyun tarafından beklenen konumlara fiziksel kurulum kullanır.
 
-## Güvenli uygulama sırası
+Bu türleri sanallaştırmak için GTA V sürümü ve loader kombinasyonlarıyla test edilmiş native ASI dosya sistemi hook'u veya uyumlu ayrı bir loader gerekir. Launcher içinde doğrulanmamış bir hook eklenmedi.
 
-1. Önce tüm server içeriği `%LOCALAPPDATA%\GTACoop Remake\Cache\<server>` altında tutulmalı.
-2. OpenIV.asi `mods` overlay'i yalnızca desteklenen DLC/RPF içerikleri için kullanılmalı; orijinal GTA arşivlerine yazılmamalı. `mods/update/update.rpf` gerekiyorsa kullanıcıya açıkça bildirilip yedeklenmeli.
-3. `scripts` / ASI dosyaları için ayrı, geri alınabilir mount yöntemi (dosya sembolik bağlantısı veya test edilmiş loader) seçilmeli; mevcut kullanıcı dosyaları asla üzerine yazılmamalı.
-4. Her mount bir `mount-manifest.json` ile sahiplik, kaynak hash'i ve hedef yol bilgisi tutmalı. Temizlik yalnızca bu manifestte GTACoop tarafından oluşturulduğu kanıtlanan mount noktalarını kaldırmalı.
-5. Native VFS hook'u geliştirilmeden önce ayrı test GTA kurulumu, oyun sürümü matrisi ve çökme testi gereklidir.
+## Güvenlik sınırları
 
-**Bu kaynak paketinde tam native VFS hook'u uygulanmış değildir.** Bilerek sahte bir VFS çözümü eklenmedi; bu, mevcut GTA kurulumuna zarar verme riski taşır.
+1. Sunucu içeriği önce `%LOCALAPPDATA%\\GTACoop Remake\\Cache\\<server>` altında tutulur.
+2. Junction hedefi ayrı cache klasörüdür; mount kaldırılırken hedefe recursive silme uygulanmaz.
+3. Sahiplik kaydı ve junction'ın çözümlenen gerçek hedefi eşleşmeden bağlantı kaldırılmaz.
+4. Sahipliği doğrulanamayan mevcut DLC klasörünün üzerine yazılmaz.
+5. `update.rpf` / `dlclist.xml` düzenlemesi bu mount'tan bağımsızdır; DLC'nin oyunda tanınması için mevcut OpenIV `mods/update/update.rpf` akışı gerekir.
+6. Junction davranışı için Windows smoke testi eklendi. Windows dışı ortamlarda test atlanır.
+
+## Bilinen sınırlamalar ve test gereksinimleri
+
+- Junction desteği Windows ve uygun NTFS/izin koşulları gerektirir. Başarısız olursa kopyalama fallback'i devreye girer.
+- GTA V'in Legacy/Enhanced sürümlerinde OpenIV.asi / OpenRPF / RageOpenV ile gerçek oyun testi yapılmalıdır.
+- Bu kaynak paketi genel amaçlı native VFS hook'u içermez; bu bilinçli bir güvenlik sınırıdır.
+
+
+## Sonraki aşama: tüm mod türleri için sanal/overlay yönetimi
+
+Hedef kapsam DLC, OIV, ASI ve Script'tir; fakat bu türlerin yüklenme biçimleri farklıdır. OIV çalışma zamanında yüklenen bir dosya değil, kurulum paketidir. ASI ve Script dosyaları kendi loader'larının beklediği konum/keşif kurallarına uyar. Bu nedenle hepsi için tek tip klasör junction'ı yeterli değildir.
+
+DeepSeek devam talimatı `DEEPSEEK-SONRAKI-ADIMLAR-VFS-UI-TR.txt` dosyasındadır. GTA V'in gerçek Rage VFS katmanına uyumlu native hook doğrulanmadan, genel amaçlı VFS tamamlandı şeklinde sunulmamalıdır. Güvenli kısmi overlay, doğrulanmamış oyun içi hook'tan daha iyidir.

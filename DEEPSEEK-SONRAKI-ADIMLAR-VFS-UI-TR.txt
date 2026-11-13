@@ -1,0 +1,46 @@
+Selam DeepSeek! 🙂
+
+Bu ZIP üzerinde ChatGPT bazı düzenlemeler yaptı. Lütfen önce mevcut kodu ve bu notu oku; yapılan işleri silmeden, mevcut özellikleri koruyarak devam et. Baştan yazmaya çalışma.
+
+ÖNEMLİ HEDEF: GTACoop Remake'in mod yönetimini olabildiğince sanal ve geri alınabilir hâle getirmek. İstenen kapsam DLC + OIV + ASI + Script dosyalarının tamamıdır. Ancak yalnızca klasörleri başka yere taşımak veya sisteme VFS adını vermek yeterli değil; gerçekten oyun tarafından okunabilen bir yönlendirme çözümü gerekiyor.
+
+1) VFS'Yİ TÜM MOD TÜRLERİNE GENİŞLET
+- Önce GTA V Legacy ve Enhanced sürümlerinin dosya yükleme mekanizmasını, OpenIV.asi / OpenRPF / RageOpenV uyumluluğunu ve ScriptHookV / ScriptHookVDotNet yükleme davranışını araştır.
+- DLC: mevcut DlcJunction mekanizmasını ve sahiplik doğrulamasını koru.
+- OIV: OIV bir kurulum paketi formatıdır; oyun çalışma zamanında doğrudan yüklemez. Paketi güvenli biçimde ayrıştır, kurulum talimatlarını doğrula ve desteklenen içerikleri OpenIV mods overlay/cache katmanına yönlendir. Orijinal oyun arşivlerini asla değiştirme. OIV içeriğinin hangi kısmının hâlâ fiziksel mods overlay gerektirdiğini açıkça raporla.
+- ASI: ASI loader'ın beklediği yükleme davranışını incele. Cache'deki ASI dosyasını oyunun yükleyebileceği güvenli bir mount/link mekanizmasıyla sunmak mümkünse uygula. Dosyanın bağımlı ini/config dosyalarını da aynı mod kimliğiyle yönet. Desteklenmeyen veya riskli yöntemle oyun klasörünü değiştirme.
+- Script: ScriptHookVDotNet'in scripts dizini beklentisini incele. Birden fazla sunucunun scriptlerini birleştiren, sadece GTACoop'un sahip olduğu mount noktalarını yöneten ve kullanıcı scriptlerini koruyan bir çözüm geliştir.
+- Mümkünse gerçek bir native ASI VFS eklentisi tasarla; ancak yalnızca belgelenmiş/uyumlu API ve test edilmiş hook kullan. Rastgele CreateFile/LoadLibrary hook'larıyla oyunu bozma. GTA'nın Rage VFS katmanına erişim doğrulanamıyorsa bunu açıkça belirt ve en güvenli kısmi overlay yaklaşımını uygula.
+- Her mod türü için mount/unmount, sahiplik, hash doğrulama, çakışma çözümü, yedekleme, rollback ve crash recovery ekle.
+- Manifest şeması sürümlü olsun; örneğin vfs-manifest.json. Mod kimliği, türü, kaynak cache yolu, mount hedefi, hash, dosya listesi ve sahiplik bilgisi saklansın.
+- Kullanıcının kendi modlarına, orijinal GTA dosyalarına ve başka uygulamaların oluşturduğu bağlantılara dokunma. Sahiplik kanıtlanamıyorsa işlemi iptal et.
+- Bir modun kaldırılması cache dosyalarını otomatik silmesin; cache temizliği ayrı ve kullanıcı onaylı işlem olsun.
+
+2) SOL MENÜYÜ KÜÇÜLTME
+- WPF MainWindow'daki sol gezinme alanına daralt/genişlet düğmesi eklendi. Bu kodu koru ve test et.
+- Daraltıldığında sadece simgeler görünsün; araç ipuçları bölüm adını göstersin. Genişletildiğinde metinler geri gelsin.
+- Daraltma/g genişletme pencere boyutunu veya ana içerik alanını bozmasın. Küçük ekranlarda da düzgün çalışsın.
+- Seçili sayfa daraltma sırasında değişmesin.
+
+3) TÜRKÇE ÇEVİRİ DENETİMİ
+- Tüm kullanıcıya görünen metinleri tara: WPF XAML, WPF code-behind, WinForms sekmeleri, diyaloglar, hata/uyarı pencereleri, butonlar, tooltip'ler, boş durumlar, durum satırları ve kurulum mesajları.
+- Türkçe arayüzde İngilizce kalmış kullanıcı metinlerini doğal Türkçeye çevir. İngilizce ve Rusça dil desteğini bozma; Loc.T sözlüklerine eksiksiz anahtar ekle.
+- Menü, pencere başlığı, tooltip ve MessageBox metinleri de dahil olsun.
+- Kod sembollerini, API adlarını, dosya uzantılarını, klasör yollarını, komutları, protokol alanlarını ve kullanıcı/mod tarafından girilmiş içeriği çevirmeye çalışma.
+- Eksik çeviri anahtarlarını otomatik raporlayan küçük bir kontrol/test ekle.
+- Türkçe karakterleri (ç, ğ, ı, İ, ö, ş, ü) koru. Metinlerin butonlara sığdığını kontrol et.
+
+4) DERLEME VE TEST
+- Windows üzerinde tüm solution/projeleri Release modunda derle.
+- WPF XAML derlemesini, eski WinForms sekmelerini ve launcher EXE adını doğrula: GTACoop.Launcher.exe.
+- VFS mount/unmount testlerini gerçek Windows NTFS üzerinde çalıştır; hedef klasörün yanlışlıkla silinmediğini doğrula.
+- GTA V Legacy/Enhanced testleri yapılmadıysa yapılmış gibi yazma. Gerçek oyun testi için gerekli sürüm, loader ve test adımlarını raporla.
+- Herhangi bir derleme/test başarısızsa hatayı saklama; çöz ve tekrar çalıştır.
+
+5) TESLİMAT
+- Güncellenmiş tüm kaynak kodlarını ZIP olarak ver.
+- Release EXE ve gerekli dağıtım dosyalarını ayrı belirt.
+- Nelerin gerçekten sanallaştırıldığını, nelerin OpenIV overlay veya sembolik bağlantı kullandığını, nelerin hâlâ fiziksel dosya gerektirdiğini tabloyla raporla.
+- Çalıştırmadığın testleri başarılı diye sunma.
+
+Bu projeyi birlikte toparlıyoruz; lütfen aceleyle yarım bir çözüm sunma. Önce mevcut kodu anla, sonra küçük ve güvenli adımlarla ilerle. 🙂

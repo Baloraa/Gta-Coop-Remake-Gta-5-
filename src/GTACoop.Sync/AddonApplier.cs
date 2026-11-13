@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text;
 using GTACoop.Rpf;
@@ -687,7 +687,7 @@ public sealed class AddonApplier
     {
         return addon.Type switch
         {
-            AddonType.DlcPack => InstallDlcPack(addon, cacheDir, version),
+            AddonType.DlcPack => InstallDlcPack(addon, cacheDir, version, old),
             AddonType.OivPackage => InstallOivPackage(addon, cacheDir, version, old,
                 protectedDlclistEntries),
             AddonType.ClientScript => InstallFiles(addon, cacheDir, version, "scripts"),
@@ -1349,25 +1349,54 @@ public sealed class AddonApplier
         }
     }
 
-    private InstalledAddon InstallDlcPack(AddonInfo addon, string cacheDir, string version)
+    private InstalledAddon InstallDlcPack(AddonInfo addon, string cacheDir, string version, InstalledAddon? old)
     {
         var mountFolder = MountFolderName(addon.Id);
         var dlcpacksRoot = Path.Combine(_gameFolder, "mods", "update", "x64", "dlcpacks");
+        // Parent directories must be ordinary directories. Do not mount through a
+        // pre-existing symlink/junction that could redirect writes outside the game.
+        _ = AddonPathSafety.GetChildPath(_gameFolder,
+            "mods/update/x64/dlcpacks/__gtacoop_mount_root_probe__");
         Directory.CreateDirectory(dlcpacksRoot);
         var target = Path.Combine(dlcpacksRoot, mountFolder);
         var staging = target + ".gtacoop-new";
         var backup = target + ".gtacoop-old";
 
-        if (Directory.Exists(staging)) DeleteDirectoryWithRetry(staging, _log);
-        // Yedek varsa ve hedef de varsa hedef yarım kalmış olabilir; bilinen
-        // eski sürümü geri getir. Yedek tek sağlam kopyaysa asla silme.
-        if (Directory.Exists(backup) && Directory.Exists(target))
+        // Staging/backup isimleri kullanıcı tarafından da oluşturulabilir. Sahipliği
+        // kanıtlanamayan klasörleri otomatik silmek veya üzerine yazmak yerine dur.
+        if (Directory.Exists(staging) || File.Exists(staging))
+            throw new SyncException(SyncText.T(
+                "DLC geçici mount yolu zaten mevcut; güvenlik için dokunulmadı: {0}", staging));
+
+        // Önceki çökmeden kalan tek yedek, hedef boşsa geri alınabilir. İkisi birden
+        // varsa hangisinin güvenli olduğunu tahmin edip hiçbirini silmeyiz.
+        if (Directory.Exists(backup) && !Directory.Exists(target))
         {
-            RestoreDlcBackup(backup, target);
-            if (Directory.Exists(backup))
+            Directory.Move(backup, target);
+        }
+        else if (Directory.Exists(backup) && Directory.Exists(target))
+        {
+            throw new SyncException(SyncText.T(
+                "DLC hedefi ve eski yedeği birlikte bulundu; ikisi de korundu: {0}", mountFolder));
+        }
+
+        if (Directory.Exists(target))
+        {
+            if (old == null || !old.InstalledPaths.Any(p => string.Equals(
+                    p.Replace('\\', '/').TrimStart('/'),
+                    Path.GetRelativePath(_gameFolder, target).Replace('\\', '/'),
+                    StringComparison.OrdinalIgnoreCase)))
                 throw new SyncException(SyncText.T(
-                    "DLC paketi güncellenemedi: eski yedek geri getirilemedi ({0}).",
-                    mountFolder));
+                    "Aynı adlı DLC klasörü zaten var ve GTACoop sahipliği doğrulanamadı; üzerine yazılmadı: {0}", target));
+
+            // Yalnızca daha önce GTACoop tarafından junction olarak bağlandığı
+            // kaydedilmiş ve hedefi hâlâ aynı olan mount güncellenebilir. Eski
+            // kopya kurulumlarını otomatik taşımak/değiştirmek kullanıcı verisini
+            // riske atabileceğinden manuel geçişe bırakıyoruz.
+            if (string.IsNullOrWhiteSpace(old.LinkTarget) ||
+                !DlcJunction.IsJunctionTo(target, old.LinkTarget))
+                throw new SyncException(SyncText.T(
+                    "Eski DLC kurulumu güvenli sanal mount olarak doğrulanamadı; mevcut klasör korundu: {0}", target));
         }
 
         string linkTarget = "";
@@ -1376,7 +1405,7 @@ public sealed class AddonApplier
             // Önce yeni sürümü geçici klasöre hazırla; eski sürüm hâlâ yerinde kalsın.
             // Oyun klasörüne GB'larca dosya kopyalamamak için NTFS bağlantısı (junction)
             // denenir. Başarısız olursa normal kopyalamaya düşülür.
-            if (TryCreateJunction(staging, cacheDir))
+            if (DlcJunction.TryCreate(staging, cacheDir))
             {
                 linkTarget = cacheDir;
                 _log(SyncText.T("{0}: oyuna bağlandı (bağlantı ile; kopyalama yapılmadı).",
@@ -1430,10 +1459,20 @@ public sealed class AddonApplier
             // dlclist'te karşılığı olmadığı için oyun tarafından yüklenmez.
             if (Directory.Exists(backup))
             {
-                try { DeleteDirectoryWithRetry(backup, _log); }
-                catch (Exception ex)
+                // Backup eski sürümün junction'ı olmalı. Hedef eşleşmiyorsa
+                // yedeği koru; hiçbir zaman link hedefindeki cache'i silme.
+                if (old != null && !string.IsNullOrWhiteSpace(old.LinkTarget) &&
+                    DlcJunction.IsJunctionTo(backup, old.LinkTarget))
                 {
-                    _log(SyncText.T("UYARI: eski DLC yedeği silinemedi: {0}", ex.Message));
+                    try { DlcJunction.RemoveOwned(backup, old.LinkTarget); }
+                    catch (Exception ex)
+                    {
+                        _log(SyncText.T("UYARI: eski DLC mount yedeği kaldırılamadı: {0}", ex.Message));
+                    }
+                }
+                else
+                {
+                    _log(SyncText.T("UYARI: sahipliği doğrulanamayan DLC yedeği korundu: {0}", backup));
                 }
             }
 
@@ -1561,37 +1600,6 @@ public sealed class AddonApplier
         }
     }
 
-    /// <summary>NTFS junction oluşturur (mklink /J). Başarılıysa true döner.</summary>
-    private static bool TryCreateJunction(string linkPath, string targetPath)
-    {
-        try
-        {
-            if (!Directory.Exists(targetPath)) return false;
-
-            var psi = new ProcessStartInfo("cmd.exe")
-            {
-                UseShellExecute = false,
-                CreateNoWindow = true,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                Arguments = $"/c mklink /J \"{linkPath}\" \"{targetPath}\""
-            };
-
-            using var p = Process.Start(psi);
-            if (p == null) return false;
-            p.StandardOutput.ReadToEnd();
-            p.StandardError.ReadToEnd();
-            p.WaitForExit(15000);
-
-            return p.ExitCode == 0 &&
-                   Directory.Exists(linkPath) &&
-                   new DirectoryInfo(linkPath).Attributes.HasFlag(FileAttributes.ReparsePoint);
-        }
-        catch
-        {
-            return false;
-        }
-    }
 
     /// <summary>Yalnızca indirme: eklentileri sunucu içerik klasörüne alır, oyuna KURMAZ.</summary>
     public async Task PrefetchAsync(
@@ -1724,8 +1732,33 @@ public sealed class AddonApplier
                 var dir = Path.Combine(_gameFolder, relDir);
                 if (Directory.Exists(dir))
                 {
-                    if (quarantineRoot != null) MoveDirectoryToQuarantine(dir, relDir, quarantineRoot);
-                    else DeleteDirectoryWithRetry(dir, _log);
+                    if (!string.IsNullOrWhiteSpace(inst.LinkTarget))
+                    {
+                        if (DlcJunction.IsJunctionTo(dir, inst.LinkTarget))
+                        {
+                            // Sadece GTACoop state kaydındaki tam hedefe işaret eden
+                            // junction kaldırılır. Cache hedefinin içeriğine dokunulmaz.
+                            DlcJunction.RemoveOwned(dir, inst.LinkTarget);
+                            _log(SyncText.T("Sanal DLC mount kaldırıldı; cache korundu: {0}", inst.MountFolder));
+                        }
+                        else
+                        {
+                            _log(SyncText.T("UYARI: DLC mount hedefi eşleşmedi; klasör korundu: {0}", dir));
+                        }
+                    }
+                    else if ((new DirectoryInfo(dir).Attributes & FileAttributes.ReparsePoint) != 0)
+                    {
+                        // Eski/harici bir reparse point için hedef bilinmiyor: dokunma.
+                        _log(SyncText.T("UYARI: sahipliği bilinmeyen bağlantı korundu: {0}", dir));
+                    }
+                    else if (quarantineRoot != null)
+                    {
+                        MoveDirectoryToQuarantine(dir, relDir, quarantineRoot);
+                    }
+                    else
+                    {
+                        DeleteDirectoryWithRetry(dir, _log);
+                    }
                 }
                 break;
             }

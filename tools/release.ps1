@@ -11,6 +11,20 @@ if ([string]::IsNullOrWhiteSpace($token)) { throw 'GitHub token bulunamadi.' }
 $headers = @{ Authorization = "token $token"; 'User-Agent' = 'GTACoop-Release'; Accept = 'application/vnd.github+json' }
 
 $notes = @"
+## GTACoop Remake $Version`n`n### Mod yönetimi (VFS / DLC)
+- DLC paketleri artık sahipliği doğrulanan junction ile bağlanıyor; mount/unmount, hedef kontrolü ve yedek geri alma sıkılaştırıldı.
+- Sahipliği kanıtlanamayan geçici/yedek klasörlere dokunulmuyor; çökme sonrası tek güvenli yedek geri alınıyor.
+- Kaldırma cache dosyalarını silmiyor; cache temizliği ayrı işlem.
+- OIV/ASI/Script için gerçek zamanlı sanallaştırma yok; OIV içeriği OpenIV mods katmanına yönlendiriliyor. Ayrıntı: VFS-TEKNIK-ANALIZ-TR.md
+
+### Arayüz
+- Sol menüye daralt/genişlet düğmesi: daraltınca yalnızca simgeler ve araç ipuçları kalır, içerik alanı genişler.
+- WPF başlık, alt başlık ve topluluk etiketi Türkçe kaynak metinlere bağlandı; İngilizce/Rusça sözlük anahtarları eklendi.
+
+### Test
+- `tests/GTACoop.Sync.SmokeTests`: 14 test geçti (path güvenliği, manifest doğrulama, DLC junction mount/unmount, sembolik bağ reddi).
+
+### Önceki sürüm notları
 ## GTACoop Remake $Version
 
 ### Arayuz
