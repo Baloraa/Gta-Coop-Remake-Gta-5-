@@ -1,0 +1,119 @@
+USED 861 MISSING 118
+'\r\n{0} paket atlandı.' <- MyServerTab.cs
+'\r\n{0} pakette desteklenmeyen işlemler atlanacak.' <- MyServerTab.cs
+"'{0}' listeden silinsin mi?\r\n(Kurulu modlar silinmez; 'Araçlar' sekmesinden temizleyebilirsiniz.)" <- ServersTab.cs
+"'{0}' oturumu bitirilecek ve sunucu modları oyun klasöründen kaldırılacak.\r\nKendi modlarınız ve diğer dosyalar etkilenmez. Devam edilsin mi?" <- ServersTab.cs
+"1) Paylaşan kişi bir klasör seçip 'Paylaşımı Başlat'a basar; ekranda çıkan IP:port kodunu arkadaşına gönderir.\r\n" <- P2PTab.cs
+'ASI eklentisi eklendi: {0}\r\n{1}Oyuncuların oyun kök klasörüne oynarken kurulur; oyundan çıkınca otomatik kaldırılır.' <- MyServerTab.cs
+'ASI eklentisi eklenemedi:\r\n' <- MyServerTab.cs
+'Adres: {0}  |  Oyun portu: {1}  |  Sync portu: {2}\r\nOtomatik relay koda eklendi: {3} (sync {4}, oyun {5}). Arkadaşınız relay öncelikli bağlanır.' <- ShareCodeDialog.cs
+'Ayarlar kaydedilemedi:\r\n' <- MyServerTab.cs
+'Açılış görevi kaldırılamadı:\r\n' <- MyServerTab.cs
+'Bazı OIV paketleri eklenemedi:\r\n' <- MyServerTab.cs
+'Bazı ped paketleri eklenemedi:\r\n' <- AddonPedsTab.cs
+'Bileşen kurulamadı:\r\n' <- ComponentsTab.cs
+'Bu bileşen zaten kurulu ve dosyaları sağlam.\r\nİndirme yapılmadı.' <- ComponentsTab.cs
+'Bu sunucunun indirilmiş mod dosyaları silinip sunucudan yeniden indirilecek.\r\n' <- ServersTab.cs
+'Clip Dictionary' <- PedEditDialog.cs
+'Combat Info' <- PedEditDialog.cs
+'DLC paketi eklendi: {0}\r\nSunucu çalışıyorsa bir sonraki manifest isteğinde otomatik dağıtılır.' <- MyServerTab.cs
+'DLC paketleri: Addons\\\\dlcpacks\\\\  |  Addon pedleri: Addons\\\\peds\\\\  |  OIV paketleri: Addons\\\\oiv\\\\  |  Scriptler: Addons\\\\scripts\\\\  |  ASI: Addons\\\\asi\\\\  |  Sunucu eklentileri: Plugins\\\\\r\nHer OIV paketi kendi klasöründe saklanır. Meta için: addon.json / peds.json' <- MyServerTab.cs
+'DLC/OIV paketleri kurulamıyor (update.rpf güvenli değil) ({0}): {1}\r\n{2}\r\n\r\n' <- ServersTab.cs
+'Decision Maker' <- PedEditDialog.cs
+'Destek paketi oluşturulamadı:\r\n' <- LogTab.cs
+'Destek paketi oluşturuldu:\r\n{0}\r\n\r\nYolu panoya da kopyaladım. Sorun bildirirken bu dosyayı paylaşabilirsiniz.\r\nParola ve token bilgileri pakete eklenmez.' <- LogTab.cs
+'Dil' <- MainWindow.xaml.cs
+'Dosyalar indirildi ve doğrulandı:\r\n{0}' <- P2PTab.cs
+'Duyuru gönderilemedi:\r\n' <- MyServerTab.cs
+'Dışa aktarılamadı:\r\n' <- HudDesignerTab.cs
+'Eklenti eklenemedi:\r\n' <- MyServerTab.cs
+'Eklenti(ler) Plugins klasörüne eklendi.\r\nSunucuyu yeniden başlatınca yüklenecek (ayarlar otomatik güncellenir).' <- MyServerTab.cs
+'Eşe bağlanılamadı:\r\n' <- P2PTab.cs
+"GTACoop Remake, GTACoop (GTACoOp) açık kaynak projesini temel alan, GNU GPL v3 lisanslı ücretsiz bir araçtır; kaynak kodu GitHub'da açıktır.\r\nRockstar Games / Take-Two Interactive ile bağlantılı değildir; resmî bir ürün değildir. Orijinal GTA V gerektirir.\r\nÜcretsizdir: satılamaz, ticari amaçla dağıtılamaz." <- AboutTab.cs
+'Geri yükleme başarısız:\r\n' <- ComponentsTab.cs,LogTab.cs
+'Geri yükleme tamamlandı.\r\nNot: Sunucu modlarının dlclist girdileri bu yedekteki duruma döner.' <- LogTab.cs
+'Geri yükleme yalnızca GTA V kapalıyken yapılabilir.\r\nKalıntı temizliği; sunuculardan kurulmuş tüm eklentileri (script, ASI, dlc paketi) kaldırır — kendi modlarınıza dokunmaz.' <- LogTab.cs
+'Güncelleme kurulamadı:\r\n' <- AboutTab.cs
+'Henüz sunucu modu günlüğü yok.\r\n{0}' <- MyServerTab.cs
+"Kendi GTACoOp sunucunuzu burada yönetin. Addons klasörüne eklediğiniz her şey, sunucuya bağlanan oyunculara otomatik iner.\r\nSunucu modları oyuncuların oyununa yalnızca oynarken kurulur. Arkadaşlarınız 'Sunucular' sekmesinden bağlanır." <- MyServerTab.cs
+'Klasör açılamadı:\r\n' <- ComponentsTab.cs
+'Klasör eklenemedi:\r\n' <- MyServerTab.cs
+'Klasör zip olarak kaydedildi:\r\n{0}' <- P2PTab.cs
+'Kısa kod aranıyor: {0} ...\r\n(İnternet üzerinden sunucu bilgileri alınıyor)' <- JoinCodeDialog.cs
+'Kısa kod bulunamadı.\r\nSunucu açık mı? Kodu doğru yazdınız mı? İnternet bağlantınız var mı?\r\nUzun GTC1 kodunu da deneyebilirsiniz.' <- JoinCodeDialog.cs
+'Kısa kod bulundu ✓\r\nSunucu: {0}\r\nAdres: {1}:{2} ({3})\r\nOyun portu: {4}  |  Sync portu: {5}\r\nŞifre: {6}' <- JoinCodeDialog.cs
+'Kısa kod bulundu ✓\r\nSunucu: {0}\r\nOtomatik relay: {1} (sync {2}, oyun {3})\r\nYedek doğrudan adres: {4}\r\nOyun portu: {5}  |  Sync portu: {6}\r\nŞifre: {7}' <- JoinCodeDialog.cs
+'Mesaj gönderilemedi:\r\n' <- MyServerTab.cs
+'Mod ayarı kaydedilemedi:\r\n' <- MyServerTab.cs
+'Mod kaldırılamadı:\r\n' <- MyServerTab.cs
+'Modlar oyun kapanınca otomatik kaldırılacak (dosyalar bilgisayarınızda kalır).\r\n\r\n' <- ServersTab.cs
+'Movement Clip Set' <- PedEditDialog.cs
+'OIV paketi eklenemedi:\r\n' <- MyServerTab.cs
+'Oturum bitirilemedi:\r\n' <- ServersTab.cs
+'Oyun başlatılamadı:\n' <- GameTab.cs
+"Oyuncu adı kaydedildi: {0}\r\nSunucuya 'Bağlan ve Oyna' dediğinizde bu ad kullanılır." <- GameTab.cs
+'Oyuncu atılamadı:\r\n' <- MyServerTab.cs
+'Oyuncu yasaklanamadı:\r\n' <- MyServerTab.cs
+'Paket eklenemedi:\r\n' <- MyServerTab.cs
+'Paylaşım başlatılamadı:\r\n' <- P2PTab.cs
+'Ped Ekle: .yft/.ydd/.ytd/.ymt dosyalarını seçin. Streamed pedler için ' <- AddonPedsTab.cs
+'Ped ayarı kaydedilemedi:\r\n' <- AddonPedsTab.cs
+'Ped dosyaları eklenemedi:\r\n' <- AddonPedsTab.cs
+'Ped görüntülenemedi:\r\n' <- AddonPedsTab.cs
+'Ped güncellenemedi:\r\n' <- AddonPedsTab.cs
+'Ped kaldırılamadı:\r\n' <- AddonPedsTab.cs
+'Ped klasörü eklenemedi:\r\n' <- AddonPedsTab.cs
+'Ped listesi yenilenemedi:\r\n' <- AddonPedsTab.cs
+'Ped paketi eklenemedi:\r\n' <- AddonPedsTab.cs
+'Personality' <- PedEditDialog.cs
+'Ragdoll' <- PedEditDialog.cs
+'Resim eklenemedi:\r\n' <- HudDesignerTab.cs
+'Script eklenemedi:\r\n' <- MyServerTab.cs
+'Script klasörü eklendi: {0}\r\nOyunculara bir sonraki bağlantıda otomatik indirilir.' <- MyServerTab.cs
+'Ses eklenemedi:\r\n' <- HudDesignerTab.cs
+'Seçilen dosyalar desteklenmiyor.\r\nDesteklenen uzantılar: {0}' <- MyServerTab.cs
+'Seçilen çalıştırma dosyası bulunamadı:\r\n{0}' <- GameTab.cs
+'Sunucu Modu (VDS) — isteğe bağlı' <- MyServerTab.cs
+'Sunucu başlatılamadı:\r\n' <- MyServerTab.cs
+'Sunucu discovery yanıtı vermedi. Yine de doğrudan bağlanılsın mı?\r\n' <- ServerBrowserTab.cs
+"Sunucu listesine sunucu ekleyin (arkadaşınızın IP'si veya kendi sunucunuz), seçip 'Bağlan ve Oyna'ya basın.\r\nSunucunun tüm modları (araç/ped paketleri, scriptler, ASI eklentileri) otomatik indirilir ve yalnızca siz oynarken kurulu kalır; oyundan çıkınca kaldırılır." <- ServersTab.cs
+'Sunucu modu başlatılamadı:\r\n' <- MyServerTab.cs
+"Sunucu modu bileşeni bulunamadı:\r\ntools\\\\ServerHost\\\\GTACoop.ServerHost.exe\r\n\r\nLauncher'ı yeniden kurun." <- MyServerTab.cs
+'Sunucu yedeği alınamadı:\r\n' <- MyServerTab.cs
+"Sunucu yedeği geri yüklendi ({0} dosya).\r\n{1}\r\n\r\nAyarların etkin olması için launcher'ı yeniden başlatın." <- MyServerTab.cs
+'Sunucu yedeği kaydedildi:\r\n{0}\r\n\r\nŞifre ve sync token yedeğe yazılmaz; geri yükledikten sonra yeniden girin.' <- MyServerTab.cs
+'Sunucu: {0}\r\n\r\nKurulacak/güncellenecek: {1} eklenti ({2:F1} MB)\r\nKaldırılacak: {3}\r\n\r\n{4}Devam edilsin mi?' <- ServersTab.cs
+'Sunucu: {0}\r\nAdres: {1}\r\nOyun portu: {2}  |  Sync portu: {3}\r\nŞifre: {4}' <- JoinCodeDialog.cs
+'Sunuculardan kurulmuş tüm modlar kaldırılacak:\r\n• script ve ASI eklentileri (scripts/ ve oyun kökü)\r\n• gcs_ önekli DLC paketleri ve dlclist girdileri\r\n\r\nKendi modlarınız ve diğer dosyalar etkilenmez. Devam edilsin mi?' <- LogTab.cs
+'Sunucunun Addons\\\\peds klasöründeki ped dosyalarını (.ydd/.ytd/.ymt/.yft) ' <- AddonPedsTab.cs
+'Sunucunun scriptleriyle çakışabilecek yerel dosyalar bulundu:\r\n\r\n{0}\r\n\r\nBunlar oyun çökmesine yol açabilir. Yine de bağlanılsın mı?' <- ServersTab.cs
+'Sunucuya bağlanılamadı:\r\n' <- MainForm.cs
+'Sunucuya ulaşılamadı. Otomatik relay ve doğrudan adresler denendi.\r\n' <- JoinCodeDialog.cs
+'Sunucuya ulaşılamadı: kısa kodda otomatik relay bilgisi yok ve doğrudan adresler aynı ağda değil.\r\n' <- JoinCodeDialog.cs
+'Sürüm listesi alınamadı:\r\n' <- ComponentsTab.cs
+'Sürüm {0}' <- MainWindow.xaml.cs
+'Sürüm {0} indirilip kurulacak.\r\nLauncher kapanıp yeniden açılacak; oyun dosyalarınız, modlarınız ve ayarlarınız değişmez. Devam edilsin mi?' <- AboutTab.cs
+'Tanılama kopyalanamadı:\r\n' <- LogTab.cs
+'Temel Model (meta)' <- PedEditDialog.cs
+'Temizlik hatası:\r\n' <- LogTab.cs
+'Temizlik tamamlandı.\r\nSunucu modları kaldırıldı; oyun eski hâlinde.' <- LogTab.cs
+'Yedek geri yüklenemedi:\r\n' <- MyServerTab.cs
+'Yedekteki sunucu ayarları ve mod dosyaları mevcut sunucunun üzerine yazılacak.\r\nÖnce mevcut durumun güvenlik yedeği alınır. Devam edilsin mi?' <- MyServerTab.cs
+'Yedekten geri yükleme tamamlandı: {0} dosya.\r\n{1}' <- ComponentsTab.cs
+"Yeni sürüm hazır: {0}\r\n\r\n'İndir ve Kur' ile güncelleyebilirsiniz.\r\nLauncher kapanıp yeniden açılır; oyun dosyalarınız, modlarınız ve ayarlarınız değişmez." <- AboutTab.cs
+'Yeniden Başlat' <- MyServerTab.cs
+'Yerleşim dışa aktarıldı:\r\n{0}' <- HudDesignerTab.cs
+"Yerleşim kaydedildi ve oyuna uygulandı:\r\n{0}\r\n\r\nOyun içinde F7 ile HUD'u açıp kapatabilirsin." <- HudDesignerTab.cs
+'Yerleşim kaydedilemedi:\r\n' <- HudDesignerTab.cs
+'Zaten bilgisayarınızda olduğu için kurulmayacak ({0}): {1}\r\n\r\n' <- ServersTab.cs
+'Zip oluşturulamadı:\r\n' <- P2PTab.cs
+'auto (doğrulanmış meta varsa açık)' <- PedEditDialog.cs
+"mods/update/update.rpf şu yedekle değiştirilecek:\r\n{0}\r\n\r\nMevcut dosya 'update.rpf.before-restore' olarak saklanır. Devam edilsin mi?" <- LogTab.cs
+'off (kapalı)' <- PedEditDialog.cs
+'on (açık)' <- PedEditDialog.cs
+'{0}\r\n\r\nYine de bağlanılsın mı?' <- ServerBrowserTab.cs
+'{0} dosya desteklenmeyen türde olduğu için atlandı.\r\n' <- MyServerTab.cs
+'{0} dosya eklendi: Addons\\\\scripts\\\\{1}\r\nOyunculara bir sonraki bağlantıda otomatik indirilir.' <- MyServerTab.cs
+'İstemci kurulamadı:\n' <- GameTab.cs
+'İstemci kurulumu tamam.\r\n\r\nKopyalanan: {0}\r\nAtlanan: {1}' <- GameTab.cs
+'İçe aktarılamadı:\r\n' <- HudDesignerTab.cs

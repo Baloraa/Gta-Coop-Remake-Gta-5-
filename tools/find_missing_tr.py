@@ -4,7 +4,8 @@ keys = set()
 for f in glob.glob('GTACoopRemakeV2/src/GTACoop.Launcher/**/Localization*.cs', recursive=True):
     s = open(f, encoding='utf-8-sig').read()
     for m in re.finditer(r'\["((?:[^"\\]|\\.)*)"\]\s*=', s):
-        keys.add(m.group(1))
+        k = m.group(1).replace('\\r', '\r').replace('\\n', '\n').replace('\\"', '"')
+        keys.add(k)
 
 used = {}
 pattern = re.compile(r'(?:Loc\.)?\bT\("((?:[^"\\]|\\.)*)"')

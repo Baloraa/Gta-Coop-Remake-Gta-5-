@@ -254,6 +254,11 @@ public sealed class MyServerTab : UserControl
         modsGroup.Controls.Add(_modsList);
         modsGroup.Controls.Add(modsListLabel);
 
+        // Sabit yükseklik, düğme satırları alta kayınca OIV/ASI/eklenti
+        // düğmelerini kesiyordu. Yükseklik içeriğe göre hesaplanır.
+        modsGroup.Height = modsListLabel.Height + _modsList.Height + _modsStatus.Height
+            + modsButtons.Height + modsRow1.Height + modsRow2.Height + modsInfo.Height + 26;
+
         // --- kontrol
         var controlGroup = new DarkGroup
         {
