@@ -48,8 +48,8 @@ public sealed class ServersTab : UserControl
         };
 
         Ui.StyleList(_list,
-            (T("Favori"), 55), (T("Sunucu"), 220), (T("Adres"), 190), (T("Oyun Portu"), 85), ("Sync", 70),
-            (T("Şifre"), 65), (T("Durum"), 180));
+            (T("Favori"), 55), (T("Sunucu"), 200), (T("Adres"), 170), (T("Oyun Portu"), 85), ("Sync", 60),
+            (T("Şifre"), 120), (T("Durum"), 170));
         _list.Height = 190;
         _list.Dock = DockStyle.Top;
         _list.DoubleClick += (_, _) => EditServer();
@@ -1124,6 +1124,40 @@ public sealed class ServersTab : UserControl
             _cts?.Dispose();
             _cts = null;
             RefreshSessionUi();
+        }
+    }
+
+    /// <summary>
+    /// Launcher açılırken çağrılır: oyun Alt+F4 ile kapatıldıysa veya izleyici
+    /// öldüyse kalan sunucu modlarını temizler. Oyun açıksa hiçbir şey yapmaz.
+    /// </summary>
+    public void FinishLeftoverOnStartup()
+    {
+        try
+        {
+            var rec = SessionStore.Load(AppEnv.DataFolder);
+            if (rec == null) return;
+            if (AddonApplier.IsGameRunning()) return;
+
+            AppEnv.Log("Kapanmamış oturum bulundu; sunucu modları kaldırılıyor...");
+            SessionService.KillWatcher(rec, AppEnv.Log);
+            var folder = AppEnv.Settings.GameFolder;
+            _ = Task.Run(() =>
+            {
+                try
+                {
+                    SessionService.Finish(AppEnv.DataFolder, folder, AppEnv.Log);
+                    AppEnv.Log("Kalan oturum temizlendi: sunucu modları kaldırıldı.");
+                }
+                catch (Exception ex)
+                {
+                    AppEnv.LogError("Kalan oturum temizlenemedi: " + ex.Message);
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            AppEnv.LogError("Oturum kontrolü: " + ex.Message);
         }
     }
 

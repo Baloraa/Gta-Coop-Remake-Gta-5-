@@ -24,12 +24,23 @@ public static class SessionStore
     public static SessionRecord? Load(string dataFolder) =>
         SyncJson.Load<SessionRecord>(RecordPath(dataFolder));
 
-    public static void Save(string dataFolder, SessionRecord record) =>
+    /// <summary>İstemci tarafı özelliklerin (HUD) oturumda olup olmadığını bildiren işaret dosyası.</summary>
+    public static string SessionFlagPath(string dataFolder) =>
+        Path.Combine(dataFolder, "session-active.flag");
+
+    public static void Save(string dataFolder, SessionRecord record)
+    {
         SyncJson.Save(RecordPath(dataFolder), record);
+        // HUD yalnızca sunucu oturumunda görünsün: işaret dosyası oyun içi
+        // istemci tarafından okunur.
+        try { File.WriteAllText(SessionFlagPath(dataFolder), record.ServerName ?? string.Empty); }
+        catch { }
+    }
 
     public static void Clear(string dataFolder)
     {
         try { File.Delete(RecordPath(dataFolder)); } catch { }
+        try { File.Delete(SessionFlagPath(dataFolder)); } catch { }
     }
 }
 

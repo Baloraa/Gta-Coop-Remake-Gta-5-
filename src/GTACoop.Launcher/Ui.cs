@@ -157,6 +157,24 @@ internal sealed class DarkButton : Button
         FlatStyle = FlatStyle.Flat;
         FlatAppearance.BorderSize = 0;
         UseVisualStyleBackColor = false;
+
+        // Metin dile/DPI'ya göre uzayıp kısalabildiği için düğme kendi
+        // içeriğine uyar. Sabit genişlik, İngilizce/Rusça'da yazıyı kesiyordu.
+        AutoSize = true;
+        AutoSizeMode = AutoSizeMode.GrowAndShrink;
+        MinimumSize = new Size(88, 30);
+        Padding = new Padding(14, 5, 14, 5);
+        TextAlign = ContentAlignment.MiddleCenter;
+    }
+
+    /// <summary>Yazının gerçek ölçüsüne göre boyut: hiçbir dilde metin kesilmez.</summary>
+    public override Size GetPreferredSize(Size proposedSize)
+    {
+        var measured = TextRenderer.MeasureText(Text ?? string.Empty, Font,
+            new Size(int.MaxValue, int.MaxValue), TextFormatFlags.NoPrefix);
+        return new Size(
+            Math.Max(MinimumSize.Width, measured.Width + Padding.Horizontal + 10),
+            Math.Max(MinimumSize.Height, measured.Height + Padding.Vertical + 8));
         BackColor = Theme.SurfaceAlt;
         ForeColor = Theme.Text;
     }

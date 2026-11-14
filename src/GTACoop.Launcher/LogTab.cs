@@ -64,6 +64,24 @@ public sealed class LogTab : UserControl
         Controls.Add(_log);
         Controls.Add(tools);
         Ui.FitToContent(tools);
+
+        // Günlük kutusu boş açılıyordu; dosyadaki son satırlar yüklenir.
+        LoadLogTail();
+    }
+
+    /// <summary>Günlük dosyasının son satırlarını arayüze taşır.</summary>
+    private void LoadLogTail()
+    {
+        try
+        {
+            if (!File.Exists(AppEnv.LogFile)) return;
+            var lines = File.ReadLines(AppEnv.LogFile).TakeLast(300).ToArray();
+            if (lines.Length == 0) return;
+            _log.Text = string.Join(Environment.NewLine, lines) + Environment.NewLine;
+            _log.SelectionStart = _log.TextLength;
+            _log.ScrollToCaret();
+        }
+        catch { /* dosya kilitliyse sessizce geç */ }
     }
 
     public void Append(string line)

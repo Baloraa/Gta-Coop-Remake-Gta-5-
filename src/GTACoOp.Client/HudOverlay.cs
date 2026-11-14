@@ -171,12 +171,31 @@ namespace GTACoOp
         private const int HudStreetName = 9;
         private const int HudHelpText = 10;
 
+        /// <summary>Launcher oturum açtıysa true (session-active.flag).</summary>
+        private static bool SessionActive()
+        {
+            try
+            {
+                var data = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+                return File.Exists(Path.Combine(data, "GTACoopRemake", "session-active.flag"));
+            }
+            catch { return false; }
+        }
+
         public void Tick(bool menuVisible)
         {
             try
             {
                 _frameRects = 0;
                 Reload();
+
+                // HUD yalnızca sunucu oturumunda görünür: normal (tek oyunculu)
+                // oyunda hiçbir şey çizilmez, oyunun kendi arayüzü kalır.
+                if (!SessionActive())
+                {
+                    Restore();
+                    return;
+                }
 
                 // Özellik kapalı (varsayılan) ya da HUD kapatıldı: oyunun kendi
                 // arayüzü aynen geri gelir, hiçbir şey gizli kalmaz.

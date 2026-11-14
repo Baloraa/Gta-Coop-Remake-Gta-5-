@@ -71,6 +71,9 @@ public sealed class MainForm : Form
             RefreshGamePath();
             _gameTab.RefreshStatus();
             _serversTab.RecoverSessionIfAny();
+            // Oyun Alt+F4 ile kapandıysa izleyici temizliği kaçırabiliyor;
+            // launcher açılışında kalan sunucu modları kaldırılır.
+            _serversTab.FinishLeftoverOnStartup();
         };
 
         _componentsTab.ComponentsChanged += _gameTab.RefreshStatus;
