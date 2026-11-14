@@ -254,6 +254,66 @@ Check("server scanner does not publish files through a symbolic link when suppor
     }
 });
 
+Check("ped modu dlclist ekleme/kaldirma turu", () =>
+{
+    var root = Path.Combine(Path.GetTempPath(), "gtacoop-dlclist-" + Guid.NewGuid().ToString("N"));
+    var updateDir = Path.Combine(root, "mods", "update");
+    Directory.CreateDirectory(updateDir);
+    var updateRpf = Path.Combine(updateDir, "update.rpf");
+    try
+    {
+        var initial = "<SMAP_PACK_MANIFEST><Paths><Item>dlcpacks:/addonpeds/</Item></Paths>" +
+                      "</SMAP_PACK_MANIFEST>";
+        var bytes = GTACoop.Rpf.Dlclist.Encode(initial,
+            GTACoop.Rpf.Dlclist.DlclistEncoding.Utf8);
+        using (var archive = GTACoop.Rpf.RpfArchive.Create(updateRpf, overwrite: true))
+            archive.SetFile(GTACoop.Rpf.Dlclist.RelativePath, bytes, verify: false);
+
+        string[] Names()
+        {
+            using var archive = GTACoop.Rpf.RpfArchive.Open(updateRpf);
+            var file = archive.Find(GTACoop.Rpf.Dlclist.RelativePath)
+                       ?? throw new InvalidOperationException("dlclist.xml yok.");
+            var (xml, _) = GTACoop.Rpf.Dlclist.Decode(archive.ReadFile(file));
+            return GTACoop.Rpf.Dlclist.GetPackNames(xml).ToArray();
+        }
+
+        using (var archive = GTACoop.Rpf.RpfArchive.Open(updateRpf))
+        {
+            var file = archive.Find(GTACoop.Rpf.Dlclist.RelativePath)!;
+            var (xml, enc) = GTACoop.Rpf.Dlclist.Decode(archive.ReadFile(file));
+            var added = GTACoop.Rpf.Dlclist.AddPackNames(xml, new[] { "gtacoop_peds" });
+            archive.SetFile(GTACoop.Rpf.Dlclist.RelativePath,
+                GTACoop.Rpf.Dlclist.Encode(added, GTACoop.Rpf.Dlclist.Normalize(added, enc)),
+                verify: true);
+        }
+
+        var afterAdd = Names();
+        if (!afterAdd.Contains("addonpeds") || !afterAdd.Contains("gtacoop_peds"))
+            throw new InvalidOperationException("Ekleme sonrasi girdiler yanlis: " +
+                                                string.Join(",", afterAdd));
+
+        using (var archive = GTACoop.Rpf.RpfArchive.Open(updateRpf))
+        {
+            var file = archive.Find(GTACoop.Rpf.Dlclist.RelativePath)!;
+            var (xml, enc) = GTACoop.Rpf.Dlclist.Decode(archive.ReadFile(file));
+            var removed = GTACoop.Rpf.Dlclist.RemovePackNames(xml, new[] { "gtacoop_peds" });
+            archive.SetFile(GTACoop.Rpf.Dlclist.RelativePath,
+                GTACoop.Rpf.Dlclist.Encode(removed, GTACoop.Rpf.Dlclist.Normalize(removed, enc)),
+                verify: true);
+        }
+
+        var afterRemove = Names();
+        if (afterRemove.Contains("gtacoop_peds") || !afterRemove.Contains("addonpeds"))
+            throw new InvalidOperationException("Kaldirma sonrasi girdiler yanlis: " +
+                                                string.Join(",", afterRemove));
+    }
+    finally
+    {
+        try { Directory.Delete(root, recursive: true); } catch { }
+    }
+});
+
 Console.WriteLine($"\nSonuç: {passed} geçti, {failed} başarısız, {skipped} atlandı.");
 return failed == 0 ? 0 : 1;
 
