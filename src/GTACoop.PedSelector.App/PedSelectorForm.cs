@@ -82,6 +82,7 @@ namespace GTACoop.PedSelector.App
             _list.Columns.Add("Sağlık", 80);
             _list.Columns.Add("Dosya", 80);
             _list.ItemChecked += OnItemChecked;
+            _list.DoubleClick += (_, _) => EditSelected();
 
             var buttons = new FlowLayoutPanel
             {
@@ -93,6 +94,8 @@ namespace GTACoop.PedSelector.App
             };
             buttons.Controls.Add(MakeButton("Ped Ekle...", (_, _) => AddPedFiles()));
             buttons.Controls.Add(MakeButton("Streamed Klasör Ekle...", (_, _) => AddPedFolder()));
+            buttons.Controls.Add(MakeButton("Düzenle...", (_, _) => EditSelected()));
+            buttons.Controls.Add(MakeButton("Kaydet", (_, _) => SavePack(announce: true)));
             buttons.Controls.Add(MakeButton("OIV Oluştur...", (_, _) => BuildOiv()));
             buttons.Controls.Add(MakeButton("Oyuna Kur...", (_, _) => InstallToGame()));
             buttons.Controls.Add(MakeButton("Kurulumu Kaldır", (_, _) => UninstallFromGame()));
@@ -162,15 +165,8 @@ namespace GTACoop.PedSelector.App
                 _list.Items.Clear();
                 foreach (var ped in _packFile.Peds)
                 {
-                    var item = new ListViewItem(string.IsNullOrWhiteSpace(ped.Name) ? ped.Model : ped.Name)
-                    {
-                        Checked = ped.Enabled,
-                        Tag = ped
-                    };
-                    item.SubItems.Add(ped.Model);
-                    item.SubItems.Add(ped.Kind);
-                    item.SubItems.Add((ped.Health > 0 ? ped.Health : 200).ToString());
-                    item.SubItems.Add((ped.Files?.Count ?? 0).ToString());
+                    var item = new ListViewItem { Checked = ped.Enabled, Tag = ped };
+                    FillItem(item, ped);
                     _list.Items.Add(item);
                 }
                 _list.EndUpdate();
@@ -188,6 +184,16 @@ namespace GTACoop.PedSelector.App
             }
         }
 
+        private static void FillItem(ListViewItem item, AddonPedInfo ped)
+        {
+            item.Text = string.IsNullOrWhiteSpace(ped.Name) ? ped.Model : ped.Name;
+            while (item.SubItems.Count < 5) item.SubItems.Add("");
+            item.SubItems[1].Text = ped.Model;
+            item.SubItems[2].Text = ped.Kind;
+            item.SubItems[3].Text = (ped.Health > 0 ? ped.Health : 200).ToString();
+            item.SubItems[4].Text = (ped.Files?.Count ?? 0).ToString();
+        }
+
         private void OnItemChecked(object sender, ItemCheckedEventArgs e)
         {
             if (_loading || e.Item.Tag is not AddonPedInfo ped) return;
@@ -195,16 +201,47 @@ namespace GTACoop.PedSelector.App
             SavePack();
         }
 
-        private void SavePack()
+        private void SavePack(bool announce = false)
         {
             try
             {
                 SyncJson.Save(Path.Combine(_packDir, AddonPeds.PackFileName), _packFile);
+                if (announce)
+                    Log($"Kaydedildi: {_packFile.Peds.Count} ped, " +
+                        $"{_packFile.Peds.Count(p => p.Enabled)} etkin.");
             }
             catch (Exception ex)
             {
                 Log("peds.json yazılamadı: " + ex.Message);
             }
+        }
+
+        // -------------------------------------------------------------- düzenleme
+
+        private void EditSelected()
+        {
+            if (_list.SelectedItems.Count == 0)
+            {
+                Log("Düzenlemek için listeden bir ped seçin.");
+                return;
+            }
+            if (_list.SelectedItems[0].Tag is not AddonPedInfo ped) return;
+
+            using var dialog = new PedEditDialog(ped);
+            if (dialog.ShowDialog(this) != DialogResult.OK) return;
+
+            ped.Name = dialog.PedName;
+            ped.Model = dialog.Model;
+            ped.Kind = dialog.Kind;
+            ped.Health = dialog.Health;
+            ped.BaseModel = dialog.BaseModel;
+            ped.Ragdoll = dialog.Ragdoll;
+            ped.Enabled = dialog.Enabled;
+
+            FillItem(_list.SelectedItems[0], ped);
+            SavePack();
+            Log($"Güncellendi: {ped.Model}" +
+                (string.IsNullOrWhiteSpace(ped.Name) ? "" : " (" + ped.Name + ")"));
         }
 
         // ---------------------------------------------------------------- ekleme

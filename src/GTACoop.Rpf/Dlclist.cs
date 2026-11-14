@@ -35,7 +35,8 @@ public static class Dlclist
 
     public static string? ParseItem(string value)
     {
-        var v = value.Trim();
+        // OIV paketleri ters bölü yazar ("dlcpacks:\ad\"); ayraçları eşitleyelim.
+        var v = value.Trim().Replace('\\', '/');
         // İki şema desteklenir: eski "platform:/dlcPacks/<ad>/" ve modern "dlcpacks:/<ad>/"
         string[] prefixes = { "platform:/dlcPacks/", "dlcpacks:/" };
         foreach (var prefix in prefixes)

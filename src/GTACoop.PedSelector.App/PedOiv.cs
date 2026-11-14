@@ -18,8 +18,8 @@ namespace GTACoop.PedSelector.App
     {
         public const string PackId = "gtacoop_peds";
 
-        /// <summary>OpenIV paket kimliği GUID olmak zorunda.</summary>
-        public const string PackageGuid = "7f3a1c92-5b64-4d0e-9a71-2c8e5d41b603";
+        /// <summary>OpenIV paket kimliği süslü parantezli GUID olmak zorunda.</summary>
+        public const string PackageGuid = "{7F3A1C92-5B64-4D0E-9A71-2C8E5D41B603}";
         public const string ScriptDllName = "AddonPedPlus.dll";
         public const string IniFileName = "AddonPedPlus.ini";
 
@@ -154,6 +154,11 @@ namespace GTACoop.PedSelector.App
                 $"dlclist: {string.Join(", ", pkg.DlclistEntries)}");
         }
 
+        /// <summary>
+        /// OpenIV Paket Formatı 2.2 assembly'si. Şartname zorunlu üç düğümü de
+        /// istiyor (metadata, colors, content); "source" yolu content klasörüne
+        /// göre ("content" öneki olmadan) ve ters bölü ile yazılır.
+        /// </summary>
         private static XDocument AssemblyXml() => new XDocument(
             new XDeclaration("1.0", "utf-8", null),
             new XElement("package",
@@ -162,36 +167,42 @@ namespace GTACoop.PedSelector.App
                 new XAttribute("target", "Five"),
                 new XElement("metadata",
                     new XElement("name", "AddonPed+"),
-                    new XElement("description",
-                        "AddonPed+ : addon ped paketi ve oyun ici ped secici. " +
-                        "GTACoop sunucusu veya launcher'i gerektirmez."),
                     new XElement("version",
                         new XElement("major", "1"),
-                        new XElement("minor", "0"),
-                        new XElement("tag", "gtacoop")),
+                        new XElement("minor", "0")),
                     new XElement("author",
-                        new XElement("displayName", "GTACoop Remake"))),
+                        new XElement("displayName", "GTACoop Remake")),
+                    new XElement("description",
+                        new XCData("AddonPed+ : addon ped paketi ve oyun ici ped secici. " +
+                                   "GTACoop sunucusu veya launcher'i gerektirmez."))),
+                new XElement("colors",
+                    new XElement("headerBackground",
+                        new XAttribute("useBlackTextColor", "False"), "$FF23366A"),
+                    new XElement("iconBackground", "$FF3B5998")),
                 new XElement("content",
                     new XElement("add",
                         new XAttribute("source",
-                            "content\\update-x64-dlcpacks-" + PackId + "\\dlc.rpf"),
-                        "update/x64/dlcpacks/" + PackId + "/dlc.rpf"),
+                            "update-x64-dlcpacks-" + PackId + "\\dlc.rpf"),
+                        "update\\x64\\dlcpacks\\" + PackId + "\\dlc.rpf"),
                     new XElement("add",
-                        new XAttribute("source", "content\\scripts\\" + ListFileName),
-                        "scripts/" + ListFileName),
+                        new XAttribute("source", "scripts\\" + ListFileName),
+                        "scripts\\" + ListFileName),
                     new XElement("add",
-                        new XAttribute("source", "content\\scripts\\" + ScriptDllName),
-                        "scripts/" + ScriptDllName),
+                        new XAttribute("source", "scripts\\" + ScriptDllName),
+                        "scripts\\" + ScriptDllName),
                     new XElement("add",
-                        new XAttribute("source", "content\\scripts\\" + IniFileName),
-                        "scripts/" + IniFileName),
+                        new XAttribute("source", "scripts\\" + IniFileName),
+                        "scripts\\" + IniFileName),
                     new XElement("archive",
-                        new XAttribute("path", "update/update.rpf"),
+                        new XAttribute("path", "update\\update.rpf"),
                         new XAttribute("createIfNotExist", "False"),
+                        new XAttribute("type", "RPF7"),
                         new XElement("xml",
-                            new XAttribute("path", "common/data/dlclist.xml"),
+                            new XAttribute("path", "common\\data\\dlclist.xml"),
                             new XElement("add",
-                                new XElement("Item", "dlcpacks:/" + PackId + "/")))))));
+                                new XAttribute("append", "Last"),
+                                new XAttribute("xpath", "/SMandatoryPacksData/Paths"),
+                                new XElement("Item", "dlcpacks:\\" + PackId + "\\")))))));
 
         private static void WriteText(ZipArchive zip, string name, string content)
         {
