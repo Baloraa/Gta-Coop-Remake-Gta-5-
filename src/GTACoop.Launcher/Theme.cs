@@ -29,6 +29,12 @@ internal static class Theme
     [DllImport("dwmapi.dll")]
     private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int value, int size);
 
+    [DllImport("user32.dll", CharSet = CharSet.Auto)]
+    private static extern IntPtr SendMessage(IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam);
+
+    [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")]
+    private static extern IntPtr GetWindowLongPtr(IntPtr hWnd, int nIndex);
+
     /// <summary>Formu ve içindeki tüm denetimleri temaya uyarlar.</summary>
     public static void Apply(Form form)
     {
@@ -174,8 +180,46 @@ internal static class Theme
         combo.BackColor = Surface;
 
         // Alan odaklanınca metnin mavi seçili görünmemesi için seçim temizlenir.
-        combo.Enter += (_, _) => { try { combo.SelectionStart = 0; combo.SelectionLength = 0; } catch { } };
-        combo.GotFocus += (_, _) => { try { combo.SelectionStart = 0; combo.SelectionLength = 0; } catch { } };
+        void NoSelection()
+        {
+            try
+            {
+                combo.SelectionStart = combo.Text.Length;
+                combo.SelectionLength = 0;
+            }
+            catch { }
+        }
+        combo.Enter += (_, _) => NoSelection();
+        combo.GotFocus += (_, _) => combo.BeginInvoke((Action)NoSelection);
+        combo.SelectedIndexChanged += (_, _) => combo.BeginInvoke((Action)NoSelection);
+        combo.TextChanged += (_, _) => NoSelection();
+
+        // Ok düğmesi Windows tarafından beyaz çiziliyordu; üzerine kendi koyu
+        // okumuzu çizen küçük bir panel yerleştiriyoruz (tıklayınca liste açılır).
+        var arrow = new Panel { BackColor = SurfaceAlt, Cursor = Cursors.Hand, Width = 18 };
+        arrow.Paint += (_, e) =>
+        {
+            using var pen = new Pen(Text, 1.6f);
+            var cx = arrow.Width / 2;
+            var cy = arrow.Height / 2;
+            e.Graphics.DrawLines(pen, new[]
+            {
+                new Point(cx - 4, cy - 2), new Point(cx, cy + 3), new Point(cx + 4, cy - 2)
+            });
+        };
+        arrow.MouseDown += (_, _) => { try { combo.DroppedDown = true; } catch { } };
+        combo.Controls.Add(arrow);
+
+        void PlaceArrow()
+        {
+            if (combo.IsDisposed) return;
+            arrow.Bounds = new Rectangle(Math.Max(0, combo.ClientSize.Width - arrow.Width - 1), 1,
+                arrow.Width, Math.Max(1, combo.ClientSize.Height - 2));
+            arrow.BringToFront();
+        }
+        combo.SizeChanged += (_, _) => PlaceArrow();
+        combo.HandleCreated += (_, _) => PlaceArrow();
+        PlaceArrow();
 
         combo.DrawMode = DrawMode.OwnerDrawFixed;
         combo.ItemHeight = Math.Max(20, combo.Font.Height + 8);
@@ -304,17 +348,50 @@ internal static class Theme
                 }
                 catch { }
                 list.SelectedIndexChanged += (_, _) => list.Invalidate();
-                if (list.IsHandleCreated)
+                void DarkScroll()
                 {
                     try { SetWindowTheme(list.Handle, "DarkMode_Explorer", null); } catch { }
+                    try { SetWindowTheme(list.Handle, "DarkMode_ItemsView", null); } catch { }
                 }
-                else
+                if (list.IsHandleCreated) DarkScroll();
+                else list.HandleCreated += (_, _) => DarkScroll();
+                list.VisibleChanged += (_, _) => { if (list.IsHandleCreated) DarkScroll(); };
+
+                // Kaydırma çubuğu yine beyaz kalırsa üzerine koyu bir şerit
+                // çizilir; tekerlek/klavye kaydırması listeye iletilir.
+                // ListView yerel bir denetim; çocuk paneli üzerine boyamıyor.
+                // Bu yüzden şerit, listenin kapsayıcısına eklenip üstte tutulur.
+                var cover = new Panel { BackColor = SurfaceAlt, Visible = false, Width = SystemInformation.VerticalScrollBarWidth };
+                list.Parent?.Controls.Add(cover);
+                cover.BringToFront();
+                cover.MouseWheel += (_, e) =>
                 {
-                    list.HandleCreated += (_, _) =>
-                    {
-                        try { SetWindowTheme(list.Handle, "DarkMode_Explorer", null); } catch { }
-                    };
+                    if (!list.IsHandleCreated) return;
+                    const int WmMouseWheel = 0x020A;
+                    var delta = (IntPtr)((e.Delta << 16) & 0xFFFF0000);
+                    SendMessage(list.Handle, WmMouseWheel, (IntPtr)0, delta);
+                };
+
+                void PlaceCover()
+                {
+                    if (list.IsDisposed || !list.IsHandleCreated) return;
+
+                    const int GwlStyle = -16;
+                    const int WsVscroll = 0x00200000;
+                    var style = GetWindowLongPtr(list.Handle, GwlStyle).ToInt64();
+                    if ((style & WsVscroll) == 0) { cover.Visible = false; return; }
+
+                    var parent = list.Parent;
+                    if (parent == null) { cover.Visible = false; return; }
+                    var bar = SystemInformation.VerticalScrollBarWidth;
+                    var left = list.Left + list.Width - bar;
+                    cover.SetBounds(left, list.Top, bar, list.Height);
+                    cover.Visible = true;
+                    cover.BringToFront();
                 }
+                list.SizeChanged += (_, _) => PlaceCover();
+                list.HandleCreated += (_, _) => PlaceCover();
+                list.ItemChecked += (_, _) => PlaceCover();
                 break;
 
             case TextBoxBase text:
