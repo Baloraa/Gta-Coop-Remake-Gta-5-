@@ -17,6 +17,9 @@ namespace GTACoop.PedSelector.App
     internal static class PedOiv
     {
         public const string PackId = "gtacoop_peds";
+
+        /// <summary>OpenIV paket kimliği GUID olmak zorunda.</summary>
+        public const string PackageGuid = "7f3a1c92-5b64-4d0e-9a71-2c8e5d41b603";
         public const string ScriptDllName = "AddonPedPlus.dll";
         public const string IniFileName = "AddonPedPlus.ini";
 
@@ -155,7 +158,7 @@ namespace GTACoop.PedSelector.App
             new XDeclaration("1.0", "utf-8", null),
             new XElement("package",
                 new XAttribute("version", "2.2"),
-                new XAttribute("id", PackId),
+                new XAttribute("id", PackageGuid),
                 new XAttribute("target", "Five"),
                 new XElement("metadata",
                     new XElement("name", "AddonPed+"),
