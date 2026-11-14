@@ -140,6 +140,38 @@ internal static class Ui
     public static void Error(Form owner, string text, string title = "GTACoop Remake") =>
         MessageBox.Show(owner, SyncText.Translate(text), title, MessageBoxButtons.OK, MessageBoxIcon.Error);
 
+    /// <summary>Tek satır metin soran küçük koyu iletişim kutusu.</summary>
+    public static string? Prompt(Form owner, string label, string title)
+    {
+        using var dlg = new Form
+        {
+            Text = title,
+            Width = 420,
+            Height = 170,
+            FormBorderStyle = FormBorderStyle.FixedDialog,
+            StartPosition = FormStartPosition.CenterParent,
+            MinimizeBox = false,
+            MaximizeBox = false,
+            BackColor = Theme.Background,
+            ForeColor = Theme.Text
+        };
+
+        var text = new Label { Text = label, AutoSize = true, Left = 14, Top = 14, ForeColor = Theme.Text };
+        var input = new TextBox { Left = 14, Top = 40, Width = 372, BackColor = Theme.Surface, ForeColor = Theme.Text, BorderStyle = BorderStyle.FixedSingle };
+        var ok = new DarkButton { Text = "OK", Left = 224, Top = 78, Width = 78 };
+        var cancel = new DarkButton { Text = Loc.T("İptal"), Left = 308, Top = 78, Width = 78 };
+        ok.DialogResult = DialogResult.OK;
+        cancel.DialogResult = DialogResult.Cancel;
+
+        dlg.Controls.AddRange(new Control[] { text, input, ok, cancel });
+        dlg.AcceptButton = ok;
+        dlg.CancelButton = cancel;
+
+        return dlg.ShowDialog(owner) == DialogResult.OK && !string.IsNullOrWhiteSpace(input.Text)
+            ? input.Text.Trim()
+            : null;
+    }
+
     public static bool Confirm(Form owner, string text, string title = "GTACoop Remake") =>
         MessageBox.Show(owner, SyncText.Translate(text), title, MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes;
 }

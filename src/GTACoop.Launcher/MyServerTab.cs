@@ -279,6 +279,25 @@ public sealed class MyServerTab : UserControl
         controlButtons.Controls.Add(Ui.Btn(T("Port Kontrolü"), (_, _) => CheckPorts()));
         controlButtons.Controls.Add(Ui.Btn(T("Yeniden Başlat"), (_, _) => RestartServer()));
 
+        // --- sunucu profilleri (RP, freeroam, test... sınırsız)
+        var profileLabel = new Label
+        {
+            Text = T("Sunucu profili:"),
+            AutoSize = true,
+            ForeColor = Color.DimGray,
+            Padding = new Padding(6, 10, 0, 0)
+        };
+        _profileCombo.Width = 190;
+        _profileCombo.DropDownStyle = ComboBoxStyle.DropDownList;
+        _profileCombo.Margin = new Padding(4, 5, 4, 4);
+        _profileCombo.SelectedIndexChanged += (_, _) => OnProfileChanged();
+        controlButtons.Controls.Add(profileLabel);
+        controlButtons.Controls.Add(_profileCombo);
+        controlButtons.Controls.Add(Ui.Btn(T("Yeni Profil..."), (_, _) => NewProfile()));
+        controlButtons.Controls.Add(Ui.Btn(T("Profil Kopyala..."), (_, _) => CopyProfile()));
+        controlButtons.Controls.Add(Ui.Btn(T("Profili Sil"), (_, _) => DeleteProfile()));
+        ReloadProfiles();
+
         _gameServerStatus.Text = T("Oyun sunucusu: kapalı");
         _gameServerStatus.AutoSize = true;
         _syncServerStatus.Text = T("Senkronizasyon sunucusu: kapalı");
@@ -1408,6 +1427,101 @@ public sealed class MyServerTab : UserControl
     /// gtaserver.core + SyncServer süreçlerini yönetir, çökmelerde yeniden başlatır
     /// ve RAM sınırını uygular.
     /// </summary>
+    private readonly ComboBox _profileCombo = new();
+    private string _profileName = "";
+    private bool _profileLoading;
+
+    /// <summary>Profil listesini yeniler; etkin profili seçili gösterir.</summary>
+    private void ReloadProfiles()
+    {
+        _profileLoading = true;
+        try
+        {
+            _profileCombo.Items.Clear();
+            var names = ServerProfiles.List();
+            foreach (var n in names) _profileCombo.Items.Add(n);
+
+            if (names.Count == 0)
+            {
+                // İlk kullanım: mevcut ayarlar "Varsayılan" profili olarak kaydedilir.
+                var initial = ServerProfiles.UniqueName(T("Varsayılan"));
+                ServerProfiles.SaveCurrent(initial);
+                _profileCombo.Items.Add(initial);
+                names.Add(initial);
+            }
+
+            var current = names.Contains(_profileName) ? _profileName : names[0];
+            _profileName = current;
+            _profileCombo.SelectedItem = current;
+        }
+        finally { _profileLoading = false; }
+    }
+
+    private void OnProfileChanged()
+    {
+        if (_profileLoading) return;
+        var selected = _profileCombo.SelectedItem?.ToString();
+        if (string.IsNullOrWhiteSpace(selected) || selected == _profileName) return;
+
+        // Önce mevcut ayarlar eski profile yazılır, kaybolmasın.
+        ServerProfiles.SaveCurrent(_profileName);
+        if (!ServerProfiles.Apply(selected))
+        {
+            Ui.Warn(FindForm()!, T("Profil yüklenemedi: {0}", selected));
+            return;
+        }
+
+        _profileName = selected;
+        AppEnv.Log($"Sunucu profili değişti: {selected}");
+        if (Ui.Confirm(FindForm()!,
+            T("'{0}' profili yüklendi.\r\nSunucu ayarları için launcher yeniden başlatılsın mı?", selected)))
+        {
+            AppEnv.SaveSettings();
+            ServerProfiles.RestartLauncher();
+        }
+    }
+
+    private void NewProfile()
+    {
+        var name = Ui.Prompt(FindForm()!, T("Yeni profil adı:"), T("Sunucu Profili"));
+        if (string.IsNullOrWhiteSpace(name)) return;
+
+        var unique = ServerProfiles.UniqueName(name);
+        ServerProfiles.SaveCurrent(_profileName);   // eskisini koru
+        ServerProfiles.SaveCurrent(unique);          // yeni profil = mevcut ayarların kopyası
+        _profileName = unique;
+        ReloadProfiles();
+        AppEnv.Log($"Sunucu profili oluşturuldu: {unique}");
+    }
+
+    private void CopyProfile()
+    {
+        if (string.IsNullOrWhiteSpace(_profileName)) return;
+        var name = Ui.Prompt(FindForm()!, T("Kopyanın adı:"), T("Sunucu Profili"));
+        if (string.IsNullOrWhiteSpace(name)) return;
+
+        var unique = ServerProfiles.UniqueName(name);
+        ServerProfiles.SaveCurrent(_profileName);
+        ServerProfiles.SaveCurrent(unique);
+        _profileName = unique;
+        ReloadProfiles();
+    }
+
+    private void DeleteProfile()
+    {
+        if (string.IsNullOrWhiteSpace(_profileName)) return;
+        if (ServerProfiles.List().Count <= 1)
+        {
+            Ui.Warn(FindForm()!, T("Son profil silinemez."));
+            return;
+        }
+        if (!Ui.Confirm(FindForm()!, T("'{0}' profili silinsin mi?", _profileName))) return;
+
+        ServerProfiles.Delete(_profileName);
+        _profileName = "";
+        ReloadProfiles();
+    }
+
     private void StartServerMode(MyServerSettings settings)
     {
         var hostExe = ServerMode.FindHostExe(AppContext.BaseDirectory);
