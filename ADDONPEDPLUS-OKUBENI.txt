@@ -20,7 +20,10 @@ Gerekenler
   * ScriptHookV  (oyun sürümünüze uygun olanı)
   * ScriptHookVDotNet 3  (scripts klasörüne kurulu)
   * OpenIV ile mods klasörü kurulu olmalı: mods\update\update.rpf
-  * .NET gerekmez: AddonPedPlus.exe kendi kendine yeterli (self-contained)
+  * .NET 8 Desktop Runtime (x64)  ->  https://dotnet.microsoft.com/download/dotnet/8.0
+    (Uygulama kucuk boyutlu tutuldugu icin bu calisma zamani gerekir. .NET
+     kurulu olmayan PC'ler icin depoda `-SelfContained` secenegiyle ~160 MB'lik
+     bagimsiz surum de paketlenebilir.)
 
 Kurulum — yol 1 (araç ile)
 --------------------------
