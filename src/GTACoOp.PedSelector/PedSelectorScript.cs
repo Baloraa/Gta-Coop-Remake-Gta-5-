@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -46,25 +46,116 @@ namespace GTACoOp.PedSelector
             Log("yüklendi, " + _peds.Count + " ped");
         }
 
-        private static string ConfigPath
+        /// <summary>
+        /// Scriptin aranacağı klasörler. SHVDN scripti belleğe yüklediğinde
+        /// Assembly.Location boş kalabildiği için tek yola güvenilmez; oyun
+        /// kökü ve scripts klasörü de denenir.
+        /// </summary>
+        private static List<string> _dirs;
+
+        private static List<string> Dirs
         {
             get
             {
-                var dir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? ".";
-                return Path.Combine(dir, "GTACoop-peds.txt");
+                if (_dirs != null) return _dirs;
+
+                var dirs = new List<string>();
+                void Add(string path)
+                {
+                    if (string.IsNullOrWhiteSpace(path)) return;
+                    foreach (var known in dirs)
+                        if (known.Equals(path, StringComparison.OrdinalIgnoreCase)) return;
+                    dirs.Add(path);
+                }
+
+                try { Add(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? ""); }
+                catch { }
+
+                try
+                {
+                    var baseDir = AppDomain.CurrentDomain.BaseDirectory;
+                    Add(Path.Combine(baseDir, "scripts"));
+                    Add(baseDir);
+                }
+                catch { }
+
+                try
+                {
+                    var cwd = Directory.GetCurrentDirectory();
+                    Add(Path.Combine(cwd, "scripts"));
+                    Add(cwd);
+                }
+                catch { }
+
+                if (dirs.Count == 0) dirs.Add(".");
+                _dirs = dirs;
+                return _dirs;
             }
         }
 
+        /// <summary>Script klasörünü (log ve ayar dosyaları için) bulur.</summary>
+        private static string ScriptDir
+        {
+            get
+            {
+                foreach (var dir in Dirs)
+                {
+                    try
+                    {
+                        if (File.Exists(Path.Combine(dir, "AddonPedPlus.dll"))) return dir;
+                    }
+                    catch { }
+                }
+                return Dirs[0];
+            }
+        }
+
+        /// <summary>Verilen dosyayı bilinen klasörlerde arar; yoksa ilk klasörü döndürür.</summary>
+        private static string FindFile(string fileName)
+        {
+            foreach (var dir in Dirs)
+            {
+                try
+                {
+                    var path = Path.Combine(dir, fileName);
+                    if (File.Exists(path)) return path;
+                }
+                catch { }
+            }
+            return Path.Combine(Dirs[0], fileName);
+        }
+
+        /// <summary>Desteklenen ped listesi dosya adları (sırayla denenir).</summary>
+        private static readonly string[] ListFileNames =
+        {
+            "GTACoop-peds.txt", "AddonPedPlus-peds.txt", "peds.txt"
+        };
+
         private static void Log(string message)
         {
+            var line = DateTime.Now.ToString("HH:mm:ss", CultureInfo.InvariantCulture) + " " +
+                       message + Environment.NewLine;
+
+            // Önce script klasörü; yazılamıyorsa kullanıcı profilindeki klasör.
+            var targets = new List<string> { ScriptDir };
             try
             {
-                var dir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? ".";
-                File.AppendAllText(Path.Combine(dir, "GTACoop-pedselector.log"),
-                    DateTime.Now.ToString("HH:mm:ss", CultureInfo.InvariantCulture) + " " + message +
-                    Environment.NewLine);
+                targets.Add(Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "GTACoop Ped Selector"));
             }
             catch { }
+
+            foreach (var dir in targets)
+            {
+                try
+                {
+                    Directory.CreateDirectory(dir);
+                    File.AppendAllText(Path.Combine(dir, "GTACoop-pedselector.log"), line);
+                    return;
+                }
+                catch { }
+            }
         }
 
         /// <summary>
@@ -75,8 +166,7 @@ namespace GTACoOp.PedSelector
         {
             try
             {
-                var dir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? ".";
-                var ini = Path.Combine(dir, "AddonPedPlus.ini");
+                var ini = FindFile("AddonPedPlus.ini");
                 if (!File.Exists(ini)) return;
 
                 foreach (var raw in File.ReadAllLines(ini))
@@ -111,13 +201,23 @@ namespace GTACoOp.PedSelector
         {
             try
             {
-                if (!File.Exists(ConfigPath))
+                _peds.Clear();
+
+                var configPath = "";
+                foreach (var name in ListFileNames)
                 {
-                    Log("liste yok: " + ConfigPath);
+                    configPath = FindFile(name);
+                    if (File.Exists(configPath)) break;
+                    configPath = "";
+                }
+                if (configPath.Length == 0)
+                {
+                    Log("liste yok. Aranan klasörler: " + string.Join(" | ", Dirs));
                     return;
                 }
 
-                foreach (var raw in File.ReadAllLines(ConfigPath))
+                Log("liste: " + configPath);
+                foreach (var raw in File.ReadAllLines(configPath))
                 {
                     var line = (raw ?? "").Trim();
                     if (line.Length == 0 || line.StartsWith("#", StringComparison.Ordinal)) continue;
@@ -150,6 +250,9 @@ namespace GTACoOp.PedSelector
             if (e.KeyCode == _toggleKey)
             {
                 _menuOpen = !_menuOpen;
+                // Liste ilk açılışta boş kaldıysa (oyun içinde kurulum, geç
+                // yüklenen dosya) menü her açılışta yeniden okumayı dener.
+                if (_menuOpen && _peds.Count == 0) LoadConfig();
                 e.SuppressKeyPress = true;
                 return;
             }
@@ -188,6 +291,7 @@ namespace GTACoOp.PedSelector
             {
                 DrawText("Ped listesi boş. GTACoop-peds.txt bulunamadı.", 0.05f, 0.05f, 0.3f,
                     System.Drawing.Color.OrangeRed);
+                DrawText(ScriptDir, 0.05f, 0.09f, 0.3f, System.Drawing.Color.Gainsboro);
                 return;
             }
 
