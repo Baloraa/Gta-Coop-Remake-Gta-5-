@@ -35,6 +35,9 @@ internal static class Theme
     [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")]
     private static extern IntPtr GetWindowLongPtr(IntPtr hWnd, int nIndex);
 
+    [DllImport("user32.dll", EntryPoint = "SetWindowLongPtrW")]
+    private static extern IntPtr SetWindowLongPtr(IntPtr hWnd, int nIndex, IntPtr value);
+
     /// <summary>Formu ve içindeki tüm denetimleri temaya uyarlar.</summary>
     public static void Apply(Form form)
     {
@@ -194,32 +197,42 @@ internal static class Theme
         combo.SelectedIndexChanged += (_, _) => combo.BeginInvoke((Action)NoSelection);
         combo.TextChanged += (_, _) => NoSelection();
 
-        // Ok düğmesi Windows tarafından beyaz çiziliyordu; üzerine kendi koyu
-        // okumuzu çizen küçük bir panel yerleştiriyoruz (tıklayınca liste açılır).
-        var arrow = new Panel { BackColor = SurfaceAlt, Cursor = Cursors.Hand, Width = 18 };
-        arrow.Paint += (_, e) =>
+        // Windows'un kapalı alanı (metin + ok) kendi renkleriyle çiziliyordu:
+        // metin mavi seçili görünüyor, ok beyaz kalıyordu. Tüm kapalı alanı
+        // kendi panelimizle kaplayıp metni ve oku biz çiziyoruz.
+        var face = new Panel { BackColor = SurfaceAlt, Cursor = Cursors.Hand };
+        face.Paint += (_, e) =>
         {
+            var g = e.Graphics;
+            var textRect = new Rectangle(6, 0, Math.Max(0, face.Width - 26), face.Height);
+            TextRenderer.DrawText(g, combo.Text, combo.Font, textRect, Text,
+                TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix |
+                TextFormatFlags.EndEllipsis);
+
             using var pen = new Pen(Text, 1.6f);
-            var cx = arrow.Width / 2;
-            var cy = arrow.Height / 2;
-            e.Graphics.DrawLines(pen, new[]
+            var cx = face.Width - 12;
+            var cy = face.Height / 2;
+            g.DrawLines(pen, new[]
             {
                 new Point(cx - 4, cy - 2), new Point(cx, cy + 3), new Point(cx + 4, cy - 2)
             });
         };
-        arrow.MouseDown += (_, _) => { try { combo.DroppedDown = true; } catch { } };
-        combo.Controls.Add(arrow);
+        face.MouseDown += (_, _) => { try { combo.DroppedDown = true; } catch { } };
+        combo.Controls.Add(face);
 
-        void PlaceArrow()
+        void PlaceFace()
         {
             if (combo.IsDisposed) return;
-            arrow.Bounds = new Rectangle(Math.Max(0, combo.ClientSize.Width - arrow.Width - 1), 1,
-                arrow.Width, Math.Max(1, combo.ClientSize.Height - 2));
-            arrow.BringToFront();
+            face.Bounds = new Rectangle(1, 1, Math.Max(1, combo.ClientSize.Width - 2),
+                Math.Max(1, combo.ClientSize.Height - 2));
+            face.BringToFront();
+            face.Invalidate();
         }
-        combo.SizeChanged += (_, _) => PlaceArrow();
-        combo.HandleCreated += (_, _) => PlaceArrow();
-        PlaceArrow();
+        combo.SizeChanged += (_, _) => PlaceFace();
+        combo.HandleCreated += (_, _) => PlaceFace();
+        combo.SelectedIndexChanged += (_, _) => face.Invalidate();
+        combo.TextChanged += (_, _) => face.Invalidate();
+        PlaceFace();
 
         combo.DrawMode = DrawMode.OwnerDrawFixed;
         combo.ItemHeight = Math.Max(20, combo.Font.Height + 8);
@@ -359,39 +372,36 @@ internal static class Theme
 
                 // Kaydırma çubuğu yine beyaz kalırsa üzerine koyu bir şerit
                 // çizilir; tekerlek/klavye kaydırması listeye iletilir.
-                // ListView yerel bir denetim; çocuk paneli üzerine boyamıyor.
-                // Bu yüzden şerit, listenin kapsayıcısına eklenip üstte tutulur.
-                var cover = new Panel { BackColor = SurfaceAlt, Visible = false, Width = SystemInformation.VerticalScrollBarWidth };
-                list.Parent?.Controls.Add(cover);
-                cover.BringToFront();
-                cover.MouseWheel += (_, e) =>
-                {
-                    if (!list.IsHandleCreated) return;
-                    const int WmMouseWheel = 0x020A;
-                    var delta = (IntPtr)((e.Delta << 16) & 0xFFFF0000);
-                    SendMessage(list.Handle, WmMouseWheel, (IntPtr)0, delta);
-                };
+                // Windows'un beyaz kaydırma çubuğu yerine kendi koyu
+                // çubuğumuzu çiziyoruz; native çubuk gizlenir.
+                var vbar = new DarkScrollBar(list) { Visible = false };
+                list.Parent?.Controls.Add(vbar);
+                vbar.BringToFront();
 
-                void PlaceCover()
+                void PlaceBar()
                 {
                     if (list.IsDisposed || !list.IsHandleCreated) return;
 
                     const int GwlStyle = -16;
                     const int WsVscroll = 0x00200000;
                     var style = GetWindowLongPtr(list.Handle, GwlStyle).ToInt64();
-                    if ((style & WsVscroll) == 0) { cover.Visible = false; return; }
+                    if ((style & WsVscroll) != 0)
+                    {
+                        // Native çubuğu gizle: beyaz şerit oluşmasın.
+                        SetWindowLongPtr(list.Handle, GwlStyle, (IntPtr)(style & ~WsVscroll));
+                        list.Refresh();
+                    }
 
                     var parent = list.Parent;
-                    if (parent == null) { cover.Visible = false; return; }
-                    var bar = SystemInformation.VerticalScrollBarWidth;
-                    var left = list.Left + list.Width - bar;
-                    cover.SetBounds(left, list.Top, bar, list.Height);
-                    cover.Visible = true;
-                    cover.BringToFront();
+                    if (parent == null) { vbar.Visible = false; return; }
+                    const int barWidth = 10;
+                    vbar.SetBounds(list.Left + list.Width - barWidth, list.Top, barWidth, list.Height);
+                    vbar.Visible = true;
+                    vbar.BringToFront();
                 }
-                list.SizeChanged += (_, _) => PlaceCover();
-                list.HandleCreated += (_, _) => PlaceCover();
-                list.ItemChecked += (_, _) => PlaceCover();
+                list.SizeChanged += (_, _) => PlaceBar();
+                list.HandleCreated += (_, _) => PlaceBar();
+                list.ItemChecked += (_, _) => PlaceBar();
                 break;
 
             case TextBoxBase text:
