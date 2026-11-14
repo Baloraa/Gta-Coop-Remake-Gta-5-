@@ -62,14 +62,7 @@
                 <TextBlock x:Name="StatusText" Style="{StaticResource MutedText}" Text="Hazır." />
             </Border>
 
-            <StackPanel Margin="22,10,22,4">
-                <TextBlock x:Name="PageTitle" Text="Genel Bakış" FontSize="19"
-                           FontWeight="SemiBold" />
-                <TextBlock x:Name="PageSubtitle" Text="Oturumunu ve araçlarını tek yerden yönet."
-                           Style="{StaticResource MutedText}" FontSize="12" Margin="0,2,0,0" />
-            </StackPanel>
-
-            <ContentControl x:Name="Host" Margin="22,4,22,12" />
+            <ContentControl x:Name="Host" Margin="22,12,22,12" />
         </DockPanel>
     </Grid>
 </Window>

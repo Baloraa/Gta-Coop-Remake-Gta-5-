@@ -180,10 +180,6 @@ public partial class MainWindow : Window
 
         Host.Content = Page(key);
         var title = Loc.T(Sections.First(s => s.Key == key).Title);
-        PageTitle.Text = title;
-        PageSubtitle.Text = key == "home"
-            ? Loc.T("Oturumunu ve araçlarını tek yerden yönet.")
-            : "GTACoop Remake · " + title;
         StatusText.Text = string.Format(Loc.T("{0} — hazır."), title);
 
         if (key == "game") _gameTab?.RefreshStatus();

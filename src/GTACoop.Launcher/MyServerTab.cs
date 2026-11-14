@@ -241,8 +241,9 @@ public sealed class MyServerTab : UserControl
         var modsInfo = new Label
         {
             Dock = DockStyle.Bottom,
-            AutoSize = false,
-            Height = 40,
+            // Açıklama içeriğe göre büyür; uzun metin kesilmez.
+            AutoSize = true,
+            MaximumSize = new Size(980, 0),
             ForeColor = Color.DimGray,
             Text = T("DLC paketleri: Addons\\dlcpacks\\  |  Addon pedleri: Addons\\peds\\  |  OIV paketleri: Addons\\oiv\\  |  Scriptler: Addons\\scripts\\  |  ASI: Addons\\asi\\  |  Sunucu eklentileri: Plugins\\\r\nHer OIV paketi kendi klasöründe saklanır. Meta için: addon.json / peds.json")
         };
@@ -297,6 +298,7 @@ public sealed class MyServerTab : UserControl
         controlButtons.Controls.Add(Ui.Btn(T("Profil Kopyala..."), (_, _) => CopyProfile()));
         controlButtons.Controls.Add(Ui.Btn(T("Profili Sil"), (_, _) => DeleteProfile()));
         ReloadProfiles();
+        Theme.Apply(controlButtons);
 
         _gameServerStatus.Text = T("Oyun sunucusu: kapalı");
         _gameServerStatus.AutoSize = true;

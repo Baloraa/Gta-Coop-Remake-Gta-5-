@@ -168,6 +168,15 @@ internal static class Theme
             combo.KeyPress += (_, e) => e.Handled = true;
         }
 
+        // Düz stil: Windows'un beyaz ok düğmesi yerine koyu çizim.
+        combo.FlatStyle = FlatStyle.Flat;
+        combo.ForeColor = Text;
+        combo.BackColor = Surface;
+
+        // Alan odaklanınca metnin mavi seçili görünmemesi için seçim temizlenir.
+        combo.Enter += (_, _) => { try { combo.SelectionStart = 0; combo.SelectionLength = 0; } catch { } };
+        combo.GotFocus += (_, _) => { try { combo.SelectionStart = 0; combo.SelectionLength = 0; } catch { } };
+
         combo.DrawMode = DrawMode.OwnerDrawFixed;
         combo.ItemHeight = Math.Max(20, combo.Font.Height + 8);
         combo.DrawItem += (_, e) =>
@@ -316,9 +325,22 @@ internal static class Theme
                 break;
 
             case NumericUpDown num:
+                // Sayı kutusunun okları Windows tarafından beyaz çiziliyordu;
+                // koyu explorer temasıyla çizilir.
                 num.BackColor = SurfaceAlt;
                 num.ForeColor = Text;
                 num.BorderStyle = BorderStyle.FixedSingle;
+                if (num.IsHandleCreated)
+                {
+                    try { SetWindowTheme(num.Handle, "DarkMode_Explorer", null); } catch { }
+                }
+                else
+                {
+                    num.HandleCreated += (_, _) =>
+                    {
+                        try { SetWindowTheme(num.Handle, "DarkMode_Explorer", null); } catch { }
+                    };
+                }
                 break;
 
             case ComboBox combo:
