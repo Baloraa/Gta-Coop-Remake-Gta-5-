@@ -1,0 +1,75 @@
+AddonPed+  —  bağımsız addon ped modu
+=====================================
+
+GTACoop launcher'ından ve sunucudan tamamen bağımsızdır. Oyunu ve mevcut
+modlarınızı bozmaz: yalnızca kendi DLC klasörünü, kendi script dosyalarını ve
+dlclist içinde tek bir girdiyi (gtacoop_peds) ekler. Kaldırınca bunları geri
+alır. AddonPeds (ap_m.xml) ve diğer ped modlarıyla birlikte çalışabilir.
+
+Klasör içeriği
+--------------
+  AddonPedPlus.exe        Masaüstü aracı (ped ekle, OIV üret, kur / kaldır)
+  payload\AddonPedPlus.dll  Oyun içi ped seçici scripti
+  AddonPedPlus.ini        Oyun içi menü tuşu ayarı (kurulumda scripts'e gider)
+  AddonPedPlus.oiv        Hazır OpenIV paketi (varsa; yoksa araç oluşturur)
+  OKUBENI.txt             Bu dosya
+
+Gerekenler
+----------
+  * GTA V (Legacy veya Enhanced)
+  * ScriptHookV  (oyun sürümünüze uygun olanı)
+  * ScriptHookVDotNet 3  (scripts klasörüne kurulu)
+  * OpenIV ile mods klasörü kurulu olmalı: mods\update\update.rpf
+  * .NET gerekmez: AddonPedPlus.exe kendi kendine yeterli (self-contained)
+
+Kurulum — yol 1 (araç ile)
+--------------------------
+  1. Ped dosyalarınızı (.yft / .ydd / .ytd / .ymt) hazırlayın.
+  2. AddonPedPlus.exe'yi açın.
+  3. "Ped Ekle..." veya "Streamed Klasör Ekle..." ile dosyaları ekleyin.
+  4. İstemediğiniz pedlerin işaretini kaldırın.
+  5. "Oyuna Kur..." → GTA V klasörünü seçin (GTA5.exe veya GTA5_Enhanced.exe
+     olan klasör).
+  6. Oyunda menü tuşuna basın (varsayılan: F10).
+
+Kurulum — yol 2 (OpenIV ile)
+----------------------------
+  1. Araçta "OIV Oluştur..." ile AddonPedPlus.oiv üretin (veya hazır olanı
+     kullanın).
+  2. OpenIV → Tools → Package Installer → .oiv dosyasını seçin → Install.
+  3. Kaldırmak için aynı paketi OpenIV'den Uninstall edin.
+
+Oyun içi menü
+-------------
+  F10 (değiştirilebilir)  menüyü aç / kapat
+  Yukarı / Aşağı           ped seç
+  Enter                    seçili pedi uygula
+  Backspace / Esc          normal pede dön
+
+Menü tuşunu değiştirmek
+-----------------------
+  Oyun klasöründeki  scripts\AddonPedPlus.ini  dosyasını açın:
+
+    [AddonPedPlus]
+    MenuKey=F10
+
+  MenuKey değerini istediğiniz tuşla değiştirin: F1..F12, M, INSERT, HOME gibi
+  (System.Windows.Forms.Keys adları). Oyunu yeniden başlatın.
+
+Kaldırma
+--------
+  * Araçtan: "Kurulumu Kaldır"  (yalnızca kendi kurduğu dosyaları siler)
+  * OpenIV'den: paketi Uninstall et
+  * Elle: mods\update\x64\dlcpacks\gtacoop_peds klasörünü silin, scripts
+    içinden AddonPedPlus.dll / AddonPedPlus.ini / GTACoop-peds.txt dosyalarını
+    silin ve mods\update\update.rpf içindeki dlclist.xml'den
+    <Item>dlcpacks:/gtacoop_peds/</Item> satırını kaldırın.
+
+Sorun giderme
+-------------
+  * Menü açılmıyor: scripts\AddonPedPlus.log dosyasına bakın; ScriptHookV ve
+    ScriptHookVDotNet kurulu mu, oyun sürümüyle uyumlu mu kontrol edin.
+  * "Ped yüklü değil" uyarısı: DLC kurulmamış ya da dlclist girdisi eksik.
+  * Ped görünmüyor: pedin .yft/.ydd/.ytd dosyaları eksik olabilir; aracın
+    günlüğünde uyarıları okuyun.
+  * F10 başka bir modda kullanılıyorsa ini dosyasından başka tuş seçin.

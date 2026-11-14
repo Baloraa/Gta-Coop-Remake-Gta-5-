@@ -17,8 +17,8 @@ namespace GTACoOp.PedSelector
     /// </summary>
     public class PedSelectorScript : Script
     {
-        private const Keys ToggleKey = Keys.F10;
         private const int VisibleRows = 12;
+        private Keys _toggleKey = Keys.F10;
 
         private sealed class PedEntry
         {
@@ -41,6 +41,7 @@ namespace GTACoOp.PedSelector
             Interval = 0;
             Tick += OnTick;
             KeyDown += OnKeyDown;
+            LoadIni();
             LoadConfig();
             Log("yüklendi, " + _peds.Count + " ped");
         }
@@ -64,6 +65,45 @@ namespace GTACoOp.PedSelector
                     Environment.NewLine);
             }
             catch { }
+        }
+
+        /// <summary>
+        /// Menü tuşunu yapılandırır: scripts klasöründeki AddonPedPlus.ini
+        /// içindeki MenuKey= değeri (ör. F10, F7, M). Yoksa F10 kullanılır.
+        /// </summary>
+        private void LoadIni()
+        {
+            try
+            {
+                var dir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? ".";
+                var ini = Path.Combine(dir, "AddonPedPlus.ini");
+                if (!File.Exists(ini)) return;
+
+                foreach (var raw in File.ReadAllLines(ini))
+                {
+                    var line = (raw ?? "").Trim();
+                    if (line.Length == 0 || line.StartsWith(";", StringComparison.Ordinal) ||
+                        line.StartsWith("#", StringComparison.Ordinal) ||
+                        line.StartsWith("[", StringComparison.Ordinal))
+                        continue;
+
+                    var split = line.IndexOf('=');
+                    if (split <= 0) continue;
+                    var key = line.Substring(0, split).Trim();
+                    var value = line.Substring(split + 1).Trim();
+                    if (!key.Equals("MenuKey", StringComparison.OrdinalIgnoreCase)) continue;
+
+                    if (Enum.TryParse<Keys>(value, true, out var parsed))
+                    {
+                        _toggleKey = parsed;
+                        Log("menü tuşu: " + parsed);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Log("ini okunamadı: " + ex.Message);
+            }
         }
 
         /// <summary>model|ad|tür|sağlık|temel model|ragdoll|meta doğrulandı</summary>
@@ -107,7 +147,7 @@ namespace GTACoOp.PedSelector
 
         private void OnKeyDown(object sender, KeyEventArgs e)
         {
-            if (e.KeyCode == ToggleKey)
+            if (e.KeyCode == _toggleKey)
             {
                 _menuOpen = !_menuOpen;
                 e.SuppressKeyPress = true;

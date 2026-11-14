@@ -5,7 +5,7 @@
     <TargetFramework>net48</TargetFramework>
     <LangVersion>latest</LangVersion>
     <Nullable>disable</Nullable>
-    <AssemblyName>GTACoOp.PedSelector</AssemblyName>
+    <AssemblyName>AddonPedPlus</AssemblyName>
     <RootNamespace>GTACoOp.PedSelector</RootNamespace>
     <AppendTargetFrameworkToOutputPath>true</AppendTargetFrameworkToOutputPath>
     <GenerateAssemblyInfo>true</GenerateAssemblyInfo>

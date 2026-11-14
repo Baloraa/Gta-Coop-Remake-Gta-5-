@@ -17,7 +17,19 @@ namespace GTACoop.PedSelector.App
     internal static class PedOiv
     {
         public const string PackId = "gtacoop_peds";
-        public const string ScriptDllName = "GTACoOp.PedSelector.dll";
+        public const string ScriptDllName = "AddonPedPlus.dll";
+        public const string IniFileName = "AddonPedPlus.ini";
+
+        /// <summary>Oyun içi menü tuşu bu ini dosyasından değiştirilir.</summary>
+        public static readonly string IniContent = string.Join(Environment.NewLine, new[]
+        {
+            "; AddonPed+ ayarlari",
+            "; MenuKey: menuyu acan tus (F10, F7, M, INSERT...)",
+            "[AddonPedPlus]",
+            "MenuKey=F10",
+            ""
+        });
+
         public const string ListFileName = "GTACoop-peds.txt";
 
         public static string ScriptDllPath
@@ -95,6 +107,7 @@ namespace GTACoop.PedSelector.App
                     WriteFile(zip,
                         "content/update-x64-dlcpacks-" + PackId + "/dlc.rpf", dlc);
                     WriteText(zip, "content/scripts/" + ListFileName, list.Text);
+                    WriteText(zip, "content/scripts/" + IniFileName, IniContent);
                     if (File.Exists(scriptDll))
                         WriteFile(zip, "content/scripts/" + ScriptDllName, scriptDll);
                 }
@@ -118,7 +131,8 @@ namespace GTACoop.PedSelector.App
             var wants = new List<string>
             {
                 "mods/update/x64/dlcpacks/" + PackId + "/dlc.rpf",
-                "scripts/" + ListFileName
+                "scripts/" + ListFileName,
+                "scripts/" + IniFileName
             };
             if (hasScript) wants.Add("scripts/" + ScriptDllName);
 
@@ -144,9 +158,9 @@ namespace GTACoop.PedSelector.App
                 new XAttribute("id", PackId),
                 new XAttribute("target", "Five"),
                 new XElement("metadata",
-                    new XElement("name", "GTACoop Addon Peds"),
+                    new XElement("name", "AddonPed+"),
                     new XElement("description",
-                        "Addon ped paketi ve oyun ici ped secici. " +
+                        "AddonPed+ : addon ped paketi ve oyun ici ped secici. " +
                         "GTACoop sunucusu veya launcher'i gerektirmez."),
                     new XElement("version",
                         new XElement("major", "1"),
@@ -165,6 +179,9 @@ namespace GTACoop.PedSelector.App
                     new XElement("add",
                         new XAttribute("source", "content\\scripts\\" + ScriptDllName),
                         "scripts/" + ScriptDllName),
+                    new XElement("add",
+                        new XAttribute("source", "content\\scripts\\" + IniFileName),
+                        "scripts/" + IniFileName),
                     new XElement("archive",
                         new XAttribute("path", "update/update.rpf"),
                         new XAttribute("createIfNotExist", "False"),

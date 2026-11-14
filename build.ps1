@@ -87,16 +87,16 @@ dotnet publish (Join-Path $root "src\GTACoop.ServerHost\GTACoop.ServerHost.cspro
 if ($LASTEXITCODE -ne 0) { throw "ServerHost publish failed." }
 # --- 10) Bagimsiz ped secici modu (kendi exesi + oyun ici script)
 Write-Host "[10/10] Publishing standalone ped selector mod..." -ForegroundColor Cyan
-$pedScriptDll = Join-Path $root "src\GTACoOp.PedSelector\bin\Release\net48\GTACoOp.PedSelector.dll"
+$pedScriptDll = Join-Path $root "src\GTACoOp.PedSelector\bin\Release\net48\AddonPedPlus.dll"
 dotnet build $pedSelectorProject -c Release --nologo
 if ($LASTEXITCODE -ne 0) { throw "Ped selector script build failed." }
 if (-not (Test-Path $pedScriptDll)) { throw "Ped selector script DLL not found: $pedScriptDll" }
-$pedOut = Join-Path $dist "GTACoopPedSelector"
+$pedOut = Join-Path $dist "AddonPedPlus"
 dotnet publish $pedAppProject -c Release -o $pedOut --nologo
 if ($LASTEXITCODE -ne 0) { throw "Ped selector app publish failed." }
 $pedPayload = Join-Path $pedOut "payload"
 New-Item -ItemType Directory -Force $pedPayload | Out-Null
-Copy-Item $pedScriptDll (Join-Path $pedPayload "GTACoOp.PedSelector.dll") -Force
+Copy-Item $pedScriptDll (Join-Path $pedPayload "AddonPedPlus.dll") -Force
 # --- Clean apphost files that can leak into the root
 # Launcher tek dosya yayinlandigi icin kok dizinde pdb/dll kalintisi olmasin.
 Remove-Item (Join-Path $dist "*.pdb") -ErrorAction SilentlyContinue

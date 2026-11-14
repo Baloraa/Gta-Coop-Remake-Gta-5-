@@ -35,7 +35,7 @@ namespace GTACoop.PedSelector.App
             _packDir = Path.Combine(_root, "peds", "paket");
             Directory.CreateDirectory(_packDir);
 
-            Text = "GTACoop Ped Selector";
+            Text = "AddonPed+";
             Width = 980;
             Height = 640;
             MinimumSize = new Size(780, 520);
@@ -46,7 +46,7 @@ namespace GTACoop.PedSelector.App
 
             _header = new Label
             {
-                Text = "Addon Ped Selector — bağımsız mod",
+                Text = "AddonPed+ — bağımsız addon ped modu",
                 Dock = DockStyle.Top,
                 Height = 54,
                 Padding = new Padding(16, 14, 16, 0),
@@ -175,7 +175,7 @@ namespace GTACoop.PedSelector.App
                 }
                 _list.EndUpdate();
 
-                _header.Text = "Addon Ped Selector — " + _packFile.Peds.Count + " ped";
+                _header.Text = "AddonPed+ — " + _packFile.Peds.Count + " ped";
                 Log($"Liste: {_packFile.Peds.Count} ped, {_packFile.Peds.Count(p => p.Enabled)} etkin.");
             }
             catch (Exception ex)
