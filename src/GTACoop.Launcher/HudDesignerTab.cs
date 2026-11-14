@@ -157,8 +157,13 @@ public sealed class HudDesignerTab : UserControl
         itemActions.Controls.Add(Ui.Btn(T("Yukarı"), (_, _) => MoveElement(-1)));
         itemActions.Controls.Add(Ui.Btn(T("Aşağı"), (_, _) => MoveElement(1)));
 
+        // Listeyi doğrudan gruba yerleştir: akış paneli içinde kalınca
+        // görünür alanın altına kayıyordu (satırlar görünmüyordu).
+        _list.Dock = DockStyle.Fill;
+        itemsGroup.Controls.Add(_list);
+
         var itemsBody = Stack();
-        itemsBody.Controls.Add(_list);
+        itemsBody.Dock = DockStyle.Bottom;
         itemsBody.Controls.Add(addRow);
         itemsBody.Controls.Add(shapeRow);
         itemsBody.Controls.Add(infoRow);

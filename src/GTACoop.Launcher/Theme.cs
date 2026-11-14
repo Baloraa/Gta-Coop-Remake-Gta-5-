@@ -200,6 +200,10 @@ internal static class Theme
         // Windows'un kapalı alanı (metin + ok) kendi renkleriyle çiziliyordu:
         // metin mavi seçili görünüyor, ok beyaz kalıyordu. Tüm kapalı alanı
         // kendi panelimizle kaplayıp metni ve oku biz çiziyoruz.
+        // Metin kutusu (edit) alt denetimi odaklanınca kendi beyaz zeminini
+        // bizim panelimizin üstüne çiziyordu; düzenlenemez stile geçiyoruz.
+        combo.DropDownStyle = ComboBoxStyle.DropDownList;
+
         var face = new Panel { BackColor = SurfaceAlt, Cursor = Cursors.Hand };
         face.Paint += (_, e) =>
         {
@@ -508,6 +512,9 @@ internal static class Theme
     // Farenin üzerinde durduğu satır (indeks). ListView başına tutulur.
     private static readonly Dictionary<ListView, int> Hover = new();
 
+    // Çizim kancaları bir kez bağlansın (çift bağlama satırları gizliyordu).
+    private static readonly HashSet<ListView> StyledLists = new();
+
     /// <summary>Listeyi koyu çizer: başlık, satırlar ve varsa onay kutuları.</summary>
     private static void StyleList(ListView list)
     {
@@ -515,7 +522,7 @@ internal static class Theme
         list.ForeColor = Text;
         list.BorderStyle = BorderStyle.FixedSingle;
 
-        if (list.OwnerDraw) return;
+        if (!StyledLists.Add(list)) return;
 
         list.OwnerDraw = true;
         list.DrawColumnHeader += DrawHeader;
@@ -538,6 +545,19 @@ internal static class Theme
             var lv = (ListView)s!;
             if (Hover.Remove(lv)) lv.Invalidate();
         };
+
+        // Son sütunu her boyut değişiminde kalan genişliğe yay; aksi hâlde
+        // sütunların sağında beyaz bir şerit (başlık + satırlar) kalıyor.
+        list.SizeChanged += (_, _) => FillLastColumn(list);
+        list.Resize += (_, _) => FillLastColumn(list);
+        FillLastColumn(list);
+    }
+
+    private static void FillLastColumn(ListView list)
+    {
+        if (list.Columns.Count == 0) return;
+        var last = list.Columns[list.Columns.Count - 1];
+        if (last.Width != -2) last.Width = -2;
     }
 
     /// <summary>Satır arka planı: seçili → yeşil, fare üzerinde → açık gri, değilse zebra.</summary>
