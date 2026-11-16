@@ -50,6 +50,203 @@ bu sürümde eklendi; ayrıntılar aşağıda.
 - 2.13.1'in güvenlik çalışmaları ve 13 kontrollü smoke test projesi dahil. Önceki WinForms launcher
   derlenebilir kalıyor; kurulum eski exeyi `GTACoop.Launcher.pre-wpf.bak` olarak yedekliyor.
 
+### 2.13.1 — Güvenlik sertleştirmesi, smoke testleri ve WPF hazırlığı
+
+- **Manifest yolu güvenliği.** Eklenti manifest yolları kanonikleştirilip doğrulanıyor: mutlak yollar,
+  `..` parçaları, Windows ADS (`:`), aygıt adları, geçersiz karakterler ve tekrarlanan kayıtlar indirme
+  başlamadan reddediliyor. Cache veya oyun klasöründeki sembolik bağ/junction bileşenleri kabul edilmiyor.
+- **Sunucu taramaları bağlantıları izlemiyor.** Sunucu eklentisi taraması ve AddonPeds keşfi sembolik
+  bağ/junction hedeflerini atlıyor, böylece eklenti klasörü dışındaki dosyalar hiç yayınlanmıyor.
+- **Türe göre cache anahtarı.** Cache klasörleri eklenti türünü ve kimlik parmak izini içeriyor; artık
+  `scripts/abc` ile `files/abc` çakışmıyor. Çakışan DLC mount adları uyarıyla manifest dışında bırakılıyor.
+- **Sync sertleştirmesi.** `https://` adresleri HTTPS kalıyor, sync portu ve host doğrulanıyor, ping
+  yanıtları temizleniyor, kullanıcı iptali artık zaman aşımı olarak raporlanmıyor ve `X-Sync-Token`
+  sabit zamanlı karşılaştırılıyor (token/TLS yokken konsol uyarısı).
+- **Testler ve CI.** Bağımlılıksız, 13 kontrollü smoke test projesi ve bir Windows GitHub Actions iş akışı.
+- **WPF hazırlığı.** Aynı `GTACoop.Launcher.exe` adı ve eşitlenmiş sürüm; dağıtılan yapı hâlâ WinForms launcher.
+- **ZIP SHA256:** `3A5FDDC03E5C75C1596DE0756271101A9F060E1171C49CDAAF18977D14ECC046`
+
+### 2.13.0 — Özel portlu sunucular LAN'da, tek tıkla başlat ve gir
+
+- **Özel portlu sunucular LAN'da bulunuyor.** LAN yayını yalnızca 4499/4498/44499 deniyordu, bu yüzden
+  4535 portundaki sunucu hiç görünmüyordu. Tarama artık kendi sunucunuzun ayarlı oyun portunu ve kayıtlı
+  sunucuların portlarını da deniyor.
+- **"Sunucumu Başlat ve Gir" düğmesi:** tek tıkla sunucunuzu başlatır, sync portunu bekler, 127.0.0.1'i
+  sunucu listesine ekler ve otomatik bağlanır (mod senkronizasyonu dahil).
+- **ZIP SHA256:** `9A96BE8D9A702E0981E2098F7C47E8DA2112747EF6572474F98EB0E515FBA796`
+
+### 2.12.0 — HUD bildirimleri, süreli öğeler ve F9 resim düzeltmesi
+
+- **F9 artık PNG'leri gerçekten gizliyor.** HUD gizlenince sprite'lar kapatılıyor, böylece resimler ekranda
+  kalmıyor. Yeni eklenen resimler varsayılan olarak HUD ile birlikte gizleniyor.
+- **Öğe başına görünme süresi:** HUD tasarımcısında saniye girin; süre dolduktan sonra o öğe oturum boyunca
+  bir daha çizilmez (0 = süresiz).
+- **Oyuncu giriş/çıkış bildirimi:** bir PNG ile bir WAV/MP3 seçin (Arayüz Tasarımı → Oyuncu giriş/çıkış
+  bildirimi), saniyeyi ayarlayın; ekranın üstünde yumuşak geçişle görünür, ses isteğe bağlıdır.
+- Diyalog pencereleri artık koyu temayı izliyor, etiketler koyu zeminde siyah görünmüyor.
+- Metin kutularında sağ tık: Geri Al (Ctrl+Z), Kes, Kopyala, Yapıştır, Tümünü Seç.
+- **ZIP SHA256:** `2216625EACC55228CDD2007B526635B12D19105A31697D46ED7732BEEDF9E6B3`
+
+### 2.11.4 — Master TLS bozukken sunucu tarayıcı çalışıyor
+
+- **Sunucu tarayıcı genel listeyi yeniden yüklüyor.** `https://master.gtacoop.com` bir Cloudflare TLS
+  hatası (526) döndürdüğü için master listesi hiç indirilemiyor, yalnızca yedek liste kullanılıyordu.
+  HTTPS master başarısız olunca launcher artık aynı adresi düz HTTP ile bir kez daha deniyor.
+- Kısa kod günlüğü, kayıtlı relay bilgisi olmayan bir kayıt için "saklandı" demiyor.
+- **ZIP SHA256:** `2C9DA0374C9E83B97AD768A59605F4B778B98D1FF5179107307A528B97C4495D`
+
+### 2.11.3 — Kendi sunucunuza bağlanırken güncel oyun portu
+
+- **Kendi sunucunuza bağlanma düzeltildi.** Kayıtlı bir giriş (ör. kısa koddan eklenen) varsayılan oyun
+  portunu tutarken sunucu başka porta taşınmışsa istemci kimsenin dinlemediği porta bağlanıp "no response
+  from remote host" diyordu. Launcher artık canlı sunucu ayarlarını okuyor ve kendi sunucunuz bu makinede
+  farklı bir portta dinliyorsa o portu kullanıp kaydediyor.
+- Aynı kontrol modsuz bağlanma yolunda da çalışıyor; başkalarının sunucularına bağlanma değişmedi.
+- **ZIP SHA256:** `4A2A9F3ADC29CCD274C9C4EACAA88F0EB0FAEE35203C643CA161924077CFD8FD`
+
+### 2.11.2 — Gerçek PNG HUD resimleri ve kendi sunucunuza bağlanma
+
+- **Gerçek PNG HUD resimleri:** istemci artık her PNG'yi ScriptHookVDotNet'in `CustomSprite`'ı ile
+  çiziyor; dosya doku olarak yüklenip tek çağrıda tam çözünürlükte çiziliyor (renkli dikdörtgenlerden
+  yeniden kurulmuyor). Eski ScriptHookVDotNet sürümleri otomatik olarak önceki çiziciye düşüyor.
+- **Launcher'dan kendi sunucunuza bağlanma:** oyun portu bu makinede zaten açıksa launcher kayıtlı
+  genel/relay adresi yerine `127.0.0.1` üzerinden bağlanıyor. NAT loopback kapalı yönlendiricilerde
+  görülen "Failed to establish connection - no response from remote host" hatası bu şekilde çözülüyor.
+- **ZIP SHA256:** `D87CB73B725C3FE53C5E17854C333DD047C12431DCC2342BA40CE0EB70126070`
+
+### 2.11.1 — HUD görünürlüğü, eksiksiz PNG'ler ve sunucu onarımı
+
+- Menü kapalıyken oyun içi HUD yeniden çiziliyor: "menü açık" bayrağı ters aktarıldığı için "her zaman
+  görünür" işaretlenmemiş tüm öğeler F9'a basılana kadar gizli kalıyordu.
+- **"Her zaman görünür"** artık çalışıyor: launcher bayrağı `alwaysVisible` olarak kaydederken oyun içi
+  çizici `always` alanını okuyordu. Artık iki ad da okunuyor, eski sürümlerle kaydedilen düzenler bozulmuyor.
+- **PNG resimleri tam çiziliyor:** pişirilmiş bir resim 5000'den fazla hücre olabiliyor ve oyun kare başına
+  çizim sınırını aşınca resmin altı kesiliyordu. Satırlar aynı renk şeritlerine birleştiriliyor ve ızgara
+  yalnızca gerektiği kadar kabalaştırılıyor (64×91 logo: 5327 → 1415 çizim), güvenlik için kare başına
+  sınır uygulanıyor.
+- **Sunucu modu:** yarım kopyalanmış sunucu klasörü başlangıçta onarılıyor. `gtaserver.core.exe` varken
+  `gtaserver.core.runtimeconfig.json` ve diğer şablon dosyaları yoksa adanmış sunucu hiç açılmıyor,
+  kimse bağlanamıyor ve sunucu tarayıcı hiçbir şey bulamıyordu.
+- Yerelde doğrulandı: sunucu modu oyun sunucusunu ayarlı portta başlatıyor ("ready to accept connections"),
+  sync sunucusu `/api/v1/ping` isteğine 200 dönüyor, yeniden başlatma döngüsü yok ve kapanış temiz.
+
+### 2.11.0 — Sunucu modu (VDS) ve zengin HUD
+
+#### Sunucu modu (VDS) - isteğe bağlı, varsayılan kapalı
+
+- Adanmış sunucu (`gtaserver.core` + eklenti sync sunucusu) artık **GTA V olmadan ve launcher açık
+  değilken** çalışabiliyor. FiveM FXServer ile aynı model: oyuncular *Sunucular* sayfasından `IP:port` ile
+  bağlanır, kimsenin oyunda olması gerekmez.
+- **Sunucu süreci başına RAM bütçesi** (0 = sınırsız); Windows job object ile uygulanır ve bütçenin
+  %75'inde çalışma kümesi kırpılır.
+- Sunucu süreçlerinden biri kapandığında **otomatik yeniden başlatma**; host PID'i, RAM sınırı, iki sürecin
+  anlık RAM'i ve yeniden başlatma sayacını gösteren canlı durum satırı.
+- İsteğe bağlı **Windows ile başlat** oturum açma görevi (aynı sayfadan kaldırılabilir) ve tek düğmeyle
+  açılabilen, döndürülen `logs/server-host.log`.
+- Sunucu modu açıkken launcher'ı kapatmak sunucuyu durdurmuyor; launcher'ı yeniden açtığınızda ikinci bir
+  kopya başlatmak yerine çalışan sunucuyu gösteriyor.
+- Sunucu modunu kapatın (veya **Durdur**'a basın), sunucu eskisi gibi launcher tarafından yönetilir. Oyun
+  veya sunucu dosyalarına hiçbir şey yazılmaz.
+
+#### Arayüz tasarımcısı
+
+- Yeni şekiller: **dış çizgi, daire, çizgi, degrade**; yeni canlı göstergeler: **hız, silah + mermi,
+  pusula, bölge/sokak, koordinatlar, FPS**.
+- Öğe başına **her zaman görünür**: PNG logolar ve katmanlar, HUD kapatma tuşuyla veya launcher menüsü
+  açıkken gizlense bile ekranda kalır.
+- PNG resimleri daha yüksek, en-boy oranına duyarlı ızgara çözünürlüğünde pişiriliyor ve her karede değil bir
+  kez çözümleniyor: daha net logolar, çizerken daha az CPU.
+- Kısayol tuşlarında bir karelik takılma ve sağa dayalı metinlerin sonraki metinlere taşması düzeltildi.
+
+> Sunucu modu paylaşım ZIP'i içinde gelir (`tools/ServerHost`). Yalnızca launcher exesini değiştirirseniz
+> host bileşeni için klasörün geri kalanını da koruyun.
+
+### 2.10.0 — Özel HUD tasarımcısı (isteğe bağlı)
+
+**Yeni sayfa:** Arayüz Tasarımı. Paneller, metin, saat, ping, oyuncu listesi, sağlık/zırh çubukları ve PNG
+resimleri 16:9 önizlemeye yerleştirin; oyunda aynı konumda çizilir.
+
+- Düzen, launcher veri klasöründe `ui/hud.json` olarak saklanır ve oyun içi çizici değişiklikleri iki
+  saniye içinde alır; yeniden başlatma gerekmez.
+- PNG resimleri kaydederken kompakt bir renk ızgarasına pişirilip dikdörtgen olarak çizilir
+  (ScriptHookVDotNet'in dosyadan doku API'si yok).
+- **Varsayılan kapalı.** Tek anahtar özel HUD'u açar; *Kapat ve varsayılana dön* kapatır ve oyun HUD'unu
+  doğrudan geri verir.
+- Klavye kısayolları her biri tek iş yapar: HUD'u aç/kapat, oyuncu listesi, sesli sohbet, radar, arayüzü
+  gizle.
+- Oyun HUD'u parça parça değiştirilebilir: tüm HUD, radar, yalnızca harita resmi (radar çerçevesi kalır),
+  aranan yıldızları, sokak adları, araç bilgisi, yardım metni.
+- Oyun klasörüne veya sunucuya hiçbir şey yazılmaz. HUD değişiklikleri kare kare uygulanır ve özellik
+  kapatıldığı anda bırakılır; tek oyunculu ve GTACoop oturumları bozulmaz.
+
+### 2.9.0 — P2P mod paylaşımı
+
+- Yeni **P2P Paylaşım** sayfası: bir mod klasörü doğrudan arkadaşa açılır (yerel ağ, hotspot veya
+  Radmin/Tailscale gibi sanal ağ). Sunucu, relay veya hesap gerekmez.
+- Paylaşan kişi `IP:port` kodu alır; arkadaş kod ile bağlanıp dosya listesini görür ve indirir. Dosya
+  başına ilerleme ve iptal düğmesi vardır.
+- Her dosya SHA256 ile doğrulanır; hedefte aynı dosya zaten varsa yeniden indirilmez (artımlı eşitleme).
+- Sayfa ayrıca klasörü `.zip` olarak dışa aktarabilir, paylaşım portu için güvenlik duvarı kuralı
+  ekleyebilir ve son kodu/portu/klasörleri hatırlar.
+- Düzeltme: oyundaki **Bileşenleri Yönet...** düğmesi ve Sunucu Tarayıcı'daki **Sunucular** bağlantıları
+  hiç sayfa değiştirmiyordu; görünmeyen TabControl yerine görünen sayfa listesi kullanılıyor.
+- Not: Oyun içi test bu makinede yapılmadı. P2P aktarımı 3 MB'lık test klasörüyle uçtan uca doğrulandı
+  (hash eşleşmesi + artımlı eşitleme).
+
+### 2.8.4 — Arayüz düzeltmeleri
+
+- İçerik alanı artık başlık çubuğunun altından başlıyor; her sayfanın üstü (Hakkında sayfası, başlığı ve
+  avatarı dahil) başlığın altına kaymıyor.
+- Grup çerçeveleri Windows yerine launcher tarafından çiziliyor; koyu zemin ve yeşil başlık korunuyor,
+  parlak beyaz kenarlıklar gitti.
+- Hakkında sayfası bölümleri sabit boşluklarla yukarıdan aşağı yerleştiriliyor; hiçbir şey üst üste
+  binmiyor veya kesilmiyor.
+- Windows desteklediği yerde yerel kaydırma çubukları koyu görünümü izliyor.
+- Oynanış, mod veya kayıt verisinde değişiklik yok.
+
+### 2.8.3 — Yan çubuk navigasyonu ve güvenilir sayfa geçişi
+
+- Menü artık solda dikey bir yan çubuk; etkin öğede yeşil işaret ve üzerine gelme durumu var.
+- İçerik alanı daha geniş ve uzun sayfalar kendi içinde kaydırılıyor.
+- Sayfa geçişi gizli TabControl'e bağlı değil (seçim olayını hiç tetiklemiyordu, bu yüzden menü
+  tıklamaları hiçbir şey yapmıyordu); seçimi artık form kendisi yönetiyor ve her menü öğesi kendi
+  sayfasını açıyor.
+- Başka davranış değişmedi; ayarlar, sunucular, modlar ve kayıtlar korunuyor.
+
+### 2.8.2 — Navigasyon çubuğu, tamamen koyu arayüz
+
+- Sekme şeridi içeriğin üstünde bir navigasyon çubuğuyla değiştirildi; Windows'un sekme başlıklarının
+  yanına çizdiği sistem renkli bant gitti.
+- Etkin sayfa yeşil vurgulanıyor, pasif öğeler soluk gri.
+- Koyu yüzeyler artık saf siyah değil koyu gri tonlarında; göz için daha rahat.
+- Düzen, metinler ve davranış aynı; ayarlar, sunucular, modlar ve kayıtlar korunuyor.
+
+### 2.8.1 — Yeşil vurgulu saf siyah tema
+
+- Her yüzey, panel, liste başlığı, liste satırı ve onay kutusu siyah; pencerede beyaz alan kalmadı.
+- Vurgu rengi yeşil: sekme alt çizgisi, grup başlıkları, form numaraları, onay işaretleri ve üzerine gelme.
+- Pencere başlığı, işletim sistemi desteklediğinde Windows koyu başlık çubuğunu kullanıyor.
+- Düzen, metin veya davranış değişikliği yok; ayarlar, sunucular, modlar ve kayıtlar korunuyor.
+
+### 2.8.0 — Yeni arayüz, hava kilidi, çakışma tespiti ve mod detayları
+
+- **Yeni arayüz:** launcher genelinde koyu, düz tema: kompakt başlık, vurgu alt çizgili sekme şeridi,
+  temalı listeler, giriş alanları, düğmeler ve grup kutuları. Düzen, metinler ve davranış değişmedi;
+  yalnızca renkler uygulanıyor ve anlamlı durum renkleri (yeşil/kırmızı) korunuyor.
+- **Hava kilidi:** **Sunucum → Hava:** dinamik (oyunun kendi döngüsü) veya sabit hava: ekstra güneşli,
+  açık, bulutlu, kapalı, yağmurlu, fırtınalı, sisli, puslu, karlı, tipi, yılbaşı. Saat gibi manifest
+  üzerinden dağıtılır; misafirlerin ayar yapması gerekmez, eski istemciler yok sayar. Sunucudan çıkınca
+  zorlama kalkar.
+- **Script çakışma tespiti:** launcher üzerinden bağlanmadan önce sunucunun script/ASI dosyaları sizin
+  `scripts`, `asi` ve `lua` klasörlerinizdeki dosyalarla karşılaştırılır; olası çakışmaları listeleyen net
+  bir uyarı çıkar ve devam etme veya iptal seçeneği sunulur. Salt okunur: hiçbir şey yazılmaz, taşınmaz
+  veya silinmez.
+- **Daha zengin tek oyunculu paketler:** paketler ad, yazar, sürüm, kategori ve açıklama içeren `mod.json`
+  (veya basit `mod.ini`) getirebilir. Liste bu sütunları gösterir ve seçili paketi bir detay bölmesi anlatır.
+- **Kendi relay sunucunuz:** `relay/` klasöründe `docker-compose.yml` ve kendi `bore` relay'inizi VPS'te
+  çalıştırmak için kısa bir İngilizce rehber var.
+- **Kurulum:** `GTACoop.Launcher.exe` dosyasını indirip çalıştırın veya paylaşım ZIP'ini kullanın.
+
 ### 2.7.7 — Ped değişimi, sunucu saati ve tek oyunculu mod yöneticisi
 
 - **"Ped uygulanamadı" hatası giderildi.** Değişim hazırlığı her karede yeniden zamanlanıyordu ve

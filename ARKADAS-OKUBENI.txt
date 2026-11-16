@@ -1,5 +1,5 @@
-﻿==========================================================
- GTACoop Remake - Arkadaş Sürümü (Türkçe, v2.7)
+==========================================================
+ GTACoop Remake - Arkadaş Sürümü (Türkçe, v2.14.0)
 ==========================================================
 
 Bu bir GTA V (Hikaye Modu) arkadaş-arası co-op aracıdır.
@@ -7,18 +7,22 @@ Sunucu sahibi modları ekler; siz bağlanınca modlar otomatik
 inip oyununuza kurulur ve oyundan çıkınca otomatik kaldırılır.
 
 ------------------------------------------------------------------
-2.7'DE YENİ
+2.14.0'DA YENİ
 ------------------------------------------------------------------
-- Legacy (klasik) GTA V'de addon DLC/RPF paketleri artık kuruluyor:
-  dlclist yazımı yedeklenir, gerekirse arşivin sonuna eklenir ve
-  yazıldıktan sonra geri okunup doğrulanır.
-- Addon ped değiştirirken çökme düzeltildi: üst üste/hızlı değişim,
-  ölüyken değişim ve aynı pedi tekrar seçme artık modeli yeniden
-  yaratmıyor.
-- Ana menüde "Animal Animations": hayvan modelindeyken otur, havla,
-  yat, ısır, kalk animasyonları (Rottweiler / Retriever / Kedi seti).
-  Köpek ırkları aynı iskeleti kullandığı için shepherd/husky gibi
-  modellerde de çalışır.
+- Launcher artık koyu WPF kabuğu: daraltılabilir yan menü, tutarlı
+  koyu açılır kutular/düğmeler/listeler, ızgara çizgileri ve ekranın
+  çalışma alanına sığan pencere.
+- DLC paketleri sahipliği doğrulanan junction ile bağlanıyor;
+  mount/unmount, hedef kontrolü ve yedek geri alma sıkılaştırıldı.
+  Kaldırma artık cache dosyalarını silmiyor (cache temizliği ayrı).
+- OIV paketleri OpenIV mods katmanına yönlendiriliyor; OIV, ASI ve
+  scriptler için gerçek zamanlı sanallaştırma yok.
+- 14 smoke test: yol güvenliği, manifest doğrulama, DLC junction
+  mount/unmount ve sembolik bağ reddi.
+
+İsteğe bağlı ayrı mod: AddonPed+ (kendi addon ped paketi ve oyun içi
+ped seçici; launcher ve sunucu gerekmez). Ayrıntı: AddonPed+ ZIP'i
+içindeki OKUBENI.txt.
 
 ------------------------------------------------------------------
 KURULUM
@@ -110,8 +114,8 @@ KURULUM
    - T   : sohbet
    - Z   : oyuncu listesi
    - N   : sesli sohbet (bas-konuş; F9 > Ayarlar'dan değiştirilebilir)
-   - İlk girişte sohbetten:  /register sıfre
-     (sonraki girişlerde:    /login sıfre)
+   - İlk girişte sohbetten:  /register sifre
+     (sonraki girişlerde:    /login sifre)
 
 ------------------------------------------------------------------
 ÖNEMLİ NOTLAR
