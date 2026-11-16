@@ -33,7 +33,7 @@ namespace GTACoop.PedSelector.App
 
         public PedEditDialog(AddonPedInfo ped)
         {
-            Text = "Pedi Düzenle";
+            Text = L.T("Edit Ped", "Pedi Düzenle");
             ClientSize = new Size(470, 372);
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = false;
@@ -64,26 +64,27 @@ namespace GTACoop.PedSelector.App
 
             _enabled = new CheckBox
             {
-                Text = "Etkin (pakete ve menüye dahil edilsin)",
+                Text = L.T("Enabled (included in the pack and the in-game menu)",
+                    "Etkin (pakete ve menüye dahil edilsin)"),
                 Checked = ped.Enabled,
                 AutoSize = true,
                 ForeColor = Color.White
             };
 
             var y = 16;
-            AddLabel("Ad", y);
+            AddLabel(L.T("Name", "Ad"), y);
             _name.Location = new Point(150, y - 2);
             y += 38;
             AddLabel("Model", y);
             _model.Location = new Point(150, y - 2);
             y += 38;
-            AddLabel("Tür", y);
+            AddLabel(L.T("Type", "Tür"), y);
             _kind.Location = new Point(150, y - 2);
             y += 38;
-            AddLabel("Sağlık", y);
+            AddLabel(L.T("Health", "Sağlık"), y);
             _health.Location = new Point(150, y - 2);
             y += 38;
-            AddLabel("Temel model", y);
+            AddLabel(L.T("Base model", "Temel model"), y);
             _baseModel.Location = new Point(150, y - 2);
             y += 38;
             AddLabel("Ragdoll", y);
@@ -93,15 +94,16 @@ namespace GTACoop.PedSelector.App
 
             var info = new Label
             {
-                Text = "Model, .yft dosyasının adıdır. Temel model boşsa tür şablonu kullanılır.",
+                Text = L.T("Model is the name of the .yft file. If the base model is empty, the type template is used.",
+                    "Model, .yft dosyasının adıdır. Temel model boşsa tür şablonu kullanılır."),
                 Location = new Point(20, y + 30),
                 Size = new Size(430, 34),
                 ForeColor = Color.FromArgb(165, 165, 178)
             };
 
-            var ok = MakeButton("Kaydet", DialogResult.OK);
+            var ok = MakeButton(L.T("Save", "Kaydet"), DialogResult.OK);
             ok.Location = new Point(ClientSize.Width - 210, ClientSize.Height - 52);
-            var cancel = MakeButton("İptal", DialogResult.Cancel);
+            var cancel = MakeButton(L.T("Cancel", "İptal"), DialogResult.Cancel);
             cancel.Location = new Point(ClientSize.Width - 110, ClientSize.Height - 52);
 
             Controls.AddRange(new Control[]
@@ -117,7 +119,8 @@ namespace GTACoop.PedSelector.App
                 if (DialogResult != DialogResult.OK) return;
                 if (Model.Length == 0)
                 {
-                    MessageBox.Show(this, "Model adı boş olamaz.", "Eksik bilgi",
+                    MessageBox.Show(this, L.T("Model name cannot be empty.", "Model adı boş olamaz."),
+                        L.T("Missing information", "Eksik bilgi"),
                         MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     e.Cancel = true;
                 }

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
@@ -26,8 +26,8 @@ namespace GTACoop.PedSelector.App
         /// <summary>Oyun içi menü tuşu bu ini dosyasından değiştirilir.</summary>
         public static readonly string IniContent = string.Join(Environment.NewLine, new[]
         {
-            "; AddonPed+ ayarlari",
-            "; MenuKey: menuyu acan tus (F10, F7, M, INSERT...)",
+            "; AddonPed+ settings",
+            "; MenuKey: key that opens the in-game menu (F10, F7, M, INSERT...)",
             "[AddonPedPlus]",
             "MenuKey=F10",
             ""

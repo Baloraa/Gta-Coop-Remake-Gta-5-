@@ -66,8 +66,8 @@ Copy-Item $scriptDll (Join-Path $payload "AddonPedPlus.dll") -Force
 # 3) Ini ve beni oku
 $ini = Join-Path $out "AddonPedPlus.ini"
 @(
-    "; AddonPed+ ayarlari"
-    "; MenuKey: menuyu acan tus (F10, F7, M, INSERT...)"
+    "; AddonPed+ settings"
+    "; MenuKey: key that opens the in-game menu (F10, F7, M, INSERT...)"
     "[AddonPedPlus]"
     "MenuKey=F10"
 ) | Set-Content -Path $ini -Encoding UTF8

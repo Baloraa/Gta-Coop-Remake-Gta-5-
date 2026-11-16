@@ -4,14 +4,16 @@ using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Windows.Forms;
 using GTACoop.Sync;
 
 namespace GTACoop.PedSelector.App
 {
     /// <summary>
-    /// Bağımsız ped seçici arayüzü: ped ekle, listeyi düzenle, OpenIV (.oiv)
+    /// Bağımsız ped seçici arayüzü: ped ekle, düzenle, kaydet, OpenIV (.oiv)
     /// paketi üret. GTACoop launcher'ı veya sunucusu olmadan çalışır.
+    /// Arayüz dili İngilizce (varsayılan) veya Türkçe olabilir.
     /// </summary>
     internal sealed class PedSelectorForm : Form
     {
@@ -24,6 +26,10 @@ namespace GTACoop.PedSelector.App
         private readonly ListView _list;
         private readonly TextBox _log;
         private readonly Label _header;
+        private readonly Label _hint;
+        private readonly Label _languageLabel;
+        private readonly ComboBox _language;
+        private readonly List<(Button Button, string En, string Tr)> _buttons = new();
 
         private AddonPedPackFile _packFile;
         private bool _loading;
@@ -34,11 +40,12 @@ namespace GTACoop.PedSelector.App
                 "GTACoop Ped Selector");
             _packDir = Path.Combine(_root, "peds", "paket");
             Directory.CreateDirectory(_packDir);
+            L.Load(_root);
 
             Text = "AddonPed+";
-            Width = 980;
-            Height = 640;
-            MinimumSize = new Size(780, 520);
+            Width = 1000;
+            Height = 660;
+            MinimumSize = new Size(800, 520);
             BackColor = Bg;
             ForeColor = Color.White;
             StartPosition = FormStartPosition.CenterScreen;
@@ -46,7 +53,6 @@ namespace GTACoop.PedSelector.App
 
             _header = new Label
             {
-                Text = "AddonPed+ — bağımsız addon ped modu",
                 Dock = DockStyle.Top,
                 Height = 54,
                 Padding = new Padding(16, 14, 16, 0),
@@ -54,15 +60,33 @@ namespace GTACoop.PedSelector.App
                 ForeColor = Color.White
             };
 
-            var hint = new Label
+            _hint = new Label
             {
-                Text = "Ped dosyalarını ekleyin, seçin ve OpenIV paketi (.oiv) oluşturun. " +
-                       "Oyun içinde F10 ile ped seçilir.",
                 Dock = DockStyle.Top,
                 Height = 30,
                 Padding = new Padding(17, 0, 16, 0),
                 ForeColor = Color.FromArgb(170, 170, 180)
             };
+
+            _languageLabel = new Label
+            {
+                AutoSize = true,
+                ForeColor = Color.FromArgb(190, 190, 200),
+                Margin = new Padding(12, 6, 4, 0)
+            };
+
+            _language = new ComboBox
+            {
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                Width = 130,
+                BackColor = Surface,
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                Margin = new Padding(0, 3, 0, 0)
+            };
+            _language.Items.AddRange(new object[] { "English", "Türkçe" });
+            _language.SelectedIndex = L.Turkish ? 1 : 0;
+            _language.SelectedIndexChanged += OnLanguageChanged;
 
             _list = new ListView
             {
@@ -78,9 +102,9 @@ namespace GTACoop.PedSelector.App
             };
             _list.Columns.Add("Ped", 260);
             _list.Columns.Add("Model", 220);
-            _list.Columns.Add("Tür", 110);
-            _list.Columns.Add("Sağlık", 80);
-            _list.Columns.Add("Dosya", 80);
+            _list.Columns.Add("Type", 110);
+            _list.Columns.Add("Health", 80);
+            _list.Columns.Add("Files", 80);
             _list.ItemChecked += OnItemChecked;
             _list.DoubleClick += (_, _) => EditSelected();
 
@@ -92,15 +116,18 @@ namespace GTACoop.PedSelector.App
                 BackColor = Bg,
                 WrapContents = true
             };
-            buttons.Controls.Add(MakeButton("Ped Ekle...", (_, _) => AddPedFiles()));
-            buttons.Controls.Add(MakeButton("Streamed Klasör Ekle...", (_, _) => AddPedFolder()));
-            buttons.Controls.Add(MakeButton("Düzenle...", (_, _) => EditSelected()));
-            buttons.Controls.Add(MakeButton("Kaydet", (_, _) => SavePack(announce: true)));
-            buttons.Controls.Add(MakeButton("OIV Oluştur...", (_, _) => BuildOiv()));
-            buttons.Controls.Add(MakeButton("Oyuna Kur...", (_, _) => InstallToGame()));
-            buttons.Controls.Add(MakeButton("Kurulumu Kaldır", (_, _) => UninstallFromGame()));
-            buttons.Controls.Add(MakeButton("Yenile", (_, _) => Reload()));
-            buttons.Controls.Add(MakeButton("Klasörü Aç", (_, _) => OpenFolder(_root)));
+            buttons.Controls.Add(MakeButton("Add Peds...", "Ped Ekle...", (_, _) => AddPedFiles()));
+            buttons.Controls.Add(MakeButton("Add Streamed Folder...", "Streamed Klasör Ekle...",
+                (_, _) => AddPedFolder()));
+            buttons.Controls.Add(MakeButton("Edit...", "Düzenle...", (_, _) => EditSelected()));
+            buttons.Controls.Add(MakeButton("Save", "Kaydet", (_, _) => SavePack(announce: true)));
+            buttons.Controls.Add(MakeButton("Build OIV...", "OIV Oluştur...", (_, _) => BuildOiv()));
+            buttons.Controls.Add(MakeButton("Install to Game...", "Oyuna Kur...", (_, _) => InstallToGame()));
+            buttons.Controls.Add(MakeButton("Uninstall", "Kurulumu Kaldır", (_, _) => UninstallFromGame()));
+            buttons.Controls.Add(MakeButton("Refresh", "Yenile", (_, _) => Reload()));
+            buttons.Controls.Add(MakeButton("Open Folder", "Klasörü Aç", (_, _) => OpenFolder(_root)));
+            buttons.Controls.Add(_languageLabel);
+            buttons.Controls.Add(_language);
 
             _log = new TextBox
             {
@@ -121,17 +148,54 @@ namespace GTACoop.PedSelector.App
             Controls.Add(listHost);
             Controls.Add(_log);
             Controls.Add(buttons);
-            Controls.Add(hint);
+            Controls.Add(_hint);
             Controls.Add(_header);
 
+            ApplyLanguage();
             Reload();
         }
 
-        private Button MakeButton(string text, EventHandler onClick)
+        // -------------------------------------------------------------------- dil
+
+        private void OnLanguageChanged(object? sender, EventArgs e)
+        {
+            var code = _language.SelectedIndex == 1 ? L.TurkishCode : L.English;
+            if (code == L.Language) return;
+
+            L.SetLanguage(code, _root);
+            ApplyLanguage();
+            Log(L.T("Language: English.", "Dil: Türkçe."));
+        }
+
+        private void ApplyLanguage()
+        {
+            _header.Text = L.T("AddonPed+ — standalone addon ped mod",
+                "AddonPed+ — bağımsız addon ped modu") +
+                (_packFile == null ? "" : "  —  " + _packFile.Peds.Count + L.T(" peds", " ped"));
+
+            _hint.Text = L.T(
+                "Add your ped files, pick the ones you want and build an OpenIV package (.oiv). " +
+                "In game, press F10 to open the ped menu.",
+                "Ped dosyalarını ekleyin, istediklerinizi seçin ve OpenIV paketi (.oiv) oluşturun. " +
+                "Oyun içinde F10 ile ped menüsü açılır.");
+
+            _languageLabel.Text = L.T("Language:", "Dil:");
+
+            foreach (var (button, en, tr) in _buttons)
+                button.Text = L.T(en, tr);
+
+            _list.Columns[0].Text = L.T("Ped", "Ped");
+            _list.Columns[1].Text = L.T("Model", "Model");
+            _list.Columns[2].Text = L.T("Type", "Tür");
+            _list.Columns[3].Text = L.T("Health", "Sağlık");
+            _list.Columns[4].Text = L.T("Files", "Dosya");
+        }
+
+        private Button MakeButton(string en, string tr, EventHandler onClick)
         {
             var button = new Button
             {
-                Text = text,
+                Text = L.T(en, tr),
                 AutoSize = true,
                 AutoSizeMode = AutoSizeMode.GrowAndShrink,
                 Padding = new Padding(10, 5, 10, 5),
@@ -142,12 +206,50 @@ namespace GTACoop.PedSelector.App
             };
             button.FlatAppearance.BorderColor = Border;
             button.Click += onClick;
+            _buttons.Add((button, en, tr));
             return button;
         }
 
         private void Log(string message)
         {
-            _log.AppendText(DateTime.Now.ToString("HH:mm:ss") + "  " + message + Environment.NewLine);
+            _log.AppendText(DateTime.Now.ToString("HH:mm:ss") + "  " +
+                            TranslateEngineLog(message) + Environment.NewLine);
+        }
+
+        /// <summary>
+        /// Motor (ped paketi / OIV / kurulum) günlük satırlarını İngilizce modda
+        /// çevirir; Türkçe modda metin olduğu gibi kalır.
+        /// </summary>
+        private static string TranslateEngineLog(string message)
+        {
+            if (L.Turkish || string.IsNullOrEmpty(message)) return message;
+
+            (string Tr, string En)[] rules =
+            {
+                ("Kopyalandı: ", "Copied: "),
+                ("Silindi: ", "Deleted: "),
+                ("dlclist eklendi: ", "dlclist entry added: "),
+                ("dlclist kaldırıldı: ", "dlclist entry removed: "),
+                ("Ped paketi hazırlandı: ", "Ped pack prepared: "),
+                ("Ped paketi dogrulandi: ", "Ped pack verified: "),
+                ("peds.rpf oluşturuldu: ", "peds.rpf created: "),
+                ("dlc.rpf oluşturuldu: ", "dlc.rpf created: "),
+                ("Kurulum tamam: ", "Install complete: "),
+                ("Kurulum kaldırıldı.", "Uninstall complete."),
+                ("Meta uyarısı: ", "Meta warning: "),
+                ("OIV hazır: ", "OIV ready: ")
+            };
+
+            foreach (var (tr, en) in rules)
+            {
+                if (!message.StartsWith(tr, StringComparison.Ordinal) &&
+                    !message.Contains(": " + tr, StringComparison.Ordinal))
+                    continue;
+                message = message.Replace(tr, en, StringComparison.Ordinal);
+            }
+
+            message = Regex.Replace(message, @"(\d+) ped\b", "$1 ped(s)");
+            return message;
         }
 
         // ------------------------------------------------------------------ liste
@@ -171,12 +273,13 @@ namespace GTACoop.PedSelector.App
                 }
                 _list.EndUpdate();
 
-                _header.Text = "AddonPed+ — " + _packFile.Peds.Count + " ped";
-                Log($"Liste: {_packFile.Peds.Count} ped, {_packFile.Peds.Count(p => p.Enabled)} etkin.");
+                ApplyLanguage();
+                Log(L.T($"{_packFile.Peds.Count} peds, {_packFile.Peds.Count(p => p.Enabled)} enabled.",
+                    $"{_packFile.Peds.Count} ped, {_packFile.Peds.Count(p => p.Enabled)} etkin."));
             }
             catch (Exception ex)
             {
-                Log("Liste okunamadı: " + ex.Message);
+                Log(L.T("Could not read the list: ", "Liste okunamadı: ") + ex.Message);
             }
             finally
             {
@@ -207,12 +310,14 @@ namespace GTACoop.PedSelector.App
             {
                 SyncJson.Save(Path.Combine(_packDir, AddonPeds.PackFileName), _packFile);
                 if (announce)
-                    Log($"Kaydedildi: {_packFile.Peds.Count} ped, " +
-                        $"{_packFile.Peds.Count(p => p.Enabled)} etkin.");
+                    Log(L.T($"Saved: {_packFile.Peds.Count} peds, " +
+                            $"{_packFile.Peds.Count(p => p.Enabled)} enabled.",
+                        $"Kaydedildi: {_packFile.Peds.Count} ped, " +
+                        $"{_packFile.Peds.Count(p => p.Enabled)} etkin."));
             }
             catch (Exception ex)
             {
-                Log("peds.json yazılamadı: " + ex.Message);
+                Log(L.T("Could not write peds.json: ", "peds.json yazılamadı: ") + ex.Message);
             }
         }
 
@@ -222,7 +327,8 @@ namespace GTACoop.PedSelector.App
         {
             if (_list.SelectedItems.Count == 0)
             {
-                Log("Düzenlemek için listeden bir ped seçin.");
+                Log(L.T("Select a ped from the list to edit it.",
+                    "Düzenlemek için listeden bir ped seçin."));
                 return;
             }
             if (_list.SelectedItems[0].Tag is not AddonPedInfo ped) return;
@@ -240,7 +346,7 @@ namespace GTACoop.PedSelector.App
 
             FillItem(_list.SelectedItems[0], ped);
             SavePack();
-            Log($"Güncellendi: {ped.Model}" +
+            Log(L.T("Updated: ", "Güncellendi: ") + ped.Model +
                 (string.IsNullOrWhiteSpace(ped.Name) ? "" : " (" + ped.Name + ")"));
         }
 
@@ -250,8 +356,9 @@ namespace GTACoop.PedSelector.App
         {
             using var dialog = new OpenFileDialog
             {
-                Title = "Ped dosyaları (.yft .ydd .ytd .ymt)",
-                Filter = "Ped dosyaları|*.yft;*.ydd;*.ytd;*.ymt|Tüm dosyalar|*.*",
+                Title = L.T("Ped files (.yft .ydd .ytd .ymt)", "Ped dosyaları (.yft .ydd .ytd .ymt)"),
+                Filter = L.T("Ped files|*.yft;*.ydd;*.ytd;*.ymt|All files|*.*",
+                    "Ped dosyaları|*.yft;*.ydd;*.ytd;*.ymt|Tüm dosyalar|*.*"),
                 Multiselect = true
             };
             if (dialog.ShowDialog(this) != DialogResult.OK) return;
@@ -265,7 +372,7 @@ namespace GTACoop.PedSelector.App
                 File.Copy(file, target);
                 copied++;
             }
-            Log($"Ped dosyası eklendi: {copied}");
+            Log(L.T($"Ped files added: {copied}", $"Ped dosyası eklendi: {copied}"));
             Reload();
         }
 
@@ -273,7 +380,8 @@ namespace GTACoop.PedSelector.App
         {
             using var dialog = new FolderBrowserDialog
             {
-                Description = "Streamed ped klasörü (.ydd/.ytd içeren klasör)"
+                Description = L.T("Streamed ped folder (contains .ydd/.ytd files)",
+                    "Streamed ped klasörü (.ydd/.ytd içeren klasör)")
             };
             if (dialog.ShowDialog(this) != DialogResult.OK) return;
 
@@ -282,7 +390,7 @@ namespace GTACoop.PedSelector.App
             var target = Path.Combine(_packDir, string.IsNullOrWhiteSpace(name) ? "ped" : name);
             if (Directory.Exists(target))
             {
-                Log("Bu klasör zaten ekli: " + name);
+                Log(L.T("This folder is already added: ", "Bu klasör zaten ekli: ") + name);
                 Reload();
                 return;
             }
@@ -297,7 +405,8 @@ namespace GTACoop.PedSelector.App
                 File.Copy(file, dest, overwrite: true);
                 copied++;
             }
-            Log($"Klasör eklendi: {name} ({copied} dosya)");
+            Log(L.T($"Folder added: {name} ({copied} files)",
+                $"Klasör eklendi: {name} ({copied} dosya)"));
             Reload();
         }
 
@@ -307,8 +416,8 @@ namespace GTACoop.PedSelector.App
         {
             using var dialog = new SaveFileDialog
             {
-                Title = "OpenIV paketini kaydet",
-                Filter = "OpenIV paketi|*.oiv",
+                Title = L.T("Save the OpenIV package", "OpenIV paketini kaydet"),
+                Filter = L.T("OpenIV package|*.oiv", "OpenIV paketi|*.oiv"),
                 FileName = "GTACoop-AddonPeds.oiv",
                 InitialDirectory = _root
             };
@@ -317,16 +426,18 @@ namespace GTACoop.PedSelector.App
             try
             {
                 Cursor = Cursors.WaitCursor;
-                Log("Paket oluşturuluyor...");
+                Log(L.T("Building the package...", "Paket oluşturuluyor..."));
                 var path = PedOiv.Build(_packDir, dialog.FileName, Log);
-                Log("Hazır: " + path);
-                Log("Kurulum: OpenIV → Tools → Package Installer → bu .oiv dosyasını seç. " +
-                    "Kaldırma: aynı paketi OpenIV üzerinden kaldır.");
+                Log(L.T("Ready: ", "Hazır: ") + path);
+                Log(L.T("Install: OpenIV → Tools → Package Installer → select this .oiv file. " +
+                        "Remove: uninstall the same package in OpenIV.",
+                    "Kurulum: OpenIV → Tools → Package Installer → bu .oiv dosyasını seç. " +
+                    "Kaldırma: aynı paketi OpenIV üzerinden kaldır."));
             }
             catch (Exception ex)
             {
-                Log("HATA: " + ex.Message);
-                MessageBox.Show(this, ex.Message, "OIV oluşturulamadı",
+                Log(L.T("ERROR: ", "HATA: ") + ex.Message);
+                MessageBox.Show(this, ex.Message, L.T("Could not build the OIV", "OIV oluşturulamadı"),
                     MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
             finally
@@ -341,7 +452,8 @@ namespace GTACoop.PedSelector.App
         {
             using var dialog = new FolderBrowserDialog
             {
-                Description = "GTA V klasörü (GTA5.exe veya GTA5_Enhanced.exe olan klasör)"
+                Description = L.T("GTA V folder (the folder that contains GTA5.exe or GTA5_Enhanced.exe)",
+                    "GTA V klasörü (GTA5.exe veya GTA5_Enhanced.exe olan klasör)")
             };
             if (dialog.ShowDialog(this) != DialogResult.OK) return;
 
@@ -349,8 +461,10 @@ namespace GTACoop.PedSelector.App
             if (!File.Exists(Path.Combine(root, "GTA5.exe")) &&
                 !File.Exists(Path.Combine(root, "GTA5_Enhanced.exe")))
             {
-                if (MessageBox.Show(this, "GTA5.exe bulunamadı. Yine de devam edilsin mi?",
-                        "Emin misiniz?", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes)
+                if (MessageBox.Show(this,
+                        L.T("GTA5.exe was not found. Continue anyway?", "GTA5.exe bulunamadı. Yine de devam edilsin mi?"),
+                        L.T("Are you sure?", "Emin misiniz?"),
+                        MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes)
                     return;
             }
 
@@ -358,17 +472,18 @@ namespace GTACoop.PedSelector.App
             {
                 Cursor = Cursors.WaitCursor;
                 var oiv = Path.Combine(_root, "GTACoop-AddonPeds.oiv");
-                Log("Paket hazırlanıyor...");
+                Log(L.T("Preparing the package...", "Paket hazırlanıyor..."));
                 PedOiv.Build(_packDir, oiv, Log);
                 PedInstaller.Install(root, oiv, Log);
                 MessageBox.Show(this,
-                    "Kuruldu. Oyunda F10 ile ped seçebilirsiniz.\n\nKaldırmak için 'Kurulumu Kaldır'.",
-                    "Tamam", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    L.T("Installed. Press F10 in game to choose a ped.\n\nUse 'Uninstall' to remove it.",
+                        "Kuruldu. Oyunda F10 ile ped seçebilirsiniz.\n\nKaldırmak için 'Kurulumu Kaldır'."),
+                    L.T("Done", "Tamam"), MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             catch (Exception ex)
             {
-                Log("HATA: " + ex.Message);
-                MessageBox.Show(this, ex.Message, "Kurulamadı",
+                Log(L.T("ERROR: ", "HATA: ") + ex.Message);
+                MessageBox.Show(this, ex.Message, L.T("Could not install", "Kurulamadı"),
                     MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
             finally
@@ -381,11 +496,14 @@ namespace GTACoop.PedSelector.App
         {
             if (!PedInstaller.IsInstalled)
             {
-                Log("Kurulum kaydı yok; kaldırılacak bir şey bulunamadı.");
+                Log(L.T("No install record; nothing to remove.",
+                    "Kurulum kaydı yok; kaldırılacak bir şey bulunamadı."));
                 return;
             }
 
-            if (MessageBox.Show(this, "Ped modu oyundan kaldırılsın mı?", "Onay",
+            if (MessageBox.Show(this,
+                    L.T("Remove the ped mod from the game?", "Ped modu oyundan kaldırılsın mı?"),
+                    L.T("Confirm", "Onay"),
                     MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
                 return;
 
@@ -393,13 +511,13 @@ namespace GTACoop.PedSelector.App
             {
                 Cursor = Cursors.WaitCursor;
                 PedInstaller.Uninstall(Log);
-                MessageBox.Show(this, "Kaldırıldı.", "Tamam",
+                MessageBox.Show(this, L.T("Removed.", "Kaldırıldı."), L.T("Done", "Tamam"),
                     MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             catch (Exception ex)
             {
-                Log("HATA: " + ex.Message);
-                MessageBox.Show(this, ex.Message, "Kaldırılamadı",
+                Log(L.T("ERROR: ", "HATA: ") + ex.Message);
+                MessageBox.Show(this, ex.Message, L.T("Could not remove", "Kaldırılamadı"),
                     MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
             finally
@@ -420,7 +538,7 @@ namespace GTACoop.PedSelector.App
             }
             catch (Exception ex)
             {
-                Log("Klasör açılamadı: " + ex.Message);
+                Log(L.T("Could not open the folder: ", "Klasör açılamadı: ") + ex.Message);
             }
         }
     }

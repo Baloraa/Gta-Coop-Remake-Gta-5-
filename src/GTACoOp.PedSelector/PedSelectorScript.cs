@@ -245,6 +245,13 @@ namespace GTACoOp.PedSelector
             }
         }
 
+        /// <summary>Menü satırları: 0 = varsayılan karakter, son satır = geri.</summary>
+        private int RowCount => _peds.Count + 2;
+
+        private bool IsDefaultRow(int row) => row == 0;
+
+        private bool IsBackRow(int row) => row == RowCount - 1;
+
         private void OnKeyDown(object sender, KeyEventArgs e)
         {
             if (e.KeyCode == _toggleKey)
@@ -252,75 +259,120 @@ namespace GTACoOp.PedSelector
                 _menuOpen = !_menuOpen;
                 // Liste ilk açılışta boş kaldıysa (oyun içinde kurulum, geç
                 // yüklenen dosya) menü her açılışta yeniden okumayı dener.
-                if (_menuOpen && _peds.Count == 0) LoadConfig();
+                if (_menuOpen)
+                {
+                    if (_peds.Count == 0) LoadConfig();
+                    _index = 0;
+                    _scroll = 0;
+                }
                 e.SuppressKeyPress = true;
                 return;
             }
 
-            if (!_menuOpen || _peds.Count == 0) return;
+            if (!_menuOpen) return;
 
             switch (e.KeyCode)
             {
                 case Keys.Up:
-                    _index = (_index - 1 + _peds.Count) % _peds.Count;
+                    _index = (_index - 1 + RowCount) % RowCount;
                     e.SuppressKeyPress = true;
                     break;
                 case Keys.Down:
-                    _index = (_index + 1) % _peds.Count;
+                    _index = (_index + 1) % RowCount;
                     e.SuppressKeyPress = true;
                     break;
                 case Keys.Enter:
-                    Apply(_peds[_index]);
+                    SelectCurrent();
+                    e.SuppressKeyPress = true;
+                    break;
+                case Keys.Escape:
+                    // Yalnızca menüyü kapatır; pedi değiştirmez.
                     _menuOpen = false;
                     e.SuppressKeyPress = true;
                     break;
                 case Keys.Back:
-                case Keys.Escape:
-                    Restore();
-                    _menuOpen = false;
+                    // Backspace artık normal pede dönmez; yalnızca yutulur.
                     e.SuppressKeyPress = true;
                     break;
             }
+        }
+
+        private void SelectCurrent()
+        {
+            if (IsDefaultRow(_index))
+            {
+                Restore();
+                _menuOpen = false;
+                return;
+            }
+
+            if (IsBackRow(_index))
+            {
+                _menuOpen = false;
+                return;
+            }
+
+            var ped = _peds[_index - 1];
+            Apply(ped);
+            _menuOpen = false;
+        }
+
+        private string RowLabel(int row)
+        {
+            if (IsDefaultRow(row)) return "Default (normal character)";
+            if (IsBackRow(row)) return "Back";
+            var ped = _peds[row - 1];
+            return ped.Name + (ped.Kind == "animal" ? "  [animal]" : "");
         }
 
         private void OnTick(object sender, EventArgs e)
         {
             if (!_menuOpen) return;
 
-            if (_peds.Count == 0)
-            {
-                DrawText("Ped listesi boş. GTACoop-peds.txt bulunamadı.", 0.05f, 0.05f, 0.3f,
-                    System.Drawing.Color.OrangeRed);
-                DrawText(ScriptDir, 0.05f, 0.09f, 0.3f, System.Drawing.Color.Gainsboro);
-                return;
-            }
+            var rowsTotal = RowCount;
+            if (_index < 0) _index = 0;
+            if (_index >= rowsTotal) _index = rowsTotal - 1;
 
+            var rows = Math.Min(VisibleRows, rowsTotal);
+            if (_scroll > rowsTotal - rows) _scroll = rowsTotal - rows;
+            if (_scroll < 0) _scroll = 0;
             if (_index < _scroll) _scroll = _index;
-            if (_index >= _scroll + VisibleRows) _scroll = _index - VisibleRows + 1;
+            if (_index >= _scroll + rows) _scroll = _index - rows + 1;
 
             var x = 0.05f;
             var y = 0.05f;
             var width = 0.22f;
-            var rows = Math.Min(VisibleRows, _peds.Count);
             Rectangle(x, y, width, 0.035f, 20, 20, 20, 210);
-            DrawText("Ped Seçici  (" + (_index + 1) + "/" + _peds.Count + ")", x + 0.005f, y, 0.22f,
+            var position = _peds.Count == 0 ? "" : "  (" + (_index + 1) + "/" + rowsTotal + ")";
+            DrawText("Ped Selector" + position, x + 0.005f, y, 0.22f,
                 System.Drawing.Color.White);
 
             for (var row = 0; row < rows; row++)
             {
-                var ped = _peds[_scroll + row];
+                var index = _scroll + row;
                 var rowY = y + 0.04f + row * 0.026f;
-                if (_scroll + row == _index)
+                if (index == _index)
                     Rectangle(x, rowY - 0.002f, width, 0.024f, 30, 90, 40, 220);
 
-                var label = ped.Name + (ped.Kind == "animal" ? "  [hayvan]" : "");
+                var label = RowLabel(index);
+                var baseColor = IsDefaultRow(index) || IsBackRow(index)
+                    ? System.Drawing.Color.Gold
+                    : System.Drawing.Color.LightGray;
                 DrawText(label, x + 0.005f, rowY, 0.3f,
-                    _scroll + row == _index ? System.Drawing.Color.White : System.Drawing.Color.LightGray);
+                    index == _index ? System.Drawing.Color.White : baseColor);
             }
 
             var infoY = y + 0.04f + rows * 0.026f + 0.005f;
-            DrawText("ENTER uygula · BACKSPACE normal ped · F10 kapat", x, infoY, 0.24f,
+            DrawText("ENTER select · ESC / F10 close", x, infoY, 0.24f,
                 System.Drawing.Color.Gainsboro);
+
+            if (_peds.Count == 0)
+            {
+                DrawText("No peds found in GTACoop-peds.txt", x, infoY + 0.03f, 0.3f,
+                    System.Drawing.Color.OrangeRed);
+                DrawText(ScriptDir, x, infoY + 0.06f, 0.3f,
+                    System.Drawing.Color.Gainsboro);
+            }
         }
 
         private static void Apply(PedEntry ped)
