@@ -8,7 +8,7 @@ GTACoop Remake is not a new multiplayer engine. It is the desktop layer around G
 
 GTACoop Remake is for private Story Mode co-op. It does not touch GTA Online, does not bypass anti-cheat, and does not inject into online sessions.
 
-**Current release:** 2.13.1  
+**Current release:** 2.14.0  
 **Platform:** Windows 10/11, x64  
 **UI:** Turkish, English, and Russian  
 **License:** GNU GPL v3
@@ -102,6 +102,7 @@ It backs up every file it replaces under `mods/GTACoop/backups/components/<compo
 - **Voice chat** with push-to-talk. The default key is `N`; the in-game menu is under `F9 > Settings > Voice Chat`. A `[MIC]` marker appears next to the speaking player when the server bridge plugin is installed.
 - **Host-led story mission co-op.** The host selects a mission and starts it through `Pause > Game > Replay Mission`; clients receive a notification and stay in the same world. Mission objectives and cutscenes belong to the host. No save files are written and clients do not need matching save games.
 - **Low-latency profile.** Disables traffic and pedestrians and reduces streamed NPCs to four. It is a mitigation for crowded areas, not a rewrite of the synchronization engine; it does not eliminate every desync.
+- **AddonPed+ (standalone ped mod).** `src/GTACoop.PedSelector.App` builds AddonPed+, an optional add-on ped pack and in-game ped selector that needs neither the launcher nor a server. It installs its own `gtacoop_peds` DLC and a single dlclist entry, ships as an OpenIV package (`AddonPedPlus.oiv`) or a one-click installer, and uninstalls cleanly. The desktop tool is English by default with a Turkish option; the in-game menu is English and opens with `F10` (key configurable in `AddonPedPlus.ini`).
 
 ### Diagnostics and language
 
@@ -290,6 +291,37 @@ This is a tool for playing with friends, not a hardened anti-cheat or privacy sy
 
 ---
 
+### 2.13.4 – 2.14.0 — Dark WPF interface and VFS hardening
+
+- **DLC packs mount through ownership-verified junctions.** Mount/unmount, target checks and backup
+  rollback were tightened; temporary or backup folders whose ownership cannot be proven are left
+  untouched, and after a crash only the single safe backup is restored. Uninstalling no longer
+  deletes cache files; cache cleanup is a separate action.
+- **OIV content goes into OpenIV's mods layer.** There is no real-time virtualisation for OIV, ASI
+  or scripts. Details: `VFS-TEKNIK-ANALIZ-TR.md`.
+- **Collapsible side menu** with an icon-only mode and tooltips; the content area widens when the
+  menu is collapsed.
+- **Consistent dark theme:** drop-downs, disabled buttons, list rows and grid lines are dark, the
+  white strip on the right of the columns is gone, hover no longer paints rows black, and the window
+  fits the screen work area so bottom rows are not cut off.
+- Group headers and descriptions are fully readable, duplicate buttons were replaced with a single
+  row, and game status loads when its tab is opened.
+- Servers, Server Browser, Game and Components texts were translated; English and Russian dictionary
+  keys were added for the new WPF strings.
+- `tests/GTACoop.Sync.SmokeTests`: 14 checks (path safety, manifest validation, DLC junction
+  mount/unmount, symlink rejection).
+
+### 2.13.2 — WPF launcher shell
+
+- **The launcher is the WPF shell now.** Same executable name, install folder, shortcuts and
+  self-updater asset, so upgrading needs no manual steps; settings, servers, sessions and logs stay
+  in `%LOCALAPPDATA%\GTACoopRemake`.
+- **Existing tabs keep working:** server, game, P2P, HUD designer, components, Addon Peds and log
+  pages are hosted WinForms controls inside the new shell.
+- **Startup fix:** the resource dictionary defined `Muted` twice; the style is `MutedText` now.
+- Includes the 2.13.1 security work and the 13-check smoke test project. The previous WinForms
+  launcher stays buildable and the installer backs the old exe up as `GTACoop.Launcher.pre-wpf.bak`.
+
 ### 2.13.1 — Security hardening, smoke tests, WPF preparation
 
 - **Manifest path safety.** Addon manifest paths are canonicalized and validated: absolute paths,
@@ -312,7 +344,7 @@ This is a tool for playing with friends, not a hardened anti-cheat or privacy sy
 - **LAN scan finds servers on custom ports.** The local-network broadcast only tried
   4499/4498/44499, so a server on 4535 was invisible in Server Browser → LAN. The scan now
   also tries your own server's configured game port and the ports of saved servers.
-- **"Sunucumu Başlat ve Gir" button.** One click starts your server, waits for the sync port
+- **"Start My Server and Join" button.** One click starts your server, waits for the sync port
   to accept connections, adds `127.0.0.1` to the server list and connects automatically
   (with mod sync); failures stay visible in the Servers status line and the log.
 
@@ -323,8 +355,8 @@ This is a tool for playing with friends, not a hardened anti-cheat or privacy sy
   with the HUD by default ("always visible" is still available per element).
 - **Visible duration per element.** Any HUD element can be given a number of seconds; once
   it elapses the element is never drawn again in that session (0 = forever).
-- **Player join/leave alert.** Choose a PNG and a WAV/MP3 in *Arayüz Tasarımı → Oyuncu
-  giriş/çıkış bildirimi*, set how many seconds it stays, and it fades in and out at the top
+- **Player join/leave alert.** Choose a PNG and a WAV/MP3 in *Interface Designer → Player
+  join/leave notification*, set how many seconds it stays, and it fades in and out at the top
   of the screen — optional sound included, like a stream donation alert.
 - Dialogs now follow the dark theme, so labels no longer stay black on dark backgrounds.
 - Right-click any text box for Undo (Ctrl+Z), Cut, Copy, Paste and Select All.
@@ -383,7 +415,7 @@ This is a tool for playing with friends, not a hardened anti-cheat or privacy sy
   counter in the live status line (host PID, RAM limit, current RAM of both processes, restarts).
 - **Start with Windows** optionally creates a per-user logon task, and the task can be removed
   again from the same page. The host writes `logs\server-host.log` (rotated at 8 MB);
-  **Sunucu günlüğünü aç** opens it.
+  **Open server log** opens it.
 - Opening the launcher again shows the live server-mode status and reconnects to the running
   server instead of starting a second one; the launcher no longer stops the server on exit while
   server mode is enabled.
@@ -410,7 +442,7 @@ This is a tool for playing with friends, not a hardened anti-cheat or privacy sy
 
 ### 2.9.0 — Peer-to-peer mod sharing
 
-- New **P2P Paylaşım** page: share a mod folder directly with a friend over the local
+- New **P2P Sharing** page: share a mod folder directly with a friend over the local
   network, a hotspot or a VPN (Radmin/Tailscale) — no server, relay or account involved.
 - The host gets an `IP:port` code; the guest connects, sees the file list with sizes and
   downloads with per-file progress and a cancel button.
@@ -419,7 +451,7 @@ This is a tool for playing with friends, not a hardened anti-cheat or privacy sy
   changed.
 - The page can export the shared folder as a `.zip`, add the Windows firewall rule for the
   sharing port, and remembers the last code, port and folders.
-- Fixed: the "Bileşenleri Yönet..." button on the Game page and the "Sunucular" links in the
+- Fixed: the "Manage Components..." button on the Game page and the "Servers" links in the
   server browser never switched pages, because they searched the hidden TabControl instead
   of the visible page list.
 
@@ -534,7 +566,7 @@ The template behind that metadata used to be the vanilla retriever definition, w
 
 The animal menu now offers **movement** sets, not only poses. Every line is a breed — Rottweiler (Chop), Shepherd, Husky, Retriever, Pug, Westy, Poodle and cat — and it applies that breed's own movement clipset (`ROTTWEILER@MOVE`, `SHEPHERD@MOVE`, …) together with its `CREATURES@<BREED>@MOVE` clip dictionary, so the animal walks and runs the way that breed does instead of standing in a scripted pose. The clipset and dictionary names are written on each menu line.
 
-A clipset is applied only after its clip dictionary actually loads. If a breed's dictionary is missing from the installed game build, the client falls back to the rottweiler set (cat models stay on `CAT@MOVE`), logs it and says so in a notification, rather than handing the game an unknown clipset. Cat models never receive dog clipsets and dog models never receive the cat one, because the skeletons differ. Sit, bark, bite and get-up poses are still available under the *Duruş animasyonları* section. No protocol change.
+A clipset is applied only after its clip dictionary actually loads. If a breed's dictionary is missing from the installed game build, the client falls back to the rottweiler set (cat models stay on `CAT@MOVE`), logs it and says so in a notification, rather than handing the game an unknown clipset. Cat models never receive dog clipsets and dog models never receive the cat one, because the skeletons differ. Sit, bark, bite and get-up poses are still available under the *Pose animations* section. No protocol change.
 
 ## What is new in 2.7.1
 
