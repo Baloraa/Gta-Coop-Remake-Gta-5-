@@ -1,5 +1,5 @@
-﻿==========================================================
- GTACoop Remake - Friend Edition (English, v2.5.1)
+==========================================================
+ GTACoop Remake - Friend Edition (English, v2.14.0)
 ==========================================================
 
 This is a friend-to-friend co-op tool for GTA V (Story Mode).
@@ -7,146 +7,165 @@ The server owner adds mods; when you connect, they are downloaded
 and installed automatically, then removed when you exit the game.
 
 ------------------------------------------------------------------
-INSTALLATION
+NEW IN 2.14.0
+------------------------------------------------------------------
+- The launcher is a dark WPF shell now: collapsible side menu,
+  consistent dark drop-downs, buttons, lists and grid lines, and
+  the window always fits your screen work area.
+- DLC packs mount through ownership-verified junctions; mounting,
+  unmounting, target checks and backup rollback are stricter.
+  Uninstalling no longer deletes cache files; cache cleanup is a
+  separate action.
+- OIV packages are routed into OpenIV's mods layer. There is no
+  real-time virtualisation for OIV, ASI or scripts.
+- 14 smoke tests cover path safety, manifest validation, DLC
+  junction mount/unmount and symlink rejection.
+
+Optional standalone mod: AddonPed+ (own add-on ped pack and ped
+selector, works without the launcher or a server). See
+ADDONPEDPLUS-OKUBENI.txt in the AddonPed+ ZIP.
+
+------------------------------------------------------------------
+INSTALL
 ------------------------------------------------------------------
 1) Extract this folder somewhere on your PC
    (for example C:\GTACoop-Remake).
 
 2) Run GTACoop.Launcher.exe.
-   - If Windows shows an "unknown publisher" warning:
-     click "More info" -> "Run anyway" (the app is unsigned,
-     this is normal).
-   - If you get "You must install .NET", install the
-     .NET 8 Desktop Runtime:
-     https://dotnet.microsoft.com/en-us/download/dotnet/8.0
+   - If Windows shows an "unknown publisher" warning, click
+     "More info" -> "Run anyway" (the app is not code-signed).
+   - If you see "You must install .NET", install the .NET 8
+     Desktop Runtime:
+     https://dotnet.microsoft.com/download/dotnet/8.0
 
 3) In the launcher, open the "Game" tab:
-   - Click "Browse..." and select your GTA V folder
+   - Pick your GTA V folder with "Browse..."
      (the folder that contains GTA5.exe).
-   - Click "Install / Update Client".
-   - The default launch executable is PlayGTAV.exe. If you launch
+   - Press "Install / Update Client".
+   - The default launch executable is PlayGTAV.exe. If you start
      GTA5.exe directly, choose it with "Launch Path...".
 
    REQUIRED:
-   - Original GTA V (Steam/Epic/Rockstar, Story Mode)
+   - A legitimate GTA V (Steam/Epic/Rockstar, story mode)
    - Microsoft Visual C++ runtime (already present on most PCs)
 
-   Install ScriptHookV and ScriptHookVDotNet from the
-   "Components" tab by choosing a version. OpenIV.asi is bundled;
-   install it with "Components > OpenIV.asi (bundled)".
-   NativeTrainer.asi is never installed; your own scripts and mods
-   are preserved. ScriptHookV/SHVDN files are not bundled (their
-   licenses do not allow redistribution); they are downloaded only
-   when you choose them.
+   ScriptHookV and ScriptHookVDotNet can be installed from the
+   "Components" tab by choosing a version. OpenIV.asi ships with
+   the package; install it with "Components > OpenIV.asi (bundled)".
+   NativeTrainer.asi is not installed; your own scripts and mods
+   are kept. ScriptHookV/SHVDN files are not bundled for licensing
+   reasons; they are only downloaded when you ask for them.
 
-4) Open the "Servers" tab:
-   - EASIEST: ask the server owner for the SHORT CODE
-     (for example Gel.com). Click "Join with Code...", type the
-     short code and click "Add and Connect". The launcher looks
-     the server up over the internet and tries the automatic
-     relay first; if the relay cannot be established, it falls
-     back to a reachable direct address. No port forwarding or
-     Radmin VPN is required. The server must be running and you
-     need an internet connection. The server owner may choose a
-     custom relay under "My Server > Relay server"; the launcher
-     then never silently falls back to bore.pub. If the router
-     supports UPnP, the game/sync ports are opened automatically;
-     otherwise the relay keeps working.
-   - The owner may instead send a long GTC1 code. That code
-     carries the address/ports/password by itself and needs no
-     internet lookup. If it was created while the server was
-     running, it also carries the automatic relay details. If the
-     code contains a short code, the relay ports are refreshed
-     automatically when you connect. Without a short code, ask for
-     a new code after the server was restarted.
-   - Alternative: click "Add Server..." and enter the address and
-     ports given by the server owner (game port 4499 UDP,
-     sync port 4599 TCP).
-   - Click "Connect & Play". Server mods download automatically
+4) "Servers" tab:
+   - EASIEST: type the SHORT CODE the host sent you
+     (for example Gel.com) into "Join with Code..." and press
+     "Add and Connect". The launcher looks the server details up
+     over the internet and tries the automatic relay first; if the
+     relay cannot be set up it falls back to a reachable direct
+     address. No port forwarding or Radmin VPN is needed. The
+     server must be online and your internet must work. The host
+     can pick a custom relay under "My Server > Relay server"; the
+     connection then does not fall back to bore.pub. If the router
+     supports UPnP the game/sync ports are opened automatically;
+     otherwise the relay stays in use.
+   - If the host sent a long GTC1 code, paste it into the same box;
+     the long code carries the details itself. If it was created
+     while the server was online it also carries the relay info.
+     Relay ports are refreshed automatically when the code has a
+     short code. If there is no short code and the server was
+     restarted, ask for a new code.
+   - Alternative: press "Add Server" and enter the address and
+     ports the host gave you (game port 4499 UDP, sync 4599 TCP).
+   - Press "Connect & Play". Server mods download automatically
      and the game starts. Details: JOIN-WITH-CODE-EN.txt
-   - Alternative: use the "Server Browser" tab to scan the GTACoOp
-     master list, LAN, or a direct IP:port. Server name, player count,
-     mode, password, ping, and version (current/old) are shown. If the
-     server has no sync server, the game starts without mods.
-   - In-game F9 > Server Browser shows the same list and works even
-     when you launch GTA V normally, without the launcher.
+   - Alternative: use "Server Browser" to scan the GTACoOp master
+     list, the LAN or a direct IP:port. Server name, player count,
+     mode, password, ping and version (current/old) are shown.
+     If there is no sync server, the game starts without mods.
+   - The in-game F9 > Server Browser shows the same list; it works
+     even if you start the game without the launcher.
+   - Join only after the host is fully in the game; the GTACoOp
+     session becomes active once the host is in.
 
-   NOTE: if mods\update\update.rpf is near 3.9 GB or structurally
-   damaged, DLC packs are skipped for safety; script/ASI mods still
-   install. If a download is very slow or the connection drops, the
-   launcher retries and resumes where it left off. Large files use
-   2 (over 4 MB) or 4 (over 12 MB) parallel connections when the
-   server supports HTTP Range; each part resumes separately, and
-   the final file is SHA-256 verified. Same-network servers skip the
-   relay. If the problem
-   persists, send %LOCALAPPDATA%\GTACoopRemake\logs\launcher-<date>.log
-   to the server owner.
+   NOTE: if your mods\update\update.rpf is close to 3.9 GB or its
+   structure is broken, DLC packs are skipped for safety. The
+   launcher does not modify that file; script/ASI mods still
+   install. Use the launcher's "Backups" section to repair.
+
+   NOTE: on GTA V Enhanced, add-on DLC (vehicle/ped) packs cannot
+   be installed. Enhanced archives are NG encrypted, so
+   mods\update\update.rpf cannot be written; the launcher never
+   copies or changes that file. Script and ASI mods install
+   normally. Add-on DLC packs need classic (Legacy) GTA V or an
+   unencrypted (OPEN) mods copy plus RageOpenV/OpenRPF. It works on
+   FiveM because FiveM registers files in memory while the game
+   runs; Story Mode has no such path.
+
+   If downloads are slow or the connection drops, the launcher
+   retries automatically and resumes where it stopped. Large files
+   use split downloads (2 parallel connections above 4 MB, 4 above
+   12 MB) and the relay is skipped when the server is on the same
+   network. If problems persist, send
+   %LOCALAPPDATA%\GTACoopRemake\logs\launcher-<date>.log to the host.
 
 5) In game:
    - F9  : GTA Coop menu
-   - F9 > Teleport to Player: pick a player to teleport to. If that
-     player is driving, you take the first free passenger seat; if the
-     vehicle is full, you are teleported next to it instead.
+   - F9 > Teleport to Player: jump to a player from the list. If
+     that player is driving, you take the first free passenger seat;
+     if the vehicle is full you teleport next to it.
    - T   : chat
    - Z   : player list
    - N   : voice chat (push-to-talk; change it in F9 > Settings)
-   - On first join, type in chat:   /register password
-     (later sessions:               /login password)
+   - First join, in chat:  /register password
+     (later joins:        /login password)
 
 ------------------------------------------------------------------
 IMPORTANT NOTES
 ------------------------------------------------------------------
-- This tool does not touch GTA Online; it works in Story Mode only.
-- While talking, [MIC] appears to the left of your name. Change the
-  push-to-talk key in F9 > Settings > Voice Chat Key.
-- Story missions: F9 > Story Mission Co-op (Host-led). The host starts
-  the real mission from Pause > Game > Replay Mission; friends help in
-  the same world. Objectives/cutscenes are host-only, no save data is
-  written, and identical save files are not required.
-- YOUR OWN mods are never touched. If a server mod already exists
-  on your PC, it is skipped: not downloaded, not overwritten.
-- Server scripts are installed directly into scripts\; the launcher
-  never creates a wrong nested scripts\scripts\... folder.
+- This tool never touches GTA Online; it only works in Story Mode.
+- While you talk in voice chat a [MIC] marker appears next to your
+  name. Change the push-to-talk key in F9 > Settings > Voice Chat
+  Key.
+- Story missions: F9 > Story Mission Co-op (host-led). The host
+  starts the mission via Pause > Game > Replay Mission; friends
+  help in the same world. Objectives and cutscenes belong to the
+  host and no save file is written. You do not need the same save
+  game.
+- YOUR own mods are never touched. If a server mod already exists
+  on your PC it is skipped: not downloaded, not overwritten.
+- Server scripts install directly into scripts\; nested folders
+  such as scripts\scripts\... are never created.
 - Server mods are installed only while you play; they are removed
   automatically when you exit the game.
-- If the server owner disables server mods, they are not downloaded
-  or installed on your next connection; previously installed server
-  mods are removed.
-- Downloaded server files are stored per server in the program
-  folder: Servers\<server name>__<server id>\
-  (open it via "My Server" -> "Open Server Folders").
-- Files that were already downloaded are skipped on later joins.
-  If a download looks broken or incomplete, select the server in
-  the "Servers" tab and click "Re-download..." to delete and
-  download that server's files again (they are not installed
-  into the game). This is blocked while that server's mods are
-  installed in the game; use "End Session" first.
-- While a large DLC downloads, the screen shows downloaded/total
-  size and speed. If the connection drops, the download resumes
-  where it left off.
-- Your game files are not modified. The "Components" tab updates
-  only the component files you choose; changed files are backed up
-  under mods\GTACoop\backups\components first. Your own mods and
-  existing ScriptHook settings are preserved.
-- If you use a short code/automatic relay, keep GTACoop.Launcher
-  open while playing; the relay carries game traffic through the
-  launcher. You can close it after exiting the game.
-- The host must fully enter the game before friends can join;
-  the GTACoOp session becomes active once the host is in game.
-- If mods\update\update.rpf is near 3.9 GB or structurally damaged,
-  DLC packs are skipped for safety and your file is not modified.
-  Script/ASI mods still install. Use Launcher > Backups to repair
-  update.rpf if needed.
+- If the host disables mods, nothing is downloaded or installed
+  when you join, and previously installed server mods are removed.
+- Downloaded mod files are kept per server in the program folder:
+  Servers\<server name>__<server id>\ ("My Server" -> "Open Server
+  Folders" shows them).
+- Files downloaded before are not downloaded again. If a download
+  is corrupt or incomplete, select the server in "Servers" and use
+  "Re-download..."; that server's files are deleted and fetched
+  again (not installed into the game). This does not run while
+  mods are installed; use "End Session" first.
+- While a large DLC downloads you see the size and speed on
+  screen. If the connection drops the download resumes.
+- Your game files are not modified. The "Components" tab only
+  updates the component files you select; replaced files are first
+  backed up under mods\GTACoop\backups\components. Your own mods
+  and current ScriptHook settings are kept.
+- If you use a short code or the automatic relay, keep
+  GTACoop.Launcher open while playing; the relay carries the game
+  traffic through the launcher. You can close the launcher once you
+  quit the game.
 - Hosting your own server additionally requires .NET 10.
 
 ------------------------------------------------------------------
 LICENSE
 ------------------------------------------------------------------
-This package includes the GNU GPL v3 licensed open-source
-GTA Coop (GTACoOp) project and this launcher under the same
-license.
+This package contains the GNU GPL v3 licensed GTA Coop (GTACoOp)
+open-source project and the launcher under the same license.
 License text: Distribution\LICENSE.md
-Credits/readme: Distribution\ATIF-README.md
-Free to share; do not sell it commercially.
+Attribution: Distribution\ATIF-README.md
+It is free to share; it must not be sold commercially.
 
 Have fun!

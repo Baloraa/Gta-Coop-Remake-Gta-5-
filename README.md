@@ -102,7 +102,7 @@ It backs up every file it replaces under `mods/GTACoop/backups/components/<compo
 - **Voice chat** with push-to-talk. The default key is `N`; the in-game menu is under `F9 > Settings > Voice Chat`. A `[MIC]` marker appears next to the speaking player when the server bridge plugin is installed.
 - **Host-led story mission co-op.** The host selects a mission and starts it through `Pause > Game > Replay Mission`; clients receive a notification and stay in the same world. Mission objectives and cutscenes belong to the host. No save files are written and clients do not need matching save games.
 - **Low-latency profile.** Disables traffic and pedestrians and reduces streamed NPCs to four. It is a mitigation for crowded areas, not a rewrite of the synchronization engine; it does not eliminate every desync.
-- **AddonPed+ (standalone ped mod).** `src/GTACoop.PedSelector.App` builds AddonPed+, an optional add-on ped pack and in-game ped selector that needs neither the launcher nor a server. It installs its own `gtacoop_peds` DLC and a single dlclist entry, ships as an OpenIV package (`AddonPedPlus.oiv`) or a one-click installer, and uninstalls cleanly. The desktop tool is English by default with a Turkish option; the in-game menu is English and opens with `F10` (key configurable in `AddonPedPlus.ini`).
+- **AddonPed+ (standalone ped mod).** `src/GTACoop.PedSelector.App` builds AddonPed+, an optional add-on ped pack and in-game ped selector that needs neither the launcher nor a server. It installs its own `gtacoop_peds` DLC and a single dlclist entry, ships as an OpenIV package (`AddonPedPlus.oiv`) or a one-click installer, and uninstalls cleanly. The desktop tool is English by default with a Turkish option; the in-game menu is English and opens with `F10` (key configurable in `AddonPedPlus.ini`). Documentation: `ADDONPEDPLUS-OKUBENI.txt` and `PED-SELECTOR-MOD-EN.md`.
 
 ### Diagnostics and language
 
@@ -298,7 +298,7 @@ This is a tool for playing with friends, not a hardened anti-cheat or privacy sy
   untouched, and after a crash only the single safe backup is restored. Uninstalling no longer
   deletes cache files; cache cleanup is a separate action.
 - **OIV content goes into OpenIV's mods layer.** There is no real-time virtualisation for OIV, ASI
-  or scripts. Details: `VFS-TEKNIK-ANALIZ-TR.md`.
+  or scripts. Details: `VFS-ANALYSIS-EN.md` (English) / `VFS-TEKNIK-ANALIZ-TR.md` (Türkçe).
 - **Collapsible side menu** with an icon-only mode and tooltips; the content area widens when the
   menu is collapsed.
 - **Consistent dark theme:** drop-downs, disabled buttons, list rows and grid lines are dark, the

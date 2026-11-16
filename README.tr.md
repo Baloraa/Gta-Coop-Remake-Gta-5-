@@ -2,6 +2,10 @@
 
 **Türkçe** | [English](README.md)
 
+**2.14.0** - **koyu WPF arayüzü** (daraltılabilir yan menü, tutarlı koyu tema, beyaz şerit ve gri satır düzeltmeleri), **VFS/DLC sıkılaştırması** (sahipliği doğrulanan junction, güvenli yedek geri alma), **14 smoke test** ve ayrıca **AddonPed+**: launcher ve sunucudan bağımsız addon ped modu (kendi exesi, İngilizce oyun içi menüsü, OpenIV `.oiv` paketi, dlclist'te tek `gtacoop_peds` girdisi).
+
+**2.13.2** - **WPF kabuğu**: aynı exe adı, kurulum klasörü, kısayollar ve güncelleyici; sekiz sekme WinForms olarak korunuyor.
+
 2.13.1 sürümü - **güvenlik sertleştirmesi (manifest yolu, symlink, HTTPS, sabit zamanlı token), smoke testleri ve WPF hazırlığı**, 2.13.0 - **özel portlu sunucular LAN taramasında bulunuyor + "Sunucumu Başlat ve Gir" tek tuşu**, 2.12.0 - **HUD giriş/çıkış bildirimi (resim + ses), saniye cinsinden görünme süresi, F9'da resmin kaybolması, beyaz yazı ve Ctrl+Z menüsü**, 2.11.4 - **master TLS hatasında HTTP'ye düşme (sunucu tarayıcı düzeltmesi)**, 2.11.3 - **kendi sunucuna bağlanırken güncel oyun portu**, 2.11.2 - **gerçek PNG desteği ve kendi sunucuna bağlanma düzeltmesi**, **HUD görünürlük ve resim düzeltmesi**, **sunucu modu (VDS: launcher kapalıyken de çalışan sunucu, RAM sınırı)**, kendi sunucu yönetimi, otomatik mod indirme, **oturum modu**,
 **kısa kod** (ör. `Gel.com`) ile internetten sunucu bulma, **otomatik relay**,
 **UPnP doğrudan bağlantı**, **özel relay sunucusu**, **tanılama kopyalama**,
@@ -15,6 +19,36 @@ yalnızca oyun açıkken kurulu kalır, oyundan çıkınca otomatik kaldırılı
 Oyun başlatma dosyası seçilebilir; varsayılan **PlayGTAV.exe**'dir (GTA5.exe de seçilebilir).
 **Sesli sohbet** (bas-konuş, `[MIC]` göstergesi) ve **host-led hikaye görevi koordinasyonu**
 bu sürümde eklendi; ayrıntılar aşağıda.
+
+### 2.13.4 – 2.14.0 — Koyu WPF arayüzü ve VFS sıkılaştırması
+
+- **DLC paketleri sahipliği doğrulanan junction ile bağlanıyor.** mount/unmount, hedef kontrolü ve yedek
+  geri alma sıkılaştırıldı; sahipliği kanıtlanamayan geçici/yedek klasörlere dokunulmuyor ve çökme
+  sonrası tek güvenli yedek geri alınıyor. Kaldırma artık cache dosyalarını silmiyor; cache temizliği
+  ayrı bir işlem.
+- **OIV içeriği OpenIV mods katmanına yönlendiriliyor.** OIV, ASI ve scriptler için gerçek zamanlı
+  sanallaştırma yok. Ayrıntı: `VFS-TEKNIK-ANALIZ-TR.md`.
+- **Daraltılabilir yan menü:** daraltınca yalnızca simgeler ve araç ipuçları kalıyor, içerik alanı genişliyor.
+- **Tutarlı koyu tema:** açılır kutular, pasif düğmeler, liste satırları ve ızgara çizgileri koyu;
+  sütunların sağındaki beyaz şerit kapandı, üzerine gelinen satır siyah olmuyor ve pencere ekranın
+  çalışma alanına sığıyor.
+- Grup başlıkları ve açıklamalar tam okunuyor, tekrar eden düğmeler tek satıra indirildi ve oyun durumu
+  sekmesi açıldığında kendiliğinden yükleniyor.
+- Sunucular, Sunucu Tarayıcı, Oyun ve Bileşenler metinleri çevrildi; yeni WPF metinleri için İngilizce ve
+  Rusça sözlük anahtarları eklendi.
+- `tests/GTACoop.Sync.SmokeTests`: 14 test (yol güvenliği, manifest doğrulama, DLC junction
+  mount/unmount, sembolik bağ reddi).
+
+### 2.13.2 — WPF kabuğu
+
+- **Launcher artık WPF kabuğu:** aynı exe adı, aynı kurulum klasörü, aynı masaüstü/başlat menüsü
+  kısayolu ve aynı güncelleyici dosya adı, yani güncelleme ek adım gerektirmiyor. Ayarlar, sunucu
+  listesi, oturumlar ve günlükler `%LOCALAPPDATA%\GTACoopRemake` içinde kalıyor.
+- **Mevcut sekmeler çalışmaya devam ediyor:** sunucu, oyun, P2P, HUD tasarımcısı, bileşenler, Addon Peds
+  ve günlük sayfaları yeni kabuk içinde WinForms denetimleri olarak barınıyor.
+- **Açılış hatası düzeltildi:** kaynak sözlüğünde `Muted` iki kez tanımlıydı; stil artık `MutedText`.
+- 2.13.1'in güvenlik çalışmaları ve 13 kontrollü smoke test projesi dahil. Önceki WinForms launcher
+  derlenebilir kalıyor; kurulum eski exeyi `GTACoop.Launcher.pre-wpf.bak` olarak yedekliyor.
 
 ### 2.7.7 — Ped değişimi, sunucu saati ve tek oyunculu mod yöneticisi
 
@@ -914,6 +948,20 @@ Oyun sırasında geçici kurulur/bağlanır; oyundan çıkınca kaldırılır. A
 - Ücretsiz tutun; satıştan ve GTA Online'a yönelik özelliklerden kaçının.
 
 ---
+
+## AddonPed+ (bağımsız ped modu)
+
+- `src/GTACoop.PedSelector.App` projesi **AddonPed+** aracını üretir: launcher'dan ve sunucudan tamamen
+  bağımsız bir addon ped paketi ve oyun içi ped seçici.
+- Kendi DLC klasörünü (`gtacoop_peds`), kendi script dosyalarını ve dlclist içinde tek bir girdiyi ekler;
+  kaldırınca bunları geri alır. Launcher'ın Addon Peds sekmesi ve sunucu ped dağıtımı ayrı çalışmaya devam eder.
+- Kurulumun iki yolu var: araçtaki **Oyuna Kur...** ya da OpenIV için üretilen `AddonPedPlus.oiv` paketi.
+- Masaüstü arayüzü **varsayılan olarak İngilizcedir** ve düğme çubuğundaki dil seçicisiyle **Türkçeye**
+  çevrilebilir; ped ekleme, düzenleme, kaydetme ve OIV üretimi vardır.
+- Oyun içi menü İngilizcedir ve varsayılan **F10** ile açılır (tuş `scripts\AddonPedPlus.ini` içindeki
+  `MenuKey` ile değiştirilir). Listenin ilk satırı **Default (normal character)**, son satırı **Back**'tir;
+  `Esc` yalnızca menüyü kapatır, pedi değiştirmez.
+- Ayrıntılı kurulum/kaldırma: `ADDONPEDPLUS-OKUBENI.txt` (İngilizce) ve `PED-SELECTOR-MOD-TR.md` (Türkçe).
 
 ## Notlar
 

@@ -1,4 +1,6 @@
-# GTACoop Ped Selector — bağımsız addon ped modu
+﻿# AddonPed+ — bağımsız addon ped modu
+
+> İngilizce sürüm: [PED-SELECTOR-MOD-EN.md](PED-SELECTOR-MOD-EN.md)
 
 GTACoop launcher'ından ve sunucusundan **tamamen bağımsız** çalışan ped modu.
 Kendi exesi, kendi oyun içi scripti ve OpenIV ile kurulup kaldırılabilen `.oiv`
@@ -9,16 +11,16 @@ onlar olduğu gibi kalır.
 
 | Parça | Dosya | Görev |
 | --- | --- | --- |
-| Masaüstü aracı | `GTACoop.PedSelector.exe` | Ped ekle, seç, OIV üret, oyuna kur / kaldır |
-| Oyun içi script | `GTACoOp.PedSelector.dll` | Oyunda **F10** ile ped seçimi |
-| Paket | `GTACoop-AddonPeds.oiv` | OpenIV ile kurulum/kaldırma |
+| Masaüstü aracı | `AddonPed+.exe` | Ped ekle, düzenle, kaydet, OIV üret, oyuna kur / kaldır |
+| Oyun içi script | `payload\AddonPedPlus.dll` | Oyunda **F10** ile ped seçimi (İngilizce menü) |
+| Paket | `AddonPedPlus.oiv` | OpenIV ile kurulum/kaldırma |
 | DLC | `gtacoop_peds/dlc.rpf` | Ped modelleri + ped meta verisi |
 
 ## Kurulum (iki yol)
 
 ### 1) Aracın içinden
 
-1. `GTACoop.PedSelector.exe` çalıştır.
+1. `AddonPed+.exe` çalıştır.
 2. **Ped Ekle...** / **Streamed Klasör Ekle...** ile ped dosyalarını (.yft/.ydd/.ytd/.ymt) ekle.
 3. Listede istemediklerinin işaretini kaldır.
 4. **Oyuna Kur...** → GTA V klasörünü seç (içinde `GTA5.exe` veya `GTA5_Enhanced.exe` olan).
@@ -29,7 +31,7 @@ ve kendi dlclist girdisini (`gtacoop_peds`) siler; başka modlara dokunmaz.
 
 ### 2) OpenIV ile
 
-1. Araçta **OIV Oluştur...** → `GTACoop-AddonPeds.oiv` kaydet.
+1. Araçta **OIV Oluştur...** → `AddonPedPlus.oiv` kaydet.
 2. OpenIV → **Tools → Package Installer** → `.oiv` dosyasını seç → **Install**.
 3. Kaldırmak için aynı paketi OpenIV üzerinden **Uninstall** et.
 
@@ -41,10 +43,16 @@ ve kendi dlclist girdisini (`gtacoop_peds`) siler; başka modlara dokunmaz.
 ## Oyun içi kullanım
 
 - **F10**: menüyü aç/kapat
-- **Yukarı/Aşağı**: ped seç
+- **Yukarı/Aşağı**: seçimi taşı
 - **Enter**: seçili pedi uygula
-- **Backspace / Esc**: normal pede (Michael) dön
+- **Default (normal character)**: listenin ilk satırı — normal karaktere döner
+- **Back**: listenin son satırı — menüyü kapatır
+- **Esc**: yalnızca menüyü kapatır, pedi değiştirmez
+- **Backspace**: artık normal pede dönmez
 - Teşhis günlüğü: `scripts/GTACoop-pedselector.log`
+
+Arayüz dili: masaüstü araç **varsayılan İngilizce**, düğme çubuğundan **Türkçe**ye çevrilebilir;
+oyun içi menü İngilizcedir.
 
 ## Ped listesi
 
